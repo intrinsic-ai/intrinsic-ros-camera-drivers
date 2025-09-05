@@ -8,6 +8,10 @@ add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 
 find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
+
+# message("orbbec ${CMAKE_INSTALL_PREFIX}")
+set(OrbbecSDK_DIR ${CMAKE_INSTALL_PREFIX}/../OrbbecSDK/lib)
+find_package(OrbbecSDK REQUIRED)
 find_package(orbbec_camera REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
@@ -19,6 +23,7 @@ add_executable(flowstate_orbbec_node src/flowstate_orbbec_node.cpp)
 
 target_link_libraries(flowstate_orbbec_node
   rclcpp::rclcpp
+  OrbbecSDK
   ${snapshot_interfaces_TARGETS}
 )
 target_compile_definitions(flowstate_orbbec_node PUBLIC ROS_JAZZY)
