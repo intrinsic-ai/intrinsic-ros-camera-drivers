@@ -19,6 +19,7 @@ cd ros_cameras_ws/src
 git clone ssh://git@github.com/intrinsic-dev/flowstate-ros-camera-drivers
 git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/ros2/rmw_zenoh --branch 0.2.3
+git clone https://github.com/orbbec/OrbbecSDK_v2 OrbbecSDK
 git clone https://github.com/orbbec/OrbbecSDK_ROS2 --branch v2-main
 ```
 
@@ -27,6 +28,7 @@ The resulting directory structure should look like this:
 ros_cameras_ws/
 └── src
     ├── flowstate-ros-camera-drivers
+    ├── OrbbecSDK
     ├── OrbbecSDK_ROS2
     ├── rmw_zenoh
     └── sdk-ros
@@ -46,11 +48,4 @@ Finally, let's build it!
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build
-```
-
-# Orbbec
-
-```
-cd ~/ros_cameras_ws/src
-git clone https://github.com/orbbec/OrbbecSDK_ROS2.git --branch v2-main
 ```
