@@ -1,0 +1,9 @@
+# proto-file: google/protobuf/any.proto
+# proto-message: Any
+[type.googleapis.com/orbbec_driver.OrbbecDriverConfig] {
+  # If no addresses are provided, the service will automatically discover
+  # and use any Orbbec cameras that it finds.
+
+  # ip_address: "192.168.0.12"
+  # ip_address: "192.168.0.14"
+}

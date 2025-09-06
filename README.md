@@ -49,3 +49,17 @@ cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build
 ```
+
+# Orbbec details
+
+Orbbec camera models are supplied by the vendor as Xacro URDF and several STL files.
+To create a single SDF of an Orbbec camera, such as the Gemini 335 Le:
+```
+ros2 run xacro xacro ../src/OrbbecSDK_ROS2/orbbec_description/urdf/gemini335Le.urdf.xacro > orbbec_gemini_335le.urdf
+gz sdf -p orbbec_gemini_335le.urdf > orbbec_gemini_335le.sdf
+cp orbbec_gemini_335le.sdf ../install/orbbec_description/share/orbbec_description/
+gz sim ../src/flowstate-ros-camera-drivers/flowstate_orbbec/model/minimal_world.sdf
+```
+That will produce `orbec_gemini_335le/meshes/orbbec_gemini_335le.dae` which is great, but has incredible detail, and is 44 MB.
+To reduce this size drastically, load it into Blender 4.5, select "node 1", then Mesh..CleanUp..MergeByDistance, using something like 0.5mm, and export just "node 1" as a `.dae`.
+The resulting size of this operation is around 1.9 MB.

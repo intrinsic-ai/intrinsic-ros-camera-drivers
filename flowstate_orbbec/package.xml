@@ -10,6 +10,8 @@
   <depend>cv_bridge</depend>
   <depend>orbbec_camera</depend>
   <depend>snapshot_interfaces</depend>
+  <depend>OrbbecSDK</depend>
+  <depend>intrinsic_sdk_ros</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
