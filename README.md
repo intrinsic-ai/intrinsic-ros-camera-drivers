@@ -19,7 +19,6 @@ cd ros_cameras_ws/src
 git clone ssh://git@github.com/intrinsic-dev/flowstate-ros-camera-drivers
 git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/ros2/rmw_zenoh --branch 0.2.3
-git clone https://github.com/orbbec/OrbbecSDK_v2 OrbbecSDK
 git clone https://github.com/orbbec/OrbbecSDK_ROS2 --branch v2-main
 ```
 
@@ -28,7 +27,6 @@ The resulting directory structure should look like this:
 ros_cameras_ws/
 └── src
     ├── flowstate-ros-camera-drivers
-    ├── OrbbecSDK
     ├── OrbbecSDK_ROS2
     ├── rmw_zenoh
     └── sdk-ros
@@ -63,3 +61,10 @@ gz sim ../src/flowstate-ros-camera-drivers/flowstate_orbbec/model/minimal_world.
 That will produce `orbec_gemini_335le/meshes/orbbec_gemini_335le.dae` which is great, but has incredible detail, and is 44 MB.
 To reduce this size drastically, load it into Blender 4.5, select "node 1", then Mesh..CleanUp..MergeByDistance, using something like 0.5mm, and export just "node 1" as a `.dae`.
 The resulting size of this operation is around 1.9 MB.
+
+# Debugging builds
+
+Sometimes there is just too much going on in parallel, and it's hard to sift through the console traffic. This invocation builds things one-at-a-time:
+```
+colcon build --event-handlers console_direct+ --executor sequential
+```

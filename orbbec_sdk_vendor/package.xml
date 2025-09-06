@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model
+  href="http://download.ros.org/schema/package_format2.xsd"
+  schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="2">
+  <name>orbbec_sdk_vendor</name>
+  <version>0.0.1</version>
+  <description>
+    Wrapper around OrbbecSDK, which is a pure CMake project.
+  </description>
+
+  <maintainer email="morganquigley@intrinsic.ai">Morgan Quigley</maintainer>
+
+  <!-- This package has a custom license -->
+  <license>Intrinsic License</license>
+  <!-- OrbbecSDK_v2 is MIT, with some other licenses for its dependencies -->
+  <license>MIT License</license>
+
+  <author email="morganquigley@intrinsic.ai">Morgan Quigley</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_vendor_package</buildtool_depend>
+
+  <!-- <depend>something</depend> -->
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

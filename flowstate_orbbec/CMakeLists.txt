@@ -9,11 +9,9 @@ add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(orbbec_camera REQUIRED)
+find_package(orbbec_sdk_vendor REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
-
-set(OrbbecSDK_DIR ${CMAKE_INSTALL_PREFIX}/../OrbbecSDK/lib)
-find_package(OrbbecSDK REQUIRED)
 
 find_package(intrinsic_sdk_ros QUIET)
 
