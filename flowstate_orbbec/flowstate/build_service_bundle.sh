@@ -1,5 +1,5 @@
 #!/bin/bash
-if [ ! -d "src/sdk-ros" ] || [ ! -d "src/flowstate-ros-camera-drivers" ] || [ ! -d "src/OrbbecSDK" ]; then
+if [ ! -d "src/sdk-ros" ] || [ ! -d "src/flowstate-ros-camera-drivers" ]; then
   echo "This script must be run at the top of a Colcon workspace. See README for details"
   exit
 fi
