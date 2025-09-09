@@ -78,7 +78,7 @@ ARG SERVICE_NAME
 ARG DEPENDENCIES
 
 RUN apt-get update \
-    && apt-get install -y python3-protobuf libopencv-core-dev ${DEPENDENCIES} iputils-ping net-tools \
+    && apt-get install -y python3-protobuf libopencv-core-dev ${DEPENDENCIES} iputils-ping net-tools ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=overlay /opt/ros/underlay/install /opt/ros/underlay/install
