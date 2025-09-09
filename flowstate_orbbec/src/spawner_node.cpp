@@ -19,7 +19,7 @@ SpawnerNode::SpawnerNode()
              const std::shared_ptr<Discover::Request>,
              const std::shared_ptr<Discover::Response> response) {
         RCLCPP_INFO(get_logger(), "Discover service called");
-        ob::Context::setLoggerSeverity(OBLogSeverity::OB_LOG_SEVERITY_OFF);
+        // ob::Context::setLoggerSeverity(OBLogSeverity::OB_LOG_SEVERITY_OFF);
         auto context = std::make_unique<ob::Context>();
         auto list = context->queryDeviceList();
         for (size_t i = 0; i < list->deviceCount(); i++) {
