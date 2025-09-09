@@ -66,6 +66,7 @@ RUN . /opt/ros/jazzy/setup.sh \
       --event-handlers=console_direct+ \
       --merge-install \
       --executor sequential \
+      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF \
       --packages-up-to=${SERVICE_PACKAGE} \
       --packages-skip intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor
 
