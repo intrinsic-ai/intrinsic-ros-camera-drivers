@@ -12,9 +12,9 @@ namespace flowstate_orbbec {
 using snapshot_interfaces::srv::Discover;
 
 SpawnerNode::SpawnerNode()
-    : Node("flowstate_orbbec") {
+    : Node(std::string("flowstate_orbbec")) {
   discover_service_ = create_service<Discover>(
-      "/cameras/discover",
+      std::string("/cameras/discover"),
       [this](const std::shared_ptr<rmw_request_id_t>,
              const std::shared_ptr<Discover::Request>,
              const std::shared_ptr<Discover::Response> response) {
@@ -30,6 +30,7 @@ SpawnerNode::SpawnerNode()
       });
   timer_ = create_wall_timer(std::chrono::seconds(10),
                              [this]() { this->UpdateCameras(); });
+  UpdateCameras();
 }
 
 void SpawnerNode::UpdateCameras() {
@@ -50,31 +51,69 @@ void SpawnerNode::UpdateCameras() {
     if (IsAlreadySpawned(serial)) continue;
     RCLCPP_INFO(get_logger(), "Spawning it...");
 
-    const std::string node_name = std::string("orbbec_") + serial;
-    rclcpp::NodeOptions node_options =
-        rclcpp::NodeOptions()
-            .append_parameter_override(
-                rclcpp::Parameter("serial_number", serial))
-            .append_parameter_override(
-                rclcpp::Parameter("net_device_ip", ip_address));
-    nodes_.push_back(std::make_unique<orbbec_camera::OBCameraNodeDriver>(
-        node_name, "/", node_options));
+    spawned_nodes_.push_back(std::make_unique<SpawnedNode>(serial, ip_address));
+  }
+
+  // See if any camera nodes have crashed. If so, close them so we can respawn
+  for (auto node_it = spawned_nodes_.begin();
+       node_it != spawned_nodes_.end();) {
+    if ((*node_it)->exited_thread_) {
+      RCLCPP_INFO(get_logger(), "Camera %s has exited. Removing it.",
+                  (*node_it)->serial_.c_str());
+      node_it = spawned_nodes_.erase(node_it);
+    } else {
+      ++node_it;
+    }
   }
 }
 
 bool SpawnerNode::IsAlreadySpawned(const std::string& serial) const {
-  for (const auto& node : nodes_) {
-    std::string node_serial;
-    if (!node->get_parameter<std::string>(std::string("serial_number"),
-                                          node_serial)) {
-      RCLCPP_ERROR(get_logger(), "Could not get serial number of a node");
-      continue;
-    }
-    if (node_serial == serial) {
+  for (const auto& spawned_node : spawned_nodes_) {
+    if (spawned_node->serial_ == serial) {
       return true;
     }
   }
   return false;
+}
+
+SpawnedNode::SpawnedNode(const std::string& serial,
+                         const std::string& ip_address)
+    : serial_(serial), ip_address_(ip_address) {
+  const std::string node_name = std::string("orbbec_") + serial;
+  rclcpp::NodeOptions node_options =
+      rclcpp::NodeOptions()
+          .append_parameter_override(rclcpp::Parameter("serial_number", serial))
+          .append_parameter_override(
+              rclcpp::Parameter("enumerate_net_device", true));
+  //            .append_parameter_override(
+  //                rclcpp::Parameter("net_device_ip", ip_address))
+  //            .append_parameter_override(
+  //                rclcpp::Parameter("net_device_port", 8090));
+  node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(node_name, "/",
+                                                              node_options);
+  thread_ = std::thread([this]() {
+    const absl::Status status = this->main();
+    if (!status.ok()) {
+      RCLCPP_ERROR_STREAM(this->node_->get_logger(),
+                          "node thread error: " << status);
+    } else {
+      RCLCPP_INFO(this->node_->get_logger(), "exited thread");
+    }
+    exited_thread_ = true;
+  });
+}
+
+absl::Status SpawnedNode::main() {
+  RCLCPP_INFO(node_->get_logger(), "SpawnedNode::main()");
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node_->get_node_base_interface());
+  // TODO: add some other test for camera health, to exit this loop if it's bad
+  while (rclcpp::ok()) {
+    executor.spin_some();
+    // maybe do something
+    rclcpp::sleep_for(std::chrono::milliseconds(10));
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace flowstate_orbbec

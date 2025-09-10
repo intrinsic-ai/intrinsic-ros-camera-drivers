@@ -3,8 +3,10 @@
 
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "rclcpp/rclcpp.hpp"
@@ -13,6 +15,19 @@
 using snapshot_interfaces::srv::Discover;
 
 namespace flowstate_orbbec {
+
+class SpawnedNode {
+ public:
+  SpawnedNode(const std::string& serial, const std::string& ip_address);
+
+  absl::Status main();
+
+  std::string serial_;
+  std::string ip_address_;
+  std::unique_ptr<orbbec_camera::OBCameraNodeDriver> node_;
+  std::thread thread_;
+  bool exited_thread_ = false;
+};
 
 class SpawnerNode : public rclcpp::Node {
  public:
@@ -24,7 +39,7 @@ class SpawnerNode : public rclcpp::Node {
 
   mutable absl::Mutex serials_mutex_;
   std::vector<std::string> serials_;
-  std::vector<std::unique_ptr<orbbec_camera::OBCameraNodeDriver>> nodes_;
+  std::vector<std::unique_ptr<SpawnedNode>> spawned_nodes_;
 
   void UpdateCameras();
   bool IsAlreadySpawned(const std::string& serial) const;

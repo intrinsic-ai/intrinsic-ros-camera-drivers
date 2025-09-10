@@ -21,6 +21,7 @@ include_directories(include)
 add_library(flowstate_orbbec src/spawner_node.cpp)
 target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_orbbec
+  absl::status
   absl::synchronization
   rclcpp::rclcpp
   ob::OrbbecSDK
