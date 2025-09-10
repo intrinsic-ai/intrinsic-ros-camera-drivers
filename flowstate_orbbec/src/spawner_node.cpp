@@ -12,7 +12,7 @@ namespace flowstate_orbbec {
 using snapshot_interfaces::srv::Discover;
 
 SpawnerNode::SpawnerNode()
-    : Node(std::string("flowstate_orbbec")) {
+    : Node(std::string("orbbec_spawner")) {
   discover_service_ = create_service<Discover>(
       std::string("/cameras/discover"),
       [this](const std::shared_ptr<rmw_request_id_t>,
@@ -51,7 +51,7 @@ void SpawnerNode::UpdateCameras() {
     if (IsAlreadySpawned(serial)) continue;
     RCLCPP_INFO(get_logger(), "Spawning it...");
 
-    spawned_nodes_.push_back(std::make_unique<SpawnedNode>(serial, ip_address));
+    spawned_nodes_.push_back(std::make_unique<AdapterNode>(serial, ip_address));
   }
 
   // See if any camera nodes have crashed. If so, close them so we can respawn
@@ -76,37 +76,50 @@ bool SpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   return false;
 }
 
-SpawnedNode::SpawnedNode(const std::string& serial,
+AdapterNode::AdapterNode(const std::string& serial,
                          const std::string& ip_address)
-    : serial_(serial), ip_address_(ip_address) {
-  const std::string node_name = std::string("orbbec_") + serial;
-  rclcpp::NodeOptions node_options =
+    : Node(std::string("orbbec_") + serial),
+      serial_(serial),
+      ip_address_(ip_address) {
+  const std::string orbbec_node_name = std::string("orbbec_camera_node");
+  const std::string orbbec_ns = std::string("orbbec/camera_") + serial;
+  rclcpp::NodeOptions orbbec_node_options =
       rclcpp::NodeOptions()
           .append_parameter_override(rclcpp::Parameter("serial_number", serial))
           .append_parameter_override(
-              rclcpp::Parameter("enumerate_net_device", true));
+              rclcpp::Parameter("enumerate_net_device", true))
+          .append_parameter_override(
+              rclcpp::Parameter("enable_depth", false))
+          .append_parameter_override(
+              rclcpp::Parameter("enable_color", true))
+          .append_parameter_override(
+              rclcpp::Parameter("enable_ir", true));
   //            .append_parameter_override(
   //                rclcpp::Parameter("net_device_ip", ip_address))
   //            .append_parameter_override(
   //                rclcpp::Parameter("net_device_port", 8090));
-  node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(node_name, "/",
-                                                              node_options);
+  orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
+      orbbec_node_name, orbbec_ns, orbbec_node_options);
   thread_ = std::thread([this]() {
     const absl::Status status = this->main();
     if (!status.ok()) {
-      RCLCPP_ERROR_STREAM(this->node_->get_logger(),
-                          "node thread error: " << status);
+      RCLCPP_ERROR_STREAM(this->get_logger(), "node thread error: " << status);
     } else {
-      RCLCPP_INFO(this->node_->get_logger(), "exited thread");
+      RCLCPP_INFO(this->get_logger(), "exited thread");
     }
+    RCLCPP_INFO(this->get_logger(), "Destroying orbbec_camera_node...");
+    orbbec_node_.reset();
+    rclcpp::sleep_for(std::chrono::milliseconds(500));  // maybe this helps?
+    RCLCPP_INFO(this->get_logger(), "Done destroying orbbec_camera_node");
     exited_thread_ = true;
   });
 }
 
-absl::Status SpawnedNode::main() {
-  RCLCPP_INFO(node_->get_logger(), "SpawnedNode::main()");
+absl::Status AdapterNode::main() {
+  RCLCPP_INFO(get_logger(), "AdapterNode::main()");
   rclcpp::executors::SingleThreadedExecutor executor;
-  executor.add_node(node_->get_node_base_interface());
+  executor.add_node(this->get_node_base_interface());
+  executor.add_node(orbbec_node_->get_node_base_interface());
   // TODO: add some other test for camera health, to exit this loop if it's bad
   while (rclcpp::ok()) {
     executor.spin_some();

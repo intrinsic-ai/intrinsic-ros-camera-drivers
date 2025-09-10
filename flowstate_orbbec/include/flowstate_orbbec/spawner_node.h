@@ -16,15 +16,15 @@ using snapshot_interfaces::srv::Discover;
 
 namespace flowstate_orbbec {
 
-class SpawnedNode {
+class AdapterNode : public rclcpp::Node {
  public:
-  SpawnedNode(const std::string& serial, const std::string& ip_address);
+  AdapterNode(const std::string& serial, const std::string& ip_address);
 
   absl::Status main();
 
   std::string serial_;
   std::string ip_address_;
-  std::unique_ptr<orbbec_camera::OBCameraNodeDriver> node_;
+  std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
   std::thread thread_;
   bool exited_thread_ = false;
 };
@@ -39,7 +39,7 @@ class SpawnerNode : public rclcpp::Node {
 
   mutable absl::Mutex serials_mutex_;
   std::vector<std::string> serials_;
-  std::vector<std::unique_ptr<SpawnedNode>> spawned_nodes_;
+  std::vector<std::unique_ptr<AdapterNode>> spawned_nodes_;
 
   void UpdateCameras();
   bool IsAlreadySpawned(const std::string& serial) const;
