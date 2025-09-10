@@ -7,6 +7,7 @@
   <maintainer email="morganquigley@intrinsic.ai">morganquigley</maintainer>
   <license>TODO</license>
 
+  <depend>abseil_cpp_vendor</depend>
   <depend>cv_bridge</depend>
   <depend>orbbec_camera</depend>
   <depend>snapshot_interfaces</depend>
