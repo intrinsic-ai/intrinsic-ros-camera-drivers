@@ -88,16 +88,15 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(rclcpp::Parameter("serial_number", serial))
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true))
-          .append_parameter_override(
-              rclcpp::Parameter("enable_depth", false))
-          .append_parameter_override(
-              rclcpp::Parameter("enable_color", true))
-          .append_parameter_override(
-              rclcpp::Parameter("enable_ir", true));
-  //            .append_parameter_override(
-  //                rclcpp::Parameter("net_device_ip", ip_address))
-  //            .append_parameter_override(
-  //                rclcpp::Parameter("net_device_port", 8090));
+          .append_parameter_override(rclcpp::Parameter("enable_depth", false))
+          .append_parameter_override(rclcpp::Parameter("color_format", "RGB"))
+          .append_parameter_override(rclcpp::Parameter("color_width", 1280))
+          .append_parameter_override(rclcpp::Parameter("color_height", 800))
+          .append_parameter_override(rclcpp::Parameter("enable_color", true))
+          .append_parameter_override(rclcpp::Parameter("left_ir_format", "Y8"))
+          .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
+          .append_parameter_override(rclcpp::Parameter("left_ir_height", 800))
+          .append_parameter_override(rclcpp::Parameter("enable_left_ir", true));
   orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
       orbbec_node_name, orbbec_ns, orbbec_node_options);
   thread_ = std::thread([this]() {
