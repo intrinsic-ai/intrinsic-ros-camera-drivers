@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 
+find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(orbbec_camera REQUIRED)
@@ -20,6 +21,8 @@ include_directories(include)
 add_library(flowstate_orbbec src/spawner_node.cpp)
 target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_orbbec
+  absl::status
+  absl::synchronization
   rclcpp::rclcpp
   ob::OrbbecSDK
   ${snapshot_interfaces_TARGETS}
