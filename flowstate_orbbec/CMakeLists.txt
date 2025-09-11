@@ -12,6 +12,7 @@ find_package(cv_bridge REQUIRED)
 find_package(orbbec_camera REQUIRED)
 find_package(OrbbecSDK REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
 
 find_package(intrinsic_sdk_ros QUIET)
@@ -28,6 +29,7 @@ target_link_libraries(flowstate_orbbec
   absl::synchronization
   rclcpp::rclcpp
   ob::OrbbecSDK
+  ${sensor_msgs_TARGETS}
   ${snapshot_interfaces_TARGETS}
 )
 ament_target_dependencies(flowstate_orbbec
