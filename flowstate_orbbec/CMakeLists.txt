@@ -19,8 +19,8 @@ find_package(intrinsic_sdk_ros QUIET)
 include_directories(include)
 
 add_library(flowstate_orbbec
-  src/adapter_node.cpp
-  src/spawner_node.cpp
+  src/adapter_node.cc
+  src/spawner_node.cc
 )
 target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_orbbec
@@ -35,7 +35,7 @@ ament_target_dependencies(flowstate_orbbec
   orbbec_camera
 )
 
-add_executable(spawner_node src/ros_main.cpp)
+add_executable(spawner_node src/ros_main.cc)
 target_link_libraries(spawner_node flowstate_orbbec)
 
 install(TARGETS spawner_node
