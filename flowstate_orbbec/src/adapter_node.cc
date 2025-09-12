@@ -233,7 +233,7 @@ void AdapterNode::SnapshotCallback(
   depth_snapshot.image.header = depth_image_->header;
   depth_snapshot.image.height = depth_image_->height;
   depth_snapshot.image.width = depth_image_->width;
-  depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32SC1;
+  depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
   depth_snapshot.image.is_bigendian = false;
   depth_snapshot.image.step = 4 * depth_snapshot.image.width;
   depth_snapshot.image.data.resize(depth_snapshot.image.step *
