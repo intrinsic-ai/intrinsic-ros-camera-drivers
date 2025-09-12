@@ -12,19 +12,24 @@ find_package(cv_bridge REQUIRED)
 find_package(orbbec_camera REQUIRED)
 find_package(OrbbecSDK REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
 
 find_package(intrinsic_sdk_ros QUIET)
 
 include_directories(include)
 
-add_library(flowstate_orbbec src/spawner_node.cpp)
+add_library(flowstate_orbbec
+  src/adapter_node.cc
+  src/spawner_node.cc
+)
 target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_orbbec
   absl::status
   absl::synchronization
   rclcpp::rclcpp
   ob::OrbbecSDK
+  ${sensor_msgs_TARGETS}
   ${snapshot_interfaces_TARGETS}
 )
 ament_target_dependencies(flowstate_orbbec
@@ -32,7 +37,7 @@ ament_target_dependencies(flowstate_orbbec
   orbbec_camera
 )
 
-add_executable(spawner_node src/ros_main.cpp)
+add_executable(spawner_node src/ros_main.cc)
 target_link_libraries(spawner_node flowstate_orbbec)
 
 install(TARGETS spawner_node
