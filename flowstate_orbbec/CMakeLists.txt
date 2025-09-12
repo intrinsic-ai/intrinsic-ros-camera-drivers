@@ -10,6 +10,13 @@ find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(orbbec_camera REQUIRED)
+find_package(OpenCV 4 REQUIRED
+  COMPONENTS
+    opencv_core
+    opencv_imgproc
+    opencv_imgcodecs
+  CONFIG
+)
 find_package(OrbbecSDK REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -34,6 +41,7 @@ target_link_libraries(flowstate_orbbec
 )
 ament_target_dependencies(flowstate_orbbec
   cv_bridge
+  OpenCV
   orbbec_camera
 )
 

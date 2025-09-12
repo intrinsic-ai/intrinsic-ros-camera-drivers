@@ -58,9 +58,9 @@ void SpawnerNode::UpdateCameras() {
   // See if any camera nodes have crashed. If so, close them so we can respawn
   for (auto node_it = spawned_nodes_.begin();
        node_it != spawned_nodes_.end();) {
-    if ((*node_it)->exited_thread_) {
+    if ((*node_it)->HasExitedThread()) {
       RCLCPP_INFO(get_logger(), "Camera %s has exited. Removing it.",
-                  (*node_it)->serial_.c_str());
+                  (*node_it)->GetSerial().c_str());
       node_it = spawned_nodes_.erase(node_it);
     } else {
       ++node_it;
@@ -70,7 +70,7 @@ void SpawnerNode::UpdateCameras() {
 
 bool SpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   for (const auto& spawned_node : spawned_nodes_) {
-    if (spawned_node->serial_ == serial) {
+    if (spawned_node->HasSerial(serial)) {
       return true;
     }
   }
