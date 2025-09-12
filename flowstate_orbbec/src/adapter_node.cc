@@ -101,11 +101,11 @@ AdapterNode::AdapterNode(const std::string& serial,
 }
 
 std::string AdapterNode::ColorImageTopic() const {
-  return absl::StrFormat("orbbec/camera_%s/color/image_raw", serial_);
+  return absl::StrFormat("/orbbec/camera_%s/color/image_raw", serial_);
 }
 
 std::string AdapterNode::IrImageTopic() const {
-  return absl::StrFormat("orbbec/camera_%s/left_ir/image_raw", serial_);
+  return absl::StrFormat("/orbbec/camera_%s/left_ir/image_raw", serial_);
 }
 
 absl::Status AdapterNode::main() {
@@ -146,7 +146,7 @@ void AdapterNode::DescribeCallback(
 
   snapshot_interfaces::msg::SensorInfo color_info;
   color_info.sensor_name = "color";
-  color_info.topic_name = absl::StrFormat("/orbbec/camera_%s/color/image_raw", serial_);
+  color_info.topic_name = ColorImageTopic();
   color_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
   color_info.camera_t_sensor.transform.rotation.w = 1.0;  // todo: get static transform
   color_info.info.push_back(*color_camera_info_);
@@ -154,7 +154,7 @@ void AdapterNode::DescribeCallback(
 
   snapshot_interfaces::msg::SensorInfo ir_info;
   ir_info.sensor_name = "ir";
-  ir_info.topic_name = absl::StrFormat("/orbbec/camera_%s/left_ir/image_raw", serial_);
+  ir_info.topic_name = IrImageTopic();
   ir_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
   ir_info.camera_t_sensor.transform.rotation.w = 1.0;  // todo: get static transform
   ir_info.info.push_back(*ir_camera_info_);
