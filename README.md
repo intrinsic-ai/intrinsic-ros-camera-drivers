@@ -21,7 +21,6 @@ git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ..
 git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
 git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon
-git clone https://github.com/luxonis/depthai-ros --branch jazzy
 ```
 
 The resulting directory structure should look like this:
@@ -41,7 +40,7 @@ Assuming the distrobox is named `ubuntu-24-04` and that the typical [desktop ROS
 
 ```
 distrobox enter ubuntu-24-04
-sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher
+sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jazzy-depthai-ros
 ```
 
 Finally, let's build it!
@@ -64,6 +63,26 @@ gz sim ../src/flowstate-ros-camera-drivers/flowstate_orbbec/model/minimal_world.
 That will produce `orbec_gemini_335le/meshes/orbbec_gemini_335le.dae` which is great, but has incredible detail, and is 44 MB.
 To reduce this size drastically, load it into Blender 4.5, select "node 1", then Mesh..CleanUp..MergeByDistance, using something like 0.5mm, and export just "node 1" as a `.dae`.
 The resulting size of this operation is around 1.9 MB.
+
+# Luxonis
+
+Happily, Luxonis already provides a release of their software, `depthai`, for ROS Jazzy:
+```
+sudo apt install ros-jazzy-depthai-ros
+```
+
+To update the firmware:
+```
+mkdir ~/luxonis
+cd ~/luxonis
+git clone https://github.com/luxonis/depthai-python.git
+virtualenv venv
+source venv/bin/activate
+cd depthai-python/utilities
+python3 install_requirements.py
+python3 device_manager.py
+```
+Then click "Specify IP", and type the IP address, such as `192.168.1.203`
 
 # Debugging builds
 
