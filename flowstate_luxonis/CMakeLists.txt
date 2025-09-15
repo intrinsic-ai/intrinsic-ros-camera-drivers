@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 
-# find_package(abseil_cpp_vendor REQUIRED)
+find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(depthai REQUIRED VERBOSE)
@@ -19,35 +19,33 @@ find_package(depthai REQUIRED VERBOSE)
 # )
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
-# find_package(snapshot_interfaces REQUIRED)
+find_package(snapshot_interfaces REQUIRED)
 
-# find_package(intrinsic_sdk_ros QUIET)
+find_package(intrinsic_sdk_ros QUIET)
 
 include_directories(include)
 
-# add_library(flowstate_luxonis
-#   # src/adapter_node.cc
-#   src/spawner_node.cc
-# )
-# # target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
-# target_link_libraries(flowstate_luxonis
-#   absl::status
-#   absl::synchronization
-#   rclcpp::rclcpp
-#   depthai
-#   ${sensor_msgs_TARGETS}
-#   ${snapshot_interfaces_TARGETS}
-# )
-# ament_target_dependencies(flowstate_luxonis
-#   cv_bridge
-#   depthai
-#   OpenCV
-# )
+add_library(flowstate_luxonis
+  src/adapter_node.cc
+  src/spawner_node.cc
+)
+# target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
+target_link_libraries(flowstate_luxonis
+  absl::status
+  absl::synchronization
+  rclcpp::rclcpp
+  depthai::core
+  ${sensor_msgs_TARGETS}
+  ${snapshot_interfaces_TARGETS}
+)
+ament_target_dependencies(flowstate_luxonis
+  cv_bridge
+  depthai
+  OpenCV
+)
 
 add_executable(spawner_node src/ros_main.cc)
-target_link_libraries(spawner_node depthai::core)
-# target_link_libraries(spawner_node flowstate_luxonis depthai::core)
-# ament_target_dependencies(spawner_node depthai)
+target_link_libraries(spawner_node flowstate_luxonis)
 
 install(TARGETS spawner_node
         DESTINATION lib/${PROJECT_NAME}

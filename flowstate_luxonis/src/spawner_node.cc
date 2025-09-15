@@ -1,20 +1,21 @@
-#if 0
-#include "flowstate_orbbec/spawner_node.h"
+#include "flowstate_luxonis/spawner_node.h"
 
 #include <memory>
 
-#include "flowstate_orbbec/adapter_node.h"
-#include "orbbec_camera/ob_camera_node_driver.h"
+#include "depthai/device/Device.hpp"
+#include "depthai/depthai.hpp"
+// #include "flowstate_orbbec/adapter_node.h"
+// #include "orbbec_camera/ob_camera_node_driver.h"
 #include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
 #include "snapshot_interfaces/srv/discover.hpp"
 
-namespace flowstate_orbbec {
+namespace flowstate_luxonis {
 
 using snapshot_interfaces::srv::Discover;
 
 SpawnerNode::SpawnerNode()
-    : Node(std::string("orbbec_spawner")) {
+    : Node(std::string("luxonis_spawner")) {
   discover_service_ = create_service<Discover>(
       std::string("/cameras/discover"),
       [this](const std::shared_ptr<rmw_request_id_t>,
@@ -24,7 +25,7 @@ SpawnerNode::SpawnerNode()
         absl::MutexLock lock(&this->serials_mutex_);
         for (const std::string& serial : serials_) {
           snapshot_interfaces::msg::DiscoveredCamera camera;
-          camera.driver_type = "orbbec";
+          camera.driver_type = "luxonis";
           camera.camera_id = serial;
           response->cameras.push_back(camera);
         }
@@ -36,6 +37,11 @@ SpawnerNode::SpawnerNode()
 }
 
 void SpawnerNode::UpdateCameras() {
+  std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
+  RCLCPP_INFO(get_logger(), "Found %lu devices", devices.size());
+#if 0
+#endif
+#if 0
   // ob::Context::setLoggerSeverity(OBLogSeverity::OB_LOG_SEVERITY_OFF);
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();
@@ -67,16 +73,19 @@ void SpawnerNode::UpdateCameras() {
       ++node_it;
     }
   }
+#endif
 }
 
 bool SpawnerNode::IsAlreadySpawned(const std::string& serial) const {
+  return false;
+#if 0
   for (const auto& spawned_node : spawned_nodes_) {
     if (spawned_node->HasSerial(serial)) {
       return true;
     }
   }
   return false;
+#endif
 }
 
-}  // namespace flowstate_orbbec
-#endif
+}  // namespace flowstate_luxonis
