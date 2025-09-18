@@ -39,8 +39,11 @@ SpawnerNode::SpawnerNode()
 void SpawnerNode::UpdateCameras() {
   std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
   RCLCPP_INFO(get_logger(), "Found %lu devices", devices.size());
-#if 0
-#endif
+  for (const auto& device_info : devices) {
+    RCLCPP_INFO(get_logger(), "  name: %s state: %d", device_info.name.c_str(),
+                (int)device_info.state);
+  }
+
 #if 0
   // ob::Context::setLoggerSeverity(OBLogSeverity::OB_LOG_SEVERITY_OFF);
   auto context = std::make_unique<ob::Context>();
