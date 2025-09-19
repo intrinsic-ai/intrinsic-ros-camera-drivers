@@ -9,6 +9,8 @@
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
 // #include "flowstate_orbbec/adapter_node.h"
+#include <XLink/XLinkPublicDefines.h>
+
 #include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/srv/discover.hpp"
 
@@ -29,6 +31,7 @@ class SpawnerNode : public rclcpp::Node {
 
   void UpdateCameras();
   bool IsAlreadySpawned(const std::string& serial) const;
+  std::string DeviceStateToString(XLinkDeviceState_t state);
 };
 
 }  // namespace flowstate_luxonis

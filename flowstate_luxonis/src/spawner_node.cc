@@ -36,12 +36,29 @@ SpawnerNode::SpawnerNode()
   UpdateCameras();
 }
 
+std::string SpawnerNode::DeviceStateToString(XLinkDeviceState_t state) {
+  switch (state) {
+    case X_LINK_ANY_STATE:
+      return std::string("any_state");
+    case X_LINK_BOOTED:
+      return std::string("booted");
+    case X_LINK_UNBOOTED:
+      return std::string("unbooted");
+    case X_LINK_BOOTLOADER:
+      return std::string("bootloader");
+    case X_LINK_FLASH_BOOTED:
+      return std::string("flash_booted");
+    default:
+      return std::string("unknown");
+  }
+}
+
 void SpawnerNode::UpdateCameras() {
   std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
   RCLCPP_INFO(get_logger(), "Found %lu devices", devices.size());
   for (const auto& device_info : devices) {
-    RCLCPP_INFO(get_logger(), "  name: %s state: %d", device_info.name.c_str(),
-                (int)device_info.state);
+    RCLCPP_INFO(get_logger(), "  ip: %s state: %s", device_info.name.c_str(),
+                DeviceStateToString(device_info.state).c_str());
   }
 
 #if 0
