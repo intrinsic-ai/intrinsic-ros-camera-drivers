@@ -56,32 +56,22 @@ std::string SpawnerNode::DeviceStateToString(XLinkDeviceState_t state) {
 void SpawnerNode::UpdateCameras() {
   std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
   RCLCPP_INFO(get_logger(), "Found %lu devices", devices.size());
+  absl::MutexLock lock(&this->serials_mutex_);
+  serials_.clear();
   for (const auto& device_info : devices) {
-    RCLCPP_INFO(get_logger(), "  ip: %s state: %s", device_info.name.c_str(),
-                DeviceStateToString(device_info.state).c_str());
+    RCLCPP_INFO(get_logger(), "  ip: %s state: %s mxid: %s",
+                device_info.name.c_str(),
+                DeviceStateToString(device_info.state).c_str(),
+                device_info.mxid.c_str());
+    serials_.push_back(device_info.mxid);
+#if 0
+    if (IsAlreadySpawned(serial)) continue;
+    RCLCPP_INFO(get_logger(), "Spawning it...");
+    spawned_nodes_.push_back(std::make_unique<AdapterNode>(serial, ip_address));
+#endif
   }
 
 #if 0
-  // ob::Context::setLoggerSeverity(OBLogSeverity::OB_LOG_SEVERITY_OFF);
-  auto context = std::make_unique<ob::Context>();
-  auto list = context->queryDeviceList();
-  absl::MutexLock lock(&this->serials_mutex_);
-  serials_.clear();
-  for (size_t i = 0; i < list->deviceCount(); i++) {
-    if (std::string(list->getConnectionType(i)) != std::string("Ethernet")) {
-      continue;
-    }
-    std::string serial = list->serialNumber(i);
-    std::string ip_address = list->getIpAddress(i);
-    RCLCPP_INFO(get_logger(), "Found Orbbec device: %s at %s", serial.c_str(),
-                ip_address.c_str());
-    serials_.push_back(serial);
-    if (IsAlreadySpawned(serial)) continue;
-    RCLCPP_INFO(get_logger(), "Spawning it...");
-
-    spawned_nodes_.push_back(std::make_unique<AdapterNode>(serial, ip_address));
-  }
-
   // See if any camera nodes have crashed. If so, close them so we can respawn
   for (auto node_it = spawned_nodes_.begin();
        node_it != spawned_nodes_.end();) {
