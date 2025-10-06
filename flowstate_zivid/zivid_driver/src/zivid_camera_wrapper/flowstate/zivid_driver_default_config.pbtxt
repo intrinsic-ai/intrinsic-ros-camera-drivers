@@ -1,0 +1,9 @@
+# proto-file: google/protobuf/any.proto
+# proto-message: Any
+[type.googleapis.com/zivid_driver.ZividDriverConfig] {
+  # If no addresses are provided, the service will automatically discover
+  # and use any IPS2 units that it finds.
+
+  # ip_address: "172.28.60.5"
+  # ip_address: "192.168.0.14"
+}

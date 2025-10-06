@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package zivid_driver;
+
+message ZividDriverConfig {
+  repeated string file_camera_path = 1;
+
+  repeated string ip_address = 2;
+
+}
