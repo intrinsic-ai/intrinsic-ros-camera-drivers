@@ -24,9 +24,9 @@ RUN rosdep init
 
 ADD src/sdk-ros /opt/ros/underlay/src/intrinsic_sdk_ros
 
-# Install rmw_zenoh pinned at 0.2.3 from source.
+# Install a compatible fork of rmw_zenoh
 RUN cd /opt/ros/underlay/src/ \
-    && git clone https://github.com/ros2/rmw_zenoh && cd rmw_zenoh && git checkout 0.2.3 && cd ../../
+    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ../..
 
 RUN . /opt/ros/jazzy/setup.sh \
     && apt-get update \
@@ -38,7 +38,7 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
         --event-handlers=console_direct+ \
         --merge-install \
-        --packages-up-to=intrinsic_sdk_ros
+        --packages-up-to intrinsic_sdk_ros snapshot_interfaces
 
 RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
@@ -56,7 +56,9 @@ RUN apt-get update \
     && apt install -y python3-protobuf libopencv-dev nlohmann-json3-dev ${DEPENDENCIES} ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs libgl1-mesa-dev ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater \
     && rm -rf /var/lib/apt/lists/*
 
-ADD src /opt/ros/overlay/src
+ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src
+ADD src/OrbbecSDK /opt/ros/overlay/src
+ADD src/OrbbecSDK_ROS2 /opt/ros/overlay/src
 
 # skip a few packages that are already built, and are somewhat slow to process
 RUN . /opt/ros/jazzy/setup.sh \
@@ -105,7 +107,6 @@ ENV RUST_LOG=info
 
 # This zenoh_config is the same as the default, other than it connects to the
 # kubernetes-provided port which forwards to the zenoh-router:
-#   "tcp/localhost:17447"
 ENV ZENOH_CONFIG_OVERRIDE='connect/endpoints=["tcp/localhost:17447"]'
 
 CMD exec /opt/ros/overlay/install/lib/${SERVICE_PACKAGE}/flowstate_service
