@@ -147,7 +147,6 @@ void AdapterNode::DescribeCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {
-  RCLCPP_INFO(get_logger(), "AdapterNode::DescribeCallback()");
   absl::MutexLock lock(&camera_info_mutex_);
   if (!color_camera_info_ || !ir_camera_info_) {
     response->error_message = "CameraInfo not yet received from camera";
