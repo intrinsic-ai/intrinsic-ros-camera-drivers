@@ -56,9 +56,9 @@ RUN apt-get update \
     && apt install -y python3-protobuf libopencv-dev nlohmann-json3-dev ${DEPENDENCIES} ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs libgl1-mesa-dev ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater \
     && rm -rf /var/lib/apt/lists/*
 
-ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src
-ADD src/OrbbecSDK /opt/ros/overlay/src
-ADD src/OrbbecSDK_ROS2 /opt/ros/overlay/src
+ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
+ADD src/OrbbecSDK /opt/ros/overlay/src/OrbbecSDK
+ADD src/OrbbecSDK_ROS2 /opt/ros/overlay/src/OrbbecSDK_ROS2
 
 # skip a few packages that are already built, and are somewhat slow to process
 RUN . /opt/ros/jazzy/setup.sh \
