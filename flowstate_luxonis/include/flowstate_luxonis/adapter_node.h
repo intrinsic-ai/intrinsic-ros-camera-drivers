@@ -8,7 +8,7 @@
 
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
-// #include "luxonis_camera/ob_camera_node_driver.h"
+#include "depthai_ros_driver/camera.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "snapshot_interfaces/msg/image_snapshot.hpp"
@@ -52,9 +52,7 @@ class AdapterNode : public rclcpp::Node {
   std::string ip_address_;
   std::thread thread_;
   bool exited_thread_ = false;
-#if 0
-  std::unique_ptr<luxonis_camera::OBCameraNodeDriver> luxonis_node_;
-#endif
+  std::shared_ptr<depthai_ros_driver::Camera> luxonis_node_;
   rclcpp::Service<snapshot_interfaces::srv::Describe>::SharedPtr
       describe_service_;
   rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr

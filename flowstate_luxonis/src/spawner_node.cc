@@ -55,23 +55,24 @@ std::string SpawnerNode::DeviceStateToString(XLinkDeviceState_t state) {
 
 void SpawnerNode::UpdateCameras() {
   std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
-  RCLCPP_INFO(get_logger(), "Found %lu devices", devices.size());
+  if (!devices.empty()) {
+    RCLCPP_INFO(get_logger(), "Found %lu devices", devices.size());
+  }
   absl::MutexLock lock(&this->serials_mutex_);
   serials_.clear();
   for (const auto& device_info : devices) {
-    RCLCPP_INFO(get_logger(), "  ip: %s state: %s mxid: %s",
-                device_info.name.c_str(),
-                DeviceStateToString(device_info.state).c_str(),
-                device_info.mxid.c_str());
-    serials_.push_back(device_info.mxid);
-#if 0
+    const std::string ip_str(device_info.name);
+    const std::string serial(device_info.mxid);
+    const std::string state_str(DeviceStateToString(device_info.state));
+
+    RCLCPP_INFO(get_logger(), "  ip: %s state: %s mxid: %s", ip_str.c_str(),
+                state_str.c_str(), serial.c_str());
+    serials_.push_back(serial);
     if (IsAlreadySpawned(serial)) continue;
     RCLCPP_INFO(get_logger(), "Spawning it...");
-    spawned_nodes_.push_back(std::make_unique<AdapterNode>(serial, ip_address));
-#endif
+    spawned_nodes_.push_back(std::make_unique<AdapterNode>(serial, ip_str));
   }
 
-#if 0
   // See if any camera nodes have crashed. If so, close them so we can respawn
   for (auto node_it = spawned_nodes_.begin();
        node_it != spawned_nodes_.end();) {
@@ -80,22 +81,19 @@ void SpawnerNode::UpdateCameras() {
                   (*node_it)->GetSerial().c_str());
       node_it = spawned_nodes_.erase(node_it);
     } else {
+      serials_.push_back((*node_it)->GetSerial());
       ++node_it;
     }
   }
-#endif
 }
 
 bool SpawnerNode::IsAlreadySpawned(const std::string& serial) const {
-  return false;
-#if 0
   for (const auto& spawned_node : spawned_nodes_) {
     if (spawned_node->HasSerial(serial)) {
       return true;
     }
   }
   return false;
-#endif
 }
 
 }  // namespace flowstate_luxonis

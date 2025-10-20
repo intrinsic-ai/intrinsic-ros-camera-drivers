@@ -8,7 +8,7 @@
 
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
-// #include "flowstate_orbbec/adapter_node.h"
+#include "flowstate_luxonis/adapter_node.h"
 #include <XLink/XLinkPublicDefines.h>
 
 #include "rclcpp/rclcpp.hpp"
@@ -27,7 +27,7 @@ class SpawnerNode : public rclcpp::Node {
 
   mutable absl::Mutex serials_mutex_;
   std::vector<std::string> serials_;
-  // std::vector<std::unique_ptr<AdapterNode>> spawned_nodes_;
+  std::vector<std::unique_ptr<AdapterNode>> spawned_nodes_;
 
   void UpdateCameras();
   bool IsAlreadySpawned(const std::string& serial) const;

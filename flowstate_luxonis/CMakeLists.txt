@@ -10,6 +10,7 @@ find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(depthai REQUIRED VERBOSE)
+find_package(depthai_ros_driver REQUIRED VERBOSE)
 # find_package(OpenCV 4 REQUIRED
 #   COMPONENTS
 #     opencv_core
@@ -41,6 +42,7 @@ target_link_libraries(flowstate_luxonis
 ament_target_dependencies(flowstate_luxonis
   cv_bridge
   depthai
+  depthai_ros_driver
   OpenCV
 )
 

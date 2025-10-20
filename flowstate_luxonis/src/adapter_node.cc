@@ -18,12 +18,14 @@ AdapterNode::AdapterNode(const std::string& serial,
     : Node(std::string("luxonis_") + serial),
       serial_(serial),
       ip_address_(ip_address) {
-#if 0
   const std::string luxonis_node_name = std::string("luxonis_camera_node");
-  const std::string luxonis_ns = std::string("luxonis/camera_") + serial;
+  const std::string luxonis_ns = std::string("/luxonis/camera_") + serial;
   rclcpp::NodeOptions luxonis_node_options =
       rclcpp::NodeOptions()
-          .append_parameter_override(rclcpp::Parameter("serial_number", serial))
+          .arguments({"--ros-args", "-r", "__ns:=" + luxonis_ns})
+          // .append_parameter_override(rclcpp::Parameter("i_device_id", serial))
+          .append_parameter_override(rclcpp::Parameter("i_ip", ip_address));
+#if 0
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true))
           .append_parameter_override(rclcpp::Parameter("enable_depth", false))
@@ -40,8 +42,17 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
           .append_parameter_override(rclcpp::Parameter("left_ir_height", 800))
           .append_parameter_override(rclcpp::Parameter("enable_left_ir", true));
-  luxonis_node_ = std::make_unique<luxonis_camera::OBCameraNodeDriver>(
-      luxonis_node_name, luxonis_ns, luxonis_node_options);
+#endif
+  luxonis_node_ =
+      std::make_shared<depthai_ros_driver::Camera>(luxonis_node_options);
+#if 0
+  // Let it attempt to start for 5 seconds
+  RCLCPP_INFO(get_logger(), "Waiting 5 seconds for camera boot");
+  rclcpp::sleep_for(std::chrono::seconds(5));
+  RCLCPP_INFO(get_logger(), "Done waiting for camera boot");
+#endif
+
+#if 0
   color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       absl::StrFormat("luxonis/camera_%s/color/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
@@ -103,7 +114,7 @@ AdapterNode::AdapterNode(const std::string& serial,
       RCLCPP_ERROR_STREAM(this->get_logger(), "node thread error: " << status);
     }
     RCLCPP_INFO(this->get_logger(), "Destroying luxonis_camera_node...");
-    // luxonis_node_.reset();
+    luxonis_node_.reset();
     rclcpp::sleep_for(std::chrono::milliseconds(500));  // maybe this helps?
     RCLCPP_INFO(this->get_logger(), "Done destroying luxonis_camera_node");
     exited_thread_ = true;
@@ -126,7 +137,7 @@ absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main()");
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(this->get_node_base_interface());
-  // executor.add_node(luxonis_node_->get_node_base_interface());
+  executor.add_node(luxonis_node_); //->get_node_base_interface());
   // TODO: add some other tests for camera health, to exit this loop if it's bad
   t_last_color_image_ = get_clock()->now();
   while (rclcpp::ok()) {
@@ -135,10 +146,12 @@ absl::Status AdapterNode::Main() {
     rclcpp::sleep_for(std::chrono::milliseconds(10));
     {
       absl::MutexLock timeout_lock(&timeout_mutex_);
+#if 0
       if ((get_clock()->now() - t_last_color_image_).seconds() > 10.0) {
         RCLCPP_ERROR(get_logger(), "No new image arrived for 10 seconds");
         break;
       }
+#endif
     }
   }
   return absl::OkStatus();
