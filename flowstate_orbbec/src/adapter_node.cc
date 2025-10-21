@@ -8,6 +8,8 @@
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "snapshot_interfaces/msg/image_snapshot.hpp"
 
+#define SEND_DEPTH 0
+
 namespace flowstate_orbbec {
 
 using snapshot_interfaces::srv::Describe;
@@ -26,15 +28,15 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true))
           .append_parameter_override(rclcpp::Parameter("enable_depth", false))
-          .append_parameter_override(rclcpp::Parameter("color_fps", 10))
+          .append_parameter_override(rclcpp::Parameter("color_fps", 5))
           .append_parameter_override(rclcpp::Parameter("color_format", "RGB"))
           .append_parameter_override(rclcpp::Parameter("color_width", 1280))
           .append_parameter_override(rclcpp::Parameter("color_height", 800))
           .append_parameter_override(rclcpp::Parameter("enable_color", true))
-          .append_parameter_override(rclcpp::Parameter("depth_fps", 10))
+          .append_parameter_override(rclcpp::Parameter("depth_fps", 5))
           .append_parameter_override(rclcpp::Parameter("enable_depth", true))
-          .append_parameter_override(rclcpp::Parameter("right_ir_fps", 10))
-          .append_parameter_override(rclcpp::Parameter("left_ir_fps", 10))
+          .append_parameter_override(rclcpp::Parameter("right_ir_fps", 5))
+          .append_parameter_override(rclcpp::Parameter("left_ir_fps", 5))
           .append_parameter_override(rclcpp::Parameter("left_ir_format", "Y8"))
           .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
           .append_parameter_override(rclcpp::Parameter("left_ir_height", 800))
@@ -156,7 +158,7 @@ void AdapterNode::DescribeCallback(
   }
 
   snapshot_interfaces::msg::SensorInfo color_info;
-  color_info.sensor_name = "color";
+  color_info.sensor_name = "rgb";
   color_info.topic_name = ColorImageTopic();
   color_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
   color_info.camera_t_sensor.transform.rotation.w = 1.0;  // todo: get static transform
@@ -164,13 +166,14 @@ void AdapterNode::DescribeCallback(
   response->sensors.push_back(color_info);
 
   snapshot_interfaces::msg::SensorInfo ir_info;
-  ir_info.sensor_name = "ir";
+  ir_info.sensor_name = "ir_left";
   ir_info.topic_name = IrImageTopic();
   ir_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
   ir_info.camera_t_sensor.transform.rotation.w = 1.0;  // todo: get static transform
   ir_info.info.push_back(*ir_camera_info_);
   response->sensors.push_back(ir_info);
 
+#if SEND_DEPTH
   snapshot_interfaces::msg::SensorInfo depth_info;
   depth_info.sensor_name = "depth";
   depth_info.topic_name = DepthImageTopic();
@@ -178,6 +181,7 @@ void AdapterNode::DescribeCallback(
   depth_info.camera_t_sensor.transform.rotation.w = 1.0;  // todo: get static transform
   depth_info.info.push_back(*depth_camera_info_);
   response->sensors.push_back(depth_info);
+#endif
 
   response->success = true;
 }
@@ -192,11 +196,15 @@ void AdapterNode::SnapshotCallback(
   // here while waiting for the image message callbacks to be invoked.
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   snapshot_interfaces::msg::ImageSnapshot ir_snapshot;
+#if SEND_DEPTH
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
+#endif
 
   color_snapshot.topic_name = ColorImageTopic();
   ir_snapshot.topic_name = IrImageTopic();
+#if SEND_DEPTH
   depth_snapshot.topic_name = DepthImageTopic();
+#endif
 
   // Lock and copy the most recent CameraInfo messages
   {
@@ -209,7 +217,9 @@ void AdapterNode::SnapshotCallback(
     }
     color_snapshot.camera_info = *color_camera_info_;
     ir_snapshot.camera_info = *ir_camera_info_;
+#if SEND_DEPTH
     depth_snapshot.camera_info = *depth_camera_info_;
+#endif
   }
 
   // Lock and copy the most recent Image messages
@@ -227,6 +237,7 @@ void AdapterNode::SnapshotCallback(
   ir_snapshot.image = *ir_image_;
   response->images.push_back(std::move(ir_snapshot));
 
+#if SEND_DEPTH
   // The Orbbec camera returns the depth image as 16-bit images in millimeters.
   // We want to convert that to 32-bit float (meters) for Flowstate.
   depth_snapshot.image.header = depth_image_->header;
@@ -245,6 +256,7 @@ void AdapterNode::SnapshotCallback(
   depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
 
   response->images.push_back(std::move(depth_snapshot));
+#endif
 
   response->success = true;
 }
