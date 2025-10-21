@@ -4,8 +4,6 @@
 
 #include "depthai/device/Device.hpp"
 #include "depthai/depthai.hpp"
-// #include "flowstate_orbbec/adapter_node.h"
-// #include "orbbec_camera/ob_camera_node_driver.h"
 #include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
 #include "snapshot_interfaces/srv/discover.hpp"

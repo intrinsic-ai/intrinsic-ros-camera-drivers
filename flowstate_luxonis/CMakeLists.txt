@@ -30,7 +30,6 @@ add_library(flowstate_luxonis
   src/adapter_node.cc
   src/spawner_node.cc
 )
-# target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_luxonis
   absl::status
   absl::synchronization
@@ -53,36 +52,36 @@ install(TARGETS spawner_node
         DESTINATION lib/${PROJECT_NAME}
 )
 
-# if (intrinsic_sdk_ros_FOUND)
-#   message("intrinsic_sdk_ros found")
-#   intrinsic_sdk_generate_service_manifest(
-#     SERVICE_NAME orbbec_driver
-#     MANIFEST flowstate/orbbec_driver.manifest.textproto
-#     DEFAULT_CONFIGURATION flowstate/orbbec_driver_default_config.textproto
-#     PARAMETER_DESCRIPTOR flowstate/orbbec_driver_config.proto
-#     PROTOS_TARGET orbbec_driver_protos
-#   )
-#   install(FILES
-#           ${CMAKE_CURRENT_BINARY_DIR}/orbbec_driver_protos.desc
-#           ${CMAKE_CURRENT_BINARY_DIR}/service_manifest.binarypb
-#           ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
-#           DESTINATION "share/${PROJECT_NAME}"
-#   )
-#   add_executable(flowstate_service src/flowstate_service.cc)
-#   target_link_libraries(flowstate_service
-#     flowstate_orbbec
-#     intrinsic_sdk_cmake::intrinsic_sdk_cmake
-#     orbbec_driver_protos
-#     rclcpp::rclcpp
-#   )
-#   add_dependencies(flowstate_service
-#     orbbec_driver_manifest
-#     orbbec_driver_default_config
-#   )
-#   install(TARGETS flowstate_service
-#           DESTINATION lib/${PROJECT_NAME})
-# else()
-#   message("intrinsic_sdk_ros not found")
-# endif()
+if (intrinsic_sdk_ros_FOUND)
+  message("intrinsic_sdk_ros found")
+  intrinsic_sdk_generate_service_manifest(
+    SERVICE_NAME luxonis_driver
+    MANIFEST flowstate/luxonis_driver.manifest.textproto
+    DEFAULT_CONFIGURATION flowstate/luxonis_driver_default_config.textproto
+    PARAMETER_DESCRIPTOR flowstate/luxonis_driver_config.proto
+    PROTOS_TARGET luxonis_driver_protos
+  )
+  install(FILES
+          ${CMAKE_CURRENT_BINARY_DIR}/luxonis_driver_protos.desc
+          ${CMAKE_CURRENT_BINARY_DIR}/service_manifest.binarypb
+          ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
+          DESTINATION "share/${PROJECT_NAME}"
+  )
+  add_executable(flowstate_service src/flowstate_service.cc)
+  target_link_libraries(flowstate_service
+    flowstate_luxonis
+    intrinsic_sdk_cmake::intrinsic_sdk_cmake
+    luxonis_driver_protos
+    rclcpp::rclcpp
+  )
+  add_dependencies(flowstate_service
+    luxonis_driver_manifest
+    luxonis_driver_default_config
+  )
+  install(TARGETS flowstate_service
+          DESTINATION lib/${PROJECT_NAME})
+else()
+  message("intrinsic_sdk_ros not found")
+endif()
 
 ament_package()
