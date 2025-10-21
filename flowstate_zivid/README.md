@@ -43,7 +43,7 @@ sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher
 
 # Zivid details
 
-Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install Zivid Core on your computer. Zivid SDK requires an OpenCL 1.2 compatible GPU with driver. Follow this [guide](https://support.zivid.com/en/latest/getting-started/software-installation/gpu/install-opencl-drivers-ubuntu.html) to install OpenCL drivers for your system.
+Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.16.0` on your computer. `Zivid SDK` requires an OpenCL 1.2 compatible GPU with driver. Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation/gpu/install-opencl-drivers-ubuntu.html) to install OpenCL drivers for your system.
 
 Finally, let's build it!
 ```
