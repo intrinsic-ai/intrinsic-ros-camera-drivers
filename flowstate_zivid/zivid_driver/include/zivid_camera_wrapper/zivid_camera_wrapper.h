@@ -1,7 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include "snapshot_interfaces/srv/discover.hpp"
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
-// #include "zivid_driver/msg/discovered_ips_camera.hpp"
 #include <absl/status/status.h>
 #include <absl/status/statusor.h>
 #include <absl/strings/str_cat.h>
@@ -57,7 +56,6 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
 
   void refreshCameraList(const std::string & file_camera_path = "");
-  // void createCameraNodes();
   void shutdownCameraNodes();
   
   std::vector<std::shared_ptr<zivid_camera_node::ZividCamNode>> camera_nodes_;
@@ -65,7 +63,6 @@ private:
 
   std::unique_ptr<Zivid::Application> zivid_app_;
   std::vector<snapshot_interfaces::msg::DiscoveredCamera> cameras_
-  // std::vector<std::string> cameras_
     ABSL_GUARDED_BY(cameras_mutex_);
   rclcpp::Service<snapshot_interfaces::srv::Discover>::SharedPtr discover_service_;
 };

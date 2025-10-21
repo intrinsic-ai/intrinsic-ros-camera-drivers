@@ -23,15 +23,7 @@ find_package(intrinsic_sdk_ros REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(ament_cmake REQUIRED)
-# find_package(rosidl_default_generators REQUIRED)
-# find_package(intrinsic_sdk REQUIRED)
 
-# rosidl_generate_interfaces(${PROJECT_NAME}
-#     msg/DiscoveredIpsCamera.msg
-#     srv/DiscoverIpsCameras.srv
-#   )
-
-# add_subdirectory(src/listener_service)
 add_subdirectory(src/zivid_camera_wrapper)
 
 
@@ -45,16 +37,6 @@ install(
   DIRECTORY include/
   DESTINATION include
 )
-
-# add_dependencies(zivid_wrapper 
-#     zivid_driver_manifest 
-#     zivid_driver_default_config
-#   )
-# Install launch directory
-# install(
-#   DIRECTORY launch/
-#   DESTINATION share/${PROJECT_NAME}/launch
-# )
 
 # Export include directories
 ament_export_include_directories(include)

@@ -1,3 +1,5 @@
+// main ros node which will be executed in the flowstate service container
+
 #include <string>
 #include <thread>
 #include <vector>
@@ -76,12 +78,6 @@ int main(int argc, char* argv[])
     rclcpp::spin(*spawner_node);
   });
 
-  // try {
-  //     std::string camera_list = exec("ros2 service list");
-  //     RCLCPP_INFO(rclcpp::get_logger("zivid_driver_main"), "ros2 service list output:\n%s", camera_list.c_str());
-  // } catch (const std::exception& e) {
-  //     RCLCPP_ERROR(rclcpp::get_logger("zivid_driver_main"), "Failed to execute ros2 service list: %s", e.what());
-  // }
   if (spin_thread.joinable()) {
     spin_thread.join();
   }

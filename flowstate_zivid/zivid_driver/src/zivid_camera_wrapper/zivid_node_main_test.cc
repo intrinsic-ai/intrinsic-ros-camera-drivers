@@ -1,3 +1,5 @@
+// local test main node for zivid camera hardware
+
 #include <string>
 #include <thread>
 #include <vector>
@@ -19,33 +21,6 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include "flowstate/zivid_driver_config.pb.h"
-
-// intrinsic_proto::config::RuntimeContext
-// GetRuntimeContext()
-// {
-//   intrinsic_proto::config::RuntimeContext runtime_context;
-//   std::ifstream runtime_context_file;
-//   runtime_context_file.open("/etc/intrinsic/runtime_config.pb", std::ios::binary);
-//   if (!runtime_context.ParseFromIstream(&runtime_context_file)) {
-//     // Return default context for running locally
-//     std::cerr << "Warning: using default RuntimeContext\n";
-//   }
-//   return runtime_context;
-// }
-
-// void StartZenohBridge(const std::string & zenoh_router_address)
-// {
-//   // Start the zenoh bridge
-//   auto zenoh_pkg_location = ament_index_cpp::get_package_prefix("zenoh_bridge_dds");
-//   if (!zenoh_pkg_location.empty()) {
-//     std::string cmd = zenoh_pkg_location + "/lib/zenoh_bridge_dds/zenoh_bridge_dds" + \
-//       " -m client" + \
-//       " -e " + zenoh_router_address + \
-//       " --no-multicast-scouting &";
-//     std::system(cmd.c_str());
-//     RCLCPP_INFO(rclcpp::get_logger("zivid_driver_main"), "Started Zenoh bridge");
-//   }
-// }
 
 void fatal_error(const rclcpp::Logger & logger, const std::string & message)
 {
@@ -284,7 +259,6 @@ void call_depth_image_service_once(std::shared_ptr<rclcpp::Node> & client_node, 
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
   
   // Create request and call service
-  // Create request and call service
   auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
   RCLCPP_INFO(client_node->get_logger(), "Calling capture service %s...", service_name.c_str());
   
@@ -490,31 +464,6 @@ void describe(const std::string & target_node_name, const std::string& service_n
   }
 }
 
-// void connect_camera(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name)
-// {
-//   RCLCPP_INFO(client_node->get_logger(), "Attempting to connect to camera node: %s", target_node_name.c_str());
-//   auto connect_client = client_node->create_client<std_srvs::srv::Trigger>(target_node_name + "/connect");
-//   while (!connect_client->wait_for_service(std::chrono::seconds(3))) {
-//     if (!rclcpp::ok()) {
-//       fatal_error(client_node->get_logger(), "Client interrupted while waiting for service to appear.");
-//     }
-//     RCLCPP_INFO(client_node->get_logger(), "Waiting for the connect service to appear...");
-//   }
-
-//   auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-//   auto future = connect_client->async_send_request(request);
-
-//   if (rclcpp::spin_until_future_complete(client_node, future, std::chrono::seconds(40)) != rclcpp::FutureReturnCode::SUCCESS) {
-//     fatal_error(client_node->get_logger(), "Connect service call failed or timed out.");
-//   }
-//   auto response = future.get();
-//   if (!response->success) {
-//     fatal_error(client_node->get_logger(), "Failed to connect to camera: " + response->message);
-//   }
-//   RCLCPP_INFO(client_node->get_logger(), "Successfully connected to camera: %s", response->message.c_str());
-// }
-
-// Helper function to execute a command and capture its standard output.
 std::string exec(const char* cmd) {
     std::array<char, 128> buffer;
     std::string result;
@@ -532,8 +481,6 @@ std::string exec(const char* cmd) {
 int main(int argc, char** argv) 
 {
 
-  // In a Kubernetes environment, it's crucial to explicitly configure Zenoh.
-  // We'll use an environment variable to specify the router's endpoint.
   const char* zenoh_router_env = std::getenv("ZENOH_ROUTER_ENDPOINT");
   if (zenoh_router_env) {
     std::string zenoh_config_override = "connect/endpoints=[\"";
@@ -569,13 +516,6 @@ int main(int argc, char** argv)
     rclcpp::spin(*spawner_node);
   });
 
-  // try {
-  //     std::string camera_list = exec("ros2 service list");
-  //     RCLCPP_INFO(rclcpp::get_logger("zivid_driver_main"), "ros2 service list output:\n%s", camera_list.c_str());
-  // } catch (const std::exception& e) {
-  //     RCLCPP_ERROR(rclcpp::get_logger("zivid_driver_main"), "Failed to execute ros2 service list: %s", e.what());
-  // }
-
   // Give camera nodes time to start up
   std::this_thread::sleep_for(std::chrono::seconds(3));
 
@@ -602,9 +542,6 @@ int main(int argc, char** argv)
   }
 
   auto client_node = rclcpp::Node::make_shared("snapshot_client");
-
-  // Connect to the camera before attempting to capture
-  // connect_camera(client_node, target_camera_node);
 
   // RCLCPP_INFO(client_node->get_logger(), "Starting continuous snapshot mode. Press Ctrl+C to exit");
 

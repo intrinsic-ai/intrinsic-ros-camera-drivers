@@ -45,8 +45,6 @@ target_link_libraries(zivid_nodes
   absl::strings
   absl::synchronization
   zivid_camera_node
-  # zivid_driver_protos
-  # intrinsic_sdk::intrinsic_sdk
   )
 
 install(TARGETS zivid_nodes DESTINATION lib)
@@ -139,7 +137,6 @@ if(BUILD_TESTING)
       absl::synchronization
       zivid_driver_protos
       zivid_nodes
-      # intrinsic_sdk::intrinsic_sdk
       )
 
 
