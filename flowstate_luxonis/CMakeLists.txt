@@ -11,13 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(depthai REQUIRED VERBOSE)
 find_package(depthai_ros_driver REQUIRED VERBOSE)
-# find_package(OpenCV 4 REQUIRED
-#   COMPONENTS
-#     opencv_core
-#     opencv_imgproc
-#     opencv_imgcodecs
-#   CONFIG
-# )
+find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(snapshot_interfaces REQUIRED)

@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "opencv2/core.hpp"
-// #include "luxonis_camera/ob_camera_node_driver.h"
+#include "opencv2/imgproc.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "snapshot_interfaces/msg/image_snapshot.hpp"
@@ -168,8 +168,24 @@ void AdapterNode::SnapshotCallback(
     RCLCPP_ERROR(get_logger(), response->error_message.c_str());
     return;
   }
+  // The rgb.i_color_order parameter didn't seem to change the data, so we
+  // need to convert BGR->RGB here, as the Flowstate ROS Image Source can
+  // only handle rgb8, not bgr8.
+  color_snapshot.image.header = color_image_->header;
+  color_snapshot.image.height = color_image_->height;
+  color_snapshot.image.width = color_image_->width;
+  color_snapshot.image.encoding = "rgb8";
+  color_snapshot.image.is_bigendian = false;
+  color_snapshot.image.step = color_image_->step;
+  color_snapshot.image.data.resize(color_snapshot.image.width *
+                                   color_snapshot.image.step);
 
-  color_snapshot.image = *color_image_;
+  const cv::Mat bgr_image(color_image_->height, color_image_->width, CV_8UC3,
+                          color_image_->data.data(), color_image_->step);
+  cv::Mat rgb_image(color_image_->height, color_image_->width, CV_8UC3,
+                    color_snapshot.image.data.data(), color_image_->step);
+  cv::cvtColor(bgr_image, rgb_image, cv::COLOR_BGR2RGB);
+
   response->images.push_back(std::move(color_snapshot));
 
   response->success = true;
