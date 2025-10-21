@@ -62,12 +62,13 @@ ros2 run zivid_driver zivid_driver_main_test
 If everything is set, we can start to build the service container for the zivid camera:
 
 ```
-./build_service_bundle.sh
+cd ~/ros_cameras_ws
+./flowstate-ros-camera-drivers/flowstate_zivid/flowstate/build_service_bundle.sh
 ```
 
 Sideload and install the service container in flowstate:
 ```
-export SERVICE_BUNDLE=~/flowstate_ws/images/zivid_driver.bundle.tar 
+export SERVICE_BUNDLE=~/ros_cameras_ws/images/zivid_driver.bundle.tar 
 
 export INTRINSIC_ORGANIZATION=<org name>
 
