@@ -57,23 +57,15 @@ class AdapterNode : public rclcpp::Node {
       describe_service_;
   rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr
       snapshot_service_;
-#if 0
+
   mutable absl::Mutex camera_info_mutex_;
   std::unique_ptr<sensor_msgs::msg::CameraInfo> color_camera_info_;
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> ir_camera_info_;
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr color_info_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr ir_info_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_sub_;
 
   mutable absl::Mutex image_mutex_;
   std::unique_ptr<sensor_msgs::msg::Image> color_image_;
-  std::unique_ptr<sensor_msgs::msg::Image> ir_image_;
-  std::unique_ptr<sensor_msgs::msg::Image> depth_image_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_image_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr ir_image_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
-#endif
+
   mutable absl::Mutex timeout_mutex_;
   rclcpp::Time t_last_color_image_;
 };
