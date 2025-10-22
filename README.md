@@ -64,6 +64,44 @@ That will produce `orbec_gemini_335le/meshes/orbbec_gemini_335le.dae` which is g
 To reduce this size drastically, load it into Blender 4.5, select "node 1", then Mesh..CleanUp..MergeByDistance, using something like 0.5mm, and export just "node 1" as a `.dae`.
 The resulting size of this operation is around 1.9 MB.
 
+# Zivid details
+
+Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.16.0` on your computer. `Zivid SDK` requires an OpenCL 1.2 compatible GPU with driver. Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation/gpu/install-opencl-drivers-ubuntu.html) to install OpenCL drivers for your system.
+
+Finally, let's build it!
+```
+cd ~/ros_cameras_ws
+source /opt/ros/jazzy/setup.bash
+colcon build
+```
+
+To test the camera functions locally, use following command to trigger capuring.
+
+```
+source install/setup.bash
+ros2 run zivid_driver zivid_driver_main_test
+```
+
+If everything is set, we can start to build the service container for the zivid camera:
+
+```
+cd ~/ros_cameras_ws
+./flowstate-ros-camera-drivers/flowstate_zivid/flowstate/build_service_bundle.sh
+```
+
+Sideload and install the service container in flowstate:
+```
+export SERVICE_BUNDLE=~/ros_cameras_ws/images/zivid_driver.bundle.tar 
+
+export INTRINSIC_ORGANIZATION=<org name>
+
+inctl cluster list --org $INTRINSIC_ORGANIZATION
+
+export INTRINSIC_CONTEXT=<cluster id>
+
+inctl service install --org $INTRINSIC_ORGANIZATION --cluster $INTRINSIC_CONTEXT $SERVICE_BUNDLE
+```
+
 # Debugging builds
 
 Sometimes there is just too much going on in parallel, and it's hard to sift through the console traffic. This invocation builds things one-at-a-time:
