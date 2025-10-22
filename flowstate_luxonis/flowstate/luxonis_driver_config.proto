@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package luxonis_driver;
+
+message LuxonisDriverConfig {
+  repeated string ip_address = 1;
+}

@@ -4,8 +4,6 @@
 
 #include "depthai/device/Device.hpp"
 #include "depthai/depthai.hpp"
-// #include "flowstate_orbbec/adapter_node.h"
-// #include "orbbec_camera/ob_camera_node_driver.h"
 #include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
 #include "snapshot_interfaces/srv/discover.hpp"
@@ -62,7 +60,7 @@ void SpawnerNode::UpdateCameras() {
   serials_.clear();
   for (const auto& device_info : devices) {
     const std::string ip_str(device_info.name);
-    const std::string serial(device_info.mxid);
+    const std::string serial(device_info.deviceId);
     const std::string state_str(DeviceStateToString(device_info.state));
 
     RCLCPP_INFO(get_logger(), "  ip: %s state: %s mxid: %s", ip_str.c_str(),

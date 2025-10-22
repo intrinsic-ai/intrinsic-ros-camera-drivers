@@ -11,13 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(depthai REQUIRED VERBOSE)
 find_package(depthai_ros_driver REQUIRED VERBOSE)
-# find_package(OpenCV 4 REQUIRED
-#   COMPONENTS
-#     opencv_core
-#     opencv_imgproc
-#     opencv_imgcodecs
-#   CONFIG
-# )
+find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
@@ -30,7 +24,6 @@ add_library(flowstate_luxonis
   src/adapter_node.cc
   src/spawner_node.cc
 )
-# target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_luxonis
   absl::status
   absl::synchronization
@@ -45,6 +38,8 @@ ament_target_dependencies(flowstate_luxonis
   depthai_ros_driver
   OpenCV
 )
+install(TARGETS flowstate_luxonis
+        DESTINATION lib)
 
 add_executable(spawner_node src/ros_main.cc)
 target_link_libraries(spawner_node flowstate_luxonis)
@@ -53,36 +48,36 @@ install(TARGETS spawner_node
         DESTINATION lib/${PROJECT_NAME}
 )
 
-# if (intrinsic_sdk_ros_FOUND)
-#   message("intrinsic_sdk_ros found")
-#   intrinsic_sdk_generate_service_manifest(
-#     SERVICE_NAME orbbec_driver
-#     MANIFEST flowstate/orbbec_driver.manifest.textproto
-#     DEFAULT_CONFIGURATION flowstate/orbbec_driver_default_config.textproto
-#     PARAMETER_DESCRIPTOR flowstate/orbbec_driver_config.proto
-#     PROTOS_TARGET orbbec_driver_protos
-#   )
-#   install(FILES
-#           ${CMAKE_CURRENT_BINARY_DIR}/orbbec_driver_protos.desc
-#           ${CMAKE_CURRENT_BINARY_DIR}/service_manifest.binarypb
-#           ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
-#           DESTINATION "share/${PROJECT_NAME}"
-#   )
-#   add_executable(flowstate_service src/flowstate_service.cc)
-#   target_link_libraries(flowstate_service
-#     flowstate_orbbec
-#     intrinsic_sdk_cmake::intrinsic_sdk_cmake
-#     orbbec_driver_protos
-#     rclcpp::rclcpp
-#   )
-#   add_dependencies(flowstate_service
-#     orbbec_driver_manifest
-#     orbbec_driver_default_config
-#   )
-#   install(TARGETS flowstate_service
-#           DESTINATION lib/${PROJECT_NAME})
-# else()
-#   message("intrinsic_sdk_ros not found")
-# endif()
+if (intrinsic_sdk_ros_FOUND)
+  message("intrinsic_sdk_ros found")
+  intrinsic_sdk_generate_service_manifest(
+    SERVICE_NAME luxonis_driver
+    MANIFEST flowstate/luxonis_driver.manifest.textproto
+    DEFAULT_CONFIGURATION flowstate/luxonis_driver_default_config.textproto
+    PARAMETER_DESCRIPTOR flowstate/luxonis_driver_config.proto
+    PROTOS_TARGET luxonis_driver_protos
+  )
+  install(FILES
+          ${CMAKE_CURRENT_BINARY_DIR}/luxonis_driver_protos.desc
+          ${CMAKE_CURRENT_BINARY_DIR}/service_manifest.binarypb
+          ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
+          DESTINATION "share/${PROJECT_NAME}"
+  )
+  add_executable(flowstate_service src/flowstate_service.cc)
+  target_link_libraries(flowstate_service
+    flowstate_luxonis
+    intrinsic_sdk_cmake::intrinsic_sdk_cmake
+    luxonis_driver_protos
+    rclcpp::rclcpp
+  )
+  add_dependencies(flowstate_service
+    luxonis_driver_manifest
+    luxonis_driver_default_config
+  )
+  install(TARGETS flowstate_service
+          DESTINATION lib/${PROJECT_NAME})
+else()
+  message("intrinsic_sdk_ros not found")
+endif()
 
 ament_package()
