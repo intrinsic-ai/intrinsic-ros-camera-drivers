@@ -38,6 +38,8 @@ ament_target_dependencies(flowstate_luxonis
   depthai_ros_driver
   OpenCV
 )
+install(TARGETS flowstate_luxonis
+        DESTINATION lib)
 
 add_executable(spawner_node src/ros_main.cc)
 target_link_libraries(spawner_node flowstate_luxonis)

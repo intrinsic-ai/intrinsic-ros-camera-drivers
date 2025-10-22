@@ -24,30 +24,33 @@ AdapterNode::AdapterNode(const std::string& serial,
       rclcpp::NodeOptions()
           .arguments({"--ros-args", "-r", "__ns:=" + luxonis_ns})
           .append_parameter_override(
-              rclcpp::Parameter("camera.i_ip", ip_address))
+              rclcpp::Parameter("driver.i_ip", ip_address))
           .append_parameter_override(
-              rclcpp::Parameter("camera.i_laser_dot_brightness", 0))
+              rclcpp::Parameter("driver.r_laser_dot_intensity", 0.0))
           .append_parameter_override(
-              rclcpp::Parameter("camera.i_pipeline_type", "RGB"))
+              rclcpp::Parameter("driver.r_floodlight_intensity", 0.0))
           .append_parameter_override(
-              rclcpp::Parameter("camera.i_nn_type", "none"))
+              rclcpp::Parameter("pipeline_gen.i_pipeline_type", "RGB"))
+          .append_parameter_override(
+              rclcpp::Parameter("pipeline_gen.i_nn_type", "none"))
           .append_parameter_override(
               rclcpp::Parameter("pipeline_gen.i_enable_imu", false))
           .append_parameter_override(rclcpp::Parameter("rgb.i_fps", 10.0))
+          .append_parameter_override(rclcpp::Parameter("rgb.i_width", 1280))
+          .append_parameter_override(rclcpp::Parameter("rgb.i_height", 800))
           .append_parameter_override(
               rclcpp::Parameter("rgb.i_low_bandwidth", false));
   luxonis_node_ =
-      std::make_shared<depthai_ros_driver::Camera>(luxonis_node_options);
+      std::make_shared<depthai_ros_driver::Driver>(luxonis_node_options);
 
   color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
-      absl::StrFormat("luxonis/camera_%s/camera/rgb/camera_info", serial_), 2,
+      absl::StrFormat("luxonis/camera_%s/driver/rgb/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->color_camera_info_ = std::move(msg);
       });
   color_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
       ColorImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
-        // RCLCPP_INFO(this->get_logger(), "Received color image");
         {
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();
@@ -85,7 +88,7 @@ AdapterNode::AdapterNode(const std::string& serial,
 }
 
 std::string AdapterNode::ColorImageTopic() const {
-  return absl::StrFormat("/luxonis/camera_%s/camera/rgb/image_raw", serial_);
+  return absl::StrFormat("/luxonis/camera_%s/driver/rgb/image_raw", serial_);
 }
 
 absl::Status AdapterNode::Main() {
