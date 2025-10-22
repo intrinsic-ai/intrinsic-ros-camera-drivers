@@ -29,6 +29,8 @@ The resulting directory structure should look like this:
 ```
 ros_cameras_ws/
 └── src
+    ├── depthai-core
+    ├── depthai-ros
     ├── flowstate-ros-camera-drivers
     ├── OrbbecSDK
     ├── OrbbecSDK_ROS2
@@ -42,7 +44,7 @@ Assuming the distrobox is named `ubuntu-24-04` and that the typical [desktop ROS
 
 ```
 distrobox enter ubuntu-24-04
-sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jazzy-depthai-ros
+sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher
 ```
 
 Finally, let's build it!
@@ -77,11 +79,6 @@ source on Jazzy.
 colcon build --packages-up-to flowstate_luxonis --merge-install --cmake-args -DBUILD_SHARED_LIBS=ON
 ```
 
-Happily, Luxonis already provides a release of their software, `depthai`, for ROS Jazzy:
-```
-sudo apt install ros-jazzy-depthai-ros
-```
-
 ## Firmware updates
 
 To update the firmware:
@@ -95,7 +92,7 @@ cd depthai-python/utilities
 python3 install_requirements.py
 python3 device_manager.py
 ```
-Then click "Specify IP", and type the IP address, such as `192.168.1.203`
+Then click "Specify IP", and type an IP address on the local network, such as `192.168.1.203`
 
 # Debugging builds
 
