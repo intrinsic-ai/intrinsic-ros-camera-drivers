@@ -21,8 +21,8 @@ git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ..
 git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
 git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon
-git clone https://github.com/luxonis/depthai-core --branch kilted && cd depthai-core && git submodule update --init --recursive && cd ..
-git clone https://github.com/luxonis/depthai-ros --branch kilted
+git clone https://github.com/codebot/depthai-core --branch kilted && cd depthai-core && git submodule update --init --recursive && cd ..
+git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
 ```
 
 The resulting directory structure should look like this:

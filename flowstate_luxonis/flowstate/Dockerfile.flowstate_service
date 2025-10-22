@@ -38,13 +38,15 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
         --event-handlers=console_direct+ \
         --merge-install \
-        --packages-up-to intrinsic_sdk_ros snapshot_interfaces
+        --packages-up-to intrinsic_sdk_ros snapshot_interfaces \
+        --cmake-args -DBUILD_SHARED_LIBS=ON
 
 RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
         --event-handlers=console_direct+ \
         --merge-install \
-        --packages-up-to=rmw_zenoh_cpp
+        --packages-up-to=rmw_zenoh_cpp \
+        --cmake-args -DBUILD_SHARED_LIBS=ON
 
 # overlay stage: underlay + service code built
 FROM underlay AS overlay
@@ -53,8 +55,21 @@ ARG SERVICE_PACKAGE
 ARG DEPENDENCIES
 
 RUN apt-get update \
-    && apt install -y python3-protobuf libopencv-dev nlohmann-json3-dev ${DEPENDENCIES} ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs libgl1-mesa-dev ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater ros-jazzy-depthai-ros \
+    && apt install -y python3-protobuf libopencv-dev nlohmann-json3-dev ${DEPENDENCIES} ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs libgl1-mesa-dev ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater curl zip unzip tar libusb-1.0-0-dev ros-jazzy-vision-msgs ros-jazzy-ffmpeg-image-transport-msgs \
     && rm -rf /var/lib/apt/lists/*
+
+ADD src/depthai-core /opt/ros/overlay/src/depthai-core
+ADD src/depthai-ros /opt/ros/overlay/src/depthai-ros
+RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
+    && cd /opt/ros/overlay \
+    && colcon build \
+      --event-handlers=console_direct+ \
+      --merge-install \
+      --executor sequential \
+      --packages-up-to=depthai_ros_driver \
+      --packages-skip intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor \
+      --cmake-args -DBUILD_SHARED_LIBS=ON -DDEPTHAI_BOOTSTRAP_VCPKG=ON
 
 ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
 
@@ -67,7 +82,8 @@ RUN . /opt/ros/jazzy/setup.sh \
       --merge-install \
       --executor sequential \
       --packages-up-to=${SERVICE_PACKAGE} \
-      --packages-skip intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor
+      --packages-skip intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor \
+      --cmake-args -DBUILD_SHARED_LIBS=ON -DDEPTHAI_BOOTSTRAP_VCPKG=ON
 
 # result stage: base + copied install folders from the overlay + service setup
 FROM base
@@ -77,7 +93,7 @@ ARG SERVICE_NAME
 ARG DEPENDENCIES
 
 RUN apt-get update \
-    && apt-get install -y python3-protobuf libopencv-core-dev ${DEPENDENCIES} iputils-ping net-tools ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater ros-jazzy-depthai-ros \
+    && apt-get install -y python3-protobuf libopencv-core-dev ${DEPENDENCIES} iputils-ping net-tools ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater curl zip unzip tar libusb-1.0-0-dev ros-jazzy-vision-msgs ros-jazzy-ffmpeg-image-transport-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=overlay /opt/ros/underlay/install /opt/ros/underlay/install
