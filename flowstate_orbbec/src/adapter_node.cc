@@ -5,6 +5,10 @@
 #include "opencv2/core.hpp"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "rclcpp/rclcpp.hpp"
+#include "rcl_interfaces/msg/floating_point_range.hpp"
+#include "rcl_interfaces/msg/integer_range.hpp"
+#include "rcl_interfaces/msg/parameter_descriptor.hpp"
+#include "rcl_interfaces/msg/parameter_type.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "snapshot_interfaces/msg/image_snapshot.hpp"
 
@@ -46,6 +50,8 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
           .append_parameter_override(rclcpp::Parameter("left_ir_height", 800))
           .append_parameter_override(rclcpp::Parameter("enable_left_ir", true));
+  init_parameters();
+
   orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
       orbbec_node_name, orbbec_ns, orbbec_node_options);
   color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
@@ -119,6 +125,200 @@ AdapterNode::AdapterNode(const std::string& serial,
   });
 }
 
+void AdapterNode::init_parameters() {
+  set_auto_exposure_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/set_color_auto_exposure", serial_));
+  set_exposure_client_ = create_client<orbbec_camera_msgs::srv::SetInt32>(
+      absl::StrFormat("/orbbec/camera_%s/set_color_exposure", serial_));
+
+  set_auto_white_balance_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/set_auto_white_balance", serial_));
+  set_white_balance_client_ = create_client<orbbec_camera_msgs::srv::SetInt32>(
+      absl::StrFormat("/orbbec/camera_%s/set_white_balance", serial_));
+
+  set_gain_client_ = create_client<orbbec_camera_msgs::srv::SetInt32>(
+      absl::StrFormat("/orbbec/camera_%s/set_color_gain", serial_));
+
+  pre_set_parameters_callback_handle_ =
+      add_pre_set_parameters_callback(std::bind(
+          &AdapterNode::PreSetParametersCallback, this, std::placeholders::_1));
+  on_set_parameters_callback_handle_ = add_on_set_parameters_callback(std::bind(
+      &AdapterNode::SetParametersCallback, this, std::placeholders::_1));
+  post_set_parameters_callback_handle_ = add_post_set_parameters_callback(
+      std::bind(&AdapterNode::PostSetParametersCallback, this,
+                std::placeholders::_1));
+
+  rcl_interfaces::msg::ParameterDescriptor auto_exposure_descriptor;
+  auto_exposure_descriptor.name = "auto_exposure";
+  auto_exposure_descriptor.type = rclcpp::ParameterType::PARAMETER_BOOL;
+  auto_exposure_descriptor.description = "Toggle auto_exposure.";
+  auto_exposure_descriptor.read_only = false;
+  declare_parameter("auto_exposure", true, auto_exposure_descriptor);
+
+  rcl_interfaces::msg::FloatingPointRange exposure_range;
+  exposure_range.from_value = 0.0001;
+  exposure_range.to_value = 0.1;
+  exposure_range.step = 0.0001;
+  rcl_interfaces::msg::ParameterDescriptor exposure_descriptor;
+  exposure_descriptor.name = "exposure";
+  exposure_descriptor.type = rclcpp::ParameterType::PARAMETER_DOUBLE;
+  exposure_descriptor.description = "Exposure time in seconds.";
+  exposure_descriptor.read_only = false;
+  exposure_descriptor.floating_point_range.push_back(exposure_range);
+  declare_parameter("exposure", 0.01, exposure_descriptor);
+
+  rcl_interfaces::msg::ParameterDescriptor auto_white_balance_descriptor;
+  auto_white_balance_descriptor.name = "auto_white_balance";
+  auto_white_balance_descriptor.type = rclcpp::ParameterType::PARAMETER_BOOL;
+  auto_white_balance_descriptor.description = "Toggle auto_white_balance.";
+  auto_white_balance_descriptor.read_only = false;
+  declare_parameter("auto_white_balance", true, auto_white_balance_descriptor);
+
+  rcl_interfaces::msg::IntegerRange white_balance_range;
+  white_balance_range.from_value = 2800;
+  white_balance_range.to_value = 6500;
+  white_balance_range.step = 1;
+  rcl_interfaces::msg::ParameterDescriptor white_balance_descriptor;
+  white_balance_descriptor.name = "white_balance";
+  white_balance_descriptor.type = rclcpp::ParameterType::PARAMETER_INTEGER;
+  white_balance_descriptor.description = "White balance in K.";
+  white_balance_descriptor.read_only = false;
+  white_balance_descriptor.integer_range.push_back(white_balance_range);
+  declare_parameter("white_balance", 4000, white_balance_descriptor);
+
+  rcl_interfaces::msg::IntegerRange gain_range;
+  gain_range.from_value = 0;
+  gain_range.to_value = 128;
+  gain_range.step = 1;
+  rcl_interfaces::msg::ParameterDescriptor gain_descriptor;
+  gain_descriptor.name = "gain";
+  gain_descriptor.type = rclcpp::ParameterType::PARAMETER_INTEGER;
+  gain_descriptor.description = "Sensor gain";
+  gain_descriptor.read_only = false;
+  gain_descriptor.integer_range.push_back(gain_range);
+  declare_parameter("gain", 0, gain_descriptor);
+}
+
+// PreSetParametersCallback is used to add or adjust the parameter vector
+void AdapterNode::PreSetParametersCallback(
+    std::vector<rclcpp::Parameter>& parameters) {
+  const bool sets_exposure =
+      std::find_if(parameters.begin(), parameters.end(),
+                   [](const rclcpp::Parameter& param) {
+                     return param.get_name() == "exposure";
+                   }) != parameters.end();
+  const bool sets_gain =
+      std::find_if(parameters.begin(), parameters.end(),
+                   [](const rclcpp::Parameter& param) {
+                     return param.get_name() == "gain";
+                   }) != parameters.end();
+  const bool sets_auto_exposure =
+      std::find_if(parameters.begin(), parameters.end(),
+                   [](const rclcpp::Parameter& param) {
+                     return param.get_name() == "auto_exposure";
+                   }) != parameters.end();
+  if ((sets_exposure || sets_gain) && !sets_auto_exposure) {
+    parameters.insert(parameters.begin(),
+                      rclcpp::Parameter("auto_exposure", false));
+  }
+
+  // it seems white balance can't be handled this way; it always
+  // resets white balance to a known value whenever it is disabled.
+  // This probably needs to be handled by querying if auto_white_balance
+  // is set to true, and if it is, set it to false, and start a one-shot
+  // timer that will set the target white balance value after 100ms or so.
+  const bool sets_white_balance =
+      std::find_if(parameters.begin(), parameters.end(),
+                   [](const rclcpp::Parameter& param) {
+                     return param.get_name() == "white_balance";
+                   }) != parameters.end();
+  const bool sets_auto_white_balance =
+      std::find_if(parameters.begin(), parameters.end(),
+                   [](const rclcpp::Parameter& param) {
+                     return param.get_name() == "auto_white_balance";
+                   }) != parameters.end();
+  if (sets_white_balance && !sets_auto_white_balance) {
+    parameters.insert(parameters.begin(),
+                      rclcpp::Parameter("auto_white_balance", false));
+  }
+}
+
+// SetParametersCallback() is where parameter validation takes place.
+rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
+    const std::vector<rclcpp::Parameter>& parameters) {
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  for (const rclcpp::Parameter& parameter : parameters){
+    if (parameter.get_name() == "exposure") {
+      if (parameter.as_double() < 0.0001 || parameter.as_double() > 0.1) {
+        result.successful = false;
+        result.reason = "Exposure must be between 0.0001 and 0.1";
+        break;
+      }
+    } else if (parameter.get_name() == "white_balance") {
+      if (parameter.as_int() < 2800 || parameter.as_int() > 6500) {
+        result.successful = false;
+        result.reason = "White balance must be between 2800 and 6500";
+        break;
+      }
+    } else if (parameter.get_name() == "gain") {
+      if (parameter.as_int() < 0 || parameter.as_int() > 128) {
+        result.successful = false;
+        result.reason = "Gain must be between 0 and 128";
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+// PostSetParametersCallback() is where we use the validated parameters
+// in this case by forwarding them to the Orbbec Driver node.
+void AdapterNode::PostSetParametersCallback(
+    const std::vector<rclcpp::Parameter>& parameters) {
+  for (const rclcpp::Parameter& parameter : parameters){
+    // First, create a reasonable log message.
+    std::string value_str = "(type not converted to string)";
+    if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_BOOL) {
+      value_str = parameter.as_bool() ? "true" : "false";
+    } else if (parameter.get_type() ==
+               rclcpp::ParameterType::PARAMETER_DOUBLE) {
+      value_str = absl::StrFormat("%.6f", parameter.as_double());
+    } else if (parameter.get_type() ==
+               rclcpp::ParameterType::PARAMETER_INTEGER) {
+      value_str = absl::StrFormat("%d", parameter.as_int());
+    } else if (parameter.get_type() ==
+               rclcpp::ParameterType::PARAMETER_STRING) {
+      value_str = parameter.as_string();
+    }
+    RCLCPP_INFO(get_logger(), "PostSetParametersCallback: %s %s",
+                parameter.get_name().c_str(), value_str.c_str());
+
+    // Set the parameter by using the relevant service client to
+    // send an async request.
+    if (parameter.get_name() == "exposure") {
+      CallAsyncSet(set_exposure_client_,
+                   static_cast<int>(10000.0 * parameter.as_double()));
+    } else if (parameter.get_name() == "auto_exposure") {
+      CallAsyncSet(set_auto_exposure_client_, parameter.as_bool());
+    } else if (parameter.get_name() == "auto_white_balance") {
+      // This one is tricky. Only disable it if it's requested to be disabled
+      // and it is currently enabled. If it is "re-disabled" while already
+      // set to disabled, then it resets the target white balance.
+      // But we don't want it to "get stuck", if the driver reboots, so always
+      // send requests to enable it.
+      if ((parameter.as_bool() != auto_white_balance_) || parameter.as_bool()) {
+        CallAsyncSet(set_auto_white_balance_client_, parameter.as_bool(),
+                     &auto_white_balance_);
+      }
+    } else if (parameter.get_name() == "white_balance") {
+      CallAsyncSet(set_white_balance_client_, parameter.as_int());
+    } else if (parameter.get_name() == "gain") {
+      CallAsyncSet(set_gain_client_, parameter.as_int());
+    }
+  }
+}
+
 std::string AdapterNode::ColorImageTopic() const {
   return absl::StrFormat("/orbbec/camera_%s/color/image_raw", serial_);
 }
@@ -138,8 +338,8 @@ absl::Status AdapterNode::Main() {
   liveness_timer_ =
       create_wall_timer(std::chrono::seconds(1), [this, &executor]() {
         absl::MutexLock timeout_lock(&timeout_mutex_);
-        if ((get_clock()->now() - t_last_color_image_).seconds() > 20.0) {
-          RCLCPP_ERROR(get_logger(), "No new image arrived for 20 seconds");
+        if ((get_clock()->now() - t_last_color_image_).seconds() > 30.0) {
+          RCLCPP_ERROR(get_logger(), "No new image arrived for 30 seconds");
           executor.cancel();
         }
       });
