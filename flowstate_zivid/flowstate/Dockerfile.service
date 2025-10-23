@@ -29,9 +29,9 @@ ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 # underlay stage: base + dependencies built
 FROM base AS underlay
 
-ADD src/sdk-ros /opt/ros/underlay/src/intrinsic_sdk_ros
-
-ADD src/flowstate_zivid /opt/ros/underlay/src/zivid-ros
+ADD src/zivid-ros /opt/ros/underlay/src/zivid-ros
+ADD src/flowstate-ros-camera-drivers /opt/ros/underlay/src/flowstate-ros-camera-drivers
+ADD src/sdk-ros /opt/ros/underlay/src/sdk-ros
 
 # Install build dependencies. Use ocl-icd-libopencl1 for NVIDIA compatibility.
 RUN . /opt/ros/jazzy/setup.sh && \
@@ -72,9 +72,9 @@ RUN apt-get update && apt-get install -y wget && \
 # Set LD_LIBRARY_PATH to include NVIDIA libraries for OpenCL discovery during build
 ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
-
+# install rmw_zenoh
 RUN cd /opt/ros/underlay/src/ \
-    && git clone https://github.com/ros2/rmw_zenoh && cd rmw_zenoh && git checkout 0.2.3 && cd ../../
+    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ../..
 
 RUN . /opt/ros/jazzy/setup.sh \
     && apt-get update \
@@ -132,7 +132,6 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 COPY --from=ros:jazzy /ros_entrypoint.sh /ros_entrypoint.sh
-
 RUN apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get update \

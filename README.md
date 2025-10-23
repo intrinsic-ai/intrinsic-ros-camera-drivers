@@ -64,6 +64,14 @@ That will produce `orbec_gemini_335le/meshes/orbbec_gemini_335le.dae` which is g
 To reduce this size drastically, load it into Blender 4.5, select "node 1", then Mesh..CleanUp..MergeByDistance, using something like 0.5mm, and export just "node 1" as a `.dae`.
 The resulting size of this operation is around 1.9 MB.
 
+# Debugging builds
+
+Sometimes there is just too much going on in parallel, and it's hard to sift through the console traffic. This invocation builds things one-at-a-time:
+```
+colcon build --event-handlers console_direct+ --executor sequential
+```
+
+
 # Zivid details
 
 Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.16.0` on your computer. `Zivid SDK` requires an OpenCL 1.2 compatible GPU with driver. Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation/gpu/install-opencl-drivers-ubuntu.html) to install OpenCL drivers for your system.
@@ -100,11 +108,4 @@ inctl cluster list --org $INTRINSIC_ORGANIZATION
 export INTRINSIC_CONTEXT=<cluster id>
 
 inctl service install --org $INTRINSIC_ORGANIZATION --cluster $INTRINSIC_CONTEXT $SERVICE_BUNDLE
-```
-
-# Debugging builds
-
-Sometimes there is just too much going on in parallel, and it's hard to sift through the console traffic. This invocation builds things one-at-a-time:
-```
-colcon build --event-handlers console_direct+ --executor sequential
 ```
