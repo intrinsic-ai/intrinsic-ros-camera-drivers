@@ -28,15 +28,20 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true))
           .append_parameter_override(rclcpp::Parameter("enable_depth", false))
-          .append_parameter_override(rclcpp::Parameter("color_fps", 5))
+          .append_parameter_override(rclcpp::Parameter("color_fps", 10))
           .append_parameter_override(rclcpp::Parameter("color_format", "RGB"))
           .append_parameter_override(rclcpp::Parameter("color_width", 1280))
           .append_parameter_override(rclcpp::Parameter("color_height", 800))
+          .append_parameter_override(rclcpp::Parameter("color_sharpness", 75))
           .append_parameter_override(rclcpp::Parameter("enable_color", true))
-          .append_parameter_override(rclcpp::Parameter("depth_fps", 5))
+#if SEND_DEPTH
+          .append_parameter_override(rclcpp::Parameter("depth_fps", 10))
+          .append_parameter_override(rclcpp::Parameter("right_ir_fps", 10))
           .append_parameter_override(rclcpp::Parameter("enable_depth", true))
-          .append_parameter_override(rclcpp::Parameter("right_ir_fps", 5))
-          .append_parameter_override(rclcpp::Parameter("left_ir_fps", 5))
+#else
+          .append_parameter_override(rclcpp::Parameter("enable_depth", false))
+#endif
+          .append_parameter_override(rclcpp::Parameter("left_ir_fps", 10))
           .append_parameter_override(rclcpp::Parameter("left_ir_format", "Y8"))
           .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
           .append_parameter_override(rclcpp::Parameter("left_ir_height", 800))
@@ -55,12 +60,14 @@ AdapterNode::AdapterNode(const std::string& serial,
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->ir_camera_info_ = std::move(msg);
       });
+#if SEND_DEPTH
   depth_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       absl::StrFormat("orbbec/camera_%s/depth/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->depth_camera_info_ = std::move(msg);
       });
+#endif
   color_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
       ColorImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
         // RCLCPP_INFO(this->get_logger(), "Received color image");
@@ -76,11 +83,13 @@ AdapterNode::AdapterNode(const std::string& serial,
         absl::MutexLock lock(&this->image_mutex_);
         this->ir_image_ = std::move(msg);
       });
+#if SEND_DEPTH
   depth_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
       DepthImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
         absl::MutexLock lock(&this->image_mutex_);
         this->depth_image_ = std::move(msg);
       });
+#endif
 
   describe_service_ = create_service<Describe>(
       "~/describe",
@@ -124,23 +133,20 @@ std::string AdapterNode::DepthImageTopic() const {
 
 absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main()");
+  t_last_color_image_ = get_clock()->now();
   rclcpp::executors::SingleThreadedExecutor executor;
+  liveness_timer_ =
+      create_wall_timer(std::chrono::seconds(1), [this, &executor]() {
+        absl::MutexLock timeout_lock(&timeout_mutex_);
+        if ((get_clock()->now() - t_last_color_image_).seconds() > 20.0) {
+          RCLCPP_ERROR(get_logger(), "No new image arrived for 20 seconds");
+          executor.cancel();
+        }
+      });
+
   executor.add_node(this->get_node_base_interface());
   executor.add_node(orbbec_node_->get_node_base_interface());
-  // TODO: add some other tests for camera health, to exit this loop if it's bad
-  t_last_color_image_ = get_clock()->now();
-  while (rclcpp::ok()) {
-    executor.spin_some();  // todo: something smarter
-    // maybe do something
-    rclcpp::sleep_for(std::chrono::milliseconds(10));
-    {
-      absl::MutexLock timeout_lock(&timeout_mutex_);
-      if ((get_clock()->now() - t_last_color_image_).seconds() > 10.0) {
-        RCLCPP_ERROR(get_logger(), "No new image arrived for 10 seconds");
-        break;
-      }
-    }
-  }
+  executor.spin();
   return absl::OkStatus();
 }
 
@@ -209,7 +215,7 @@ void AdapterNode::SnapshotCallback(
   // Lock and copy the most recent CameraInfo messages
   {
     absl::MutexLock lock(&camera_info_mutex_);
-    if (!color_camera_info_ || !ir_camera_info_ || !depth_camera_info_) {
+    if (!color_camera_info_ || !ir_camera_info_) {
       response->error_message = "CameraInfo not yet received";
       response->success = false;
       RCLCPP_ERROR(get_logger(), response->error_message.c_str());
@@ -218,13 +224,15 @@ void AdapterNode::SnapshotCallback(
     color_snapshot.camera_info = *color_camera_info_;
     ir_snapshot.camera_info = *ir_camera_info_;
 #if SEND_DEPTH
-    depth_snapshot.camera_info = *depth_camera_info_;
+    if (depth_camera_info_) {
+      depth_snapshot.camera_info = *depth_camera_info_;
+    }
 #endif
   }
 
   // Lock and copy the most recent Image messages
   absl::MutexLock lock(&image_mutex_);
-  if (!color_image_ || !ir_image_ || !depth_image_) {
+  if (!color_image_ || !ir_image_) {
     response->error_message = "images not yet received from camera";
     response->success = false;
     RCLCPP_ERROR(get_logger(), response->error_message.c_str());
@@ -238,6 +246,12 @@ void AdapterNode::SnapshotCallback(
   response->images.push_back(std::move(ir_snapshot));
 
 #if SEND_DEPTH
+  if (!depth_image_) {
+    response->error_message = "depth image not yet received from camera";
+    response->success = false;
+    RCLCPP_ERROR(get_logger(), response->error_message.c_str());
+    return;
+  }
   // The Orbbec camera returns the depth image as 16-bit images in millimeters.
   // We want to convert that to 32-bit float (meters) for Flowstate.
   depth_snapshot.image.header = depth_image_->header;

@@ -57,6 +57,7 @@ class AdapterNode : public rclcpp::Node {
       describe_service_;
   rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr
       snapshot_service_;
+  rclcpp::TimerBase::SharedPtr liveness_timer_;
 
   mutable absl::Mutex camera_info_mutex_;
   std::unique_ptr<sensor_msgs::msg::CameraInfo> color_camera_info_;

@@ -93,23 +93,20 @@ std::string AdapterNode::ColorImageTopic() const {
 
 absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main()");
+  t_last_color_image_ = get_clock()->now();
   rclcpp::executors::SingleThreadedExecutor executor;
+  liveness_timer_ =
+      create_wall_timer(std::chrono::seconds(1), [this, &executor]() {
+        absl::MutexLock timeout_lock(&timeout_mutex_);
+        if ((get_clock()->now() - t_last_color_image_).seconds() > 30.0) {
+          RCLCPP_ERROR(get_logger(), "No new image arrived for 30 seconds");
+          executor.cancel();
+        }
+      });
+
   executor.add_node(this->get_node_base_interface());
   executor.add_node(luxonis_node_); //->get_node_base_interface());
-  // TODO: add some other tests for camera health, to exit this loop if it's bad
-  t_last_color_image_ = get_clock()->now();
-  while (rclcpp::ok()) {
-    executor.spin_some();  // todo: something smarter
-    // maybe do something
-    rclcpp::sleep_for(std::chrono::milliseconds(10));
-    {
-      absl::MutexLock timeout_lock(&timeout_mutex_);
-      if ((get_clock()->now() - t_last_color_image_).seconds() > 30.0) {
-        RCLCPP_ERROR(get_logger(), "No new image arrived for 30 seconds");
-        break;
-      }
-    }
-  }
+  executor.spin();
   return absl::OkStatus();
 }
 
@@ -118,8 +115,6 @@ void AdapterNode::DescribeCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {
-  RCLCPP_INFO(get_logger(), "AdapterNode::DescribeCallback()");
-
   absl::MutexLock lock(&camera_info_mutex_);
   if (!color_camera_info_) {
     response->error_message = "CameraInfo not yet received from camera";
