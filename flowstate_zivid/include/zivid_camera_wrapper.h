@@ -6,7 +6,7 @@
 #include <absl/strings/str_cat.h>
 #include <absl/synchronization/mutex.h>
 #include <thread>
-#include "zivid_camera_wrapper/zivid_camera_node.h"
+#include "zivid_camera_node.h"
 
 // Forward declarations
 namespace zivid_camera {
@@ -28,7 +28,7 @@ class Image;
 class PointCloud;
 class Settings2D;
 class Settings;
-}  // namespace Zivid
+}  // namespace Zivid/zivid_camera_node.h
 namespace zivid_camera_wrapper
 {
 

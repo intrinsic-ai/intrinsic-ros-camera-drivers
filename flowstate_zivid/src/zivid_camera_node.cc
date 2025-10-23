@@ -29,7 +29,7 @@
 #include <zivid_camera/infield_correction_controller.hpp>
 #include <zivid_camera/projection_controller.hpp>
 #include <zivid_camera/utility.hpp>
-#include <zivid_camera_wrapper/zivid_camera_node.h>
+#include "zivid_camera_node.h"
 
 // snapshot_interfaces
 #include "snapshot_interfaces/srv/describe.hpp"

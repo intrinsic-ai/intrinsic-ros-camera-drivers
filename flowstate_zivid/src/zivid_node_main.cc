@@ -9,7 +9,7 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include "zivid_camera_wrapper/zivid_camera_wrapper.h"
+#include "zivid_camera_wrapper.h"
 #include "snapshot_interfaces/srv/discover.hpp"
 
 #include <fstream>

@@ -19,8 +19,8 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
-#include "zivid_camera_wrapper/zivid_camera_wrapper.h"
-#include "zivid_camera_wrapper/zivid_camera_node.h"
+#include "zivid_camera_wrapper.h"
+#include "zivid_camera_node.h"
 #include "snapshot_interfaces/srv/discover.hpp"
 
 using ::snapshot_interfaces::srv::Describe;

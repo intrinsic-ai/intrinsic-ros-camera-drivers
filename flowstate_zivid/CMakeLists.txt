@@ -1,4 +1,40 @@
 cmake_minimum_required(VERSION 3.8)
+project(flowstate_zivid)
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Find required packages
+# Find Zivid SDK first (required by zivid_camera)
+find_package(Zivid 2.15.0 COMPONENTS Core REQUIRED)
+message(STATUS "Found Zivid SDK version ${Zivid_VERSION}")
+
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(zivid_camera REQUIRED)
+find_package(snapshot_interfaces REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(rcl_interfaces REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(intrinsic_sdk_ros REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(ament_cmake REQU
+IRED)
+
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+# Install include directory
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
 
 
 intrinsic_sdk_generate_service_manifest(
@@ -9,9 +45,10 @@ intrinsic_sdk_generate_service_manifest(
   PROTOS_TARGET zivid_driver_protos
 )
 
-add_library(zivid_camera_node SHARED zivid_camera_node.cc)
+add_library(zivid_camera_node SHARED src/zivid_camera_node.cc)
+
 target_include_directories(zivid_camera_node PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(zivid_camera_node
@@ -29,12 +66,12 @@ install(TARGETS zivid_camera_node DESTINATION lib)
 
 
 add_library(zivid_nodes
-    zivid_camera_wrapper.cc
+    src/zivid_camera_wrapper.cc
   )
 
 
 target_include_directories(zivid_nodes PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -67,11 +104,11 @@ ament_target_dependencies(zivid_nodes
 
 # Add executable
 add_executable(zivid_driver_main 
-  zivid_node_main.cc)
+  src/zivid_node_main.cc)
 
 # Include directories - point to the package root's include directory
 target_include_directories(zivid_driver_main PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -87,7 +124,6 @@ target_link_libraries(zivid_driver_main
     absl::synchronization
     zivid_driver_protos
     zivid_nodes
-    # intrinsic_sdk::intrinsic_sdk
     )
 
 
@@ -119,12 +155,12 @@ install(TARGETS zivid_driver_main
 if(BUILD_TESTING)
   # Add executable
   add_executable(zivid_driver_main_test
-    zivid_node_main_test.cc
+    src/zivid_node_main_test.cc
   )
 
   # Include directories - point to the package root's include directory
   target_include_directories(zivid_driver_main_test PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
       $<INSTALL_INTERFACE:include>
   )
 
@@ -161,6 +197,10 @@ if(BUILD_TESTING)
   )
 endif()
 
+
+# Export include directories
+ament_export_include_directories(include)
+
 # Install the proto descriptor database
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zivid_driver_protos.desc
         DESTINATION "share/${PROJECT_NAME}/zivid_driver"
@@ -174,3 +214,5 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/service_manifest.binarypb
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
         DESTINATION "share/${PROJECT_NAME}/zivid_driver"
 )
+
+ament_package()

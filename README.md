@@ -96,7 +96,7 @@ If everything is set, we can start to build the service container for the zivid 
 
 ```
 cd ~/ros_cameras_ws
-./flowstate-ros-camera-drivers/flowstate_zivid/flowstate/build_service_bundle.sh
+./src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/build_service_bundle.sh
 ```
 
 Sideload and install the service container in flowstate:
