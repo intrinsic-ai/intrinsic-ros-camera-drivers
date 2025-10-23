@@ -21,8 +21,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(intrinsic_sdk_ros REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(image_transport REQUIRED)
-find_package(ament_cmake REQU
-IRED)
+find_package(ament_cmake REQUIRED)
 
 
 if(BUILD_TESTING)
