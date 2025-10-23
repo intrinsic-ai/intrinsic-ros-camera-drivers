@@ -21,7 +21,7 @@ git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/ros2/rmw_zenoh --branch 0.2.3
 git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
 git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon
-git clone https://github.com/tt-232/zivid-ros.git
+git clone https://github.com/intrinsic-dev/zivid-ros
 ```
 
 The resulting directory structure should look like this:
