@@ -11,10 +11,12 @@
   <depend>cv_bridge</depend>
   <depend>intrinsic_sdk_ros</depend>
   <depend>orbbec_camera</depend>
+  <depend>orbbec_camera_msgs</depend>
   <depend>libopencv-dev</depend>
   <depend>OrbbecSDK</depend>
   <depend>sensor_msgs</depend>
   <depend>snapshot_interfaces</depend>
+  <depend>std_srvs</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
