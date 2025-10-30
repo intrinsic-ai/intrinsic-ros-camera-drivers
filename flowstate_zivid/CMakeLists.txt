@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(flowstate_zivid)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -22,6 +25,7 @@ find_package(intrinsic_sdk_ros REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(ament_cmake REQUIRED)
+find_package(abseil_cpp_vendor REQUIRED)
 
 
 if(BUILD_TESTING)
@@ -44,7 +48,7 @@ intrinsic_sdk_generate_service_manifest(
   PROTOS_TARGET zivid_driver_protos
 )
 
-add_library(zivid_camera_node SHARED src/zivid_camera_node.cc)
+add_library(zivid_camera_node SHARED src/adapter_node.cc)
 
 target_include_directories(zivid_camera_node PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -60,12 +64,20 @@ ament_target_dependencies(zivid_camera_node
     rcl_interfaces
     geometry_msgs
 )
-target_link_libraries(zivid_camera_node Zivid::Core)
+target_link_libraries(zivid_camera_node 
+    Zivid::Core
+    absl::base
+    absl::core_headers
+    absl::status
+    absl::statusor
+    absl::strings
+    absl::synchronization
+)
 install(TARGETS zivid_camera_node DESTINATION lib)
 
 
 add_library(zivid_nodes
-    src/zivid_camera_wrapper.cc
+    src/spawner_node.cc
   )
 
 
@@ -76,6 +88,8 @@ target_include_directories(zivid_nodes PUBLIC
 
 target_link_libraries(zivid_nodes 
   Zivid::Core
+  absl::base
+  absl::core_headers
   absl::status
   absl::statusor
   absl::strings
@@ -103,16 +117,13 @@ ament_target_dependencies(zivid_nodes
 
 # Add executable
 add_executable(zivid_driver_main 
-  src/zivid_node_main.cc)
+  src/ros_main.cc)
 
 # Include directories - point to the package root's include directory
 target_include_directories(zivid_driver_main PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-
-find_package(absl REQUIRED)
-
 
 # Link libraries
 target_link_libraries(zivid_driver_main 
@@ -141,6 +152,7 @@ ament_target_dependencies(zivid_driver_main
     sensor_msgs
     rcl_interfaces
     geometry_msgs
+    ament_index_cpp
 )
 
 # Set C++ standard
@@ -154,7 +166,7 @@ install(TARGETS zivid_driver_main
 if(BUILD_TESTING)
   # Add executable
   add_executable(zivid_driver_main_test
-    src/zivid_node_main_test.cc
+    src/ros_main_test.cc
   )
 
   # Include directories - point to the package root's include directory

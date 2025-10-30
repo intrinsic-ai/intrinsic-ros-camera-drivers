@@ -118,7 +118,6 @@ RUN echo "Searching for and copying vendored absl libraries..." && \
     find /opt/ros/underlay/build/abseil_cpp_vendor -name "libabsl*.so*" -exec cp -d {} /opt/ros/overlay/install/lib/ \;
 
 RUN ls -l /opt/ros/overlay/install/lib/${SERVICE_PACKAGE}
-# Or, even better, check the entire install directory
 RUN ls -R /opt/ros/overlay/install
 
 # result stage: base + copied install folders from the overlay + service setup
@@ -140,7 +139,6 @@ RUN apt-get clean \
     ros-jazzy-image-transport-plugins \
     ocl-icd-libopencl1 \
     ros-jazzy-std-srvs \
-    # valgrind \
     wget && \
     # Download and install Zivid SDK runtime dependencies
     wget -O zivid.deb https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid_2.16.0+46cdaba6-1_amd64.deb && \
@@ -172,20 +170,13 @@ RUN cp \
 
 # Set LD_LIBRARY_PATH to include NVIDIA libraries for OpenCL discovery
 ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
-# RUN sudo gpasswd -a $USER render
-# RUN sudo gpasswd -a $USER video
 ENTRYPOINT ["/ros_entrypoint.sh"]
 
 
-# Build arguments are not substituted in the CMD command and hence we set environemnt variables
-# which can be substituted instead.
 ENV SERVICE_PACKAGE=${SERVICE_PACKAGE}
 ENV SERVICE_NAME=${SERVICE_NAME}
 ENV RUST_LOG=info
 
-# This zenoh_config is the same as the default, other than it connects to the
-# kubernetes-provided port which forwards to the zenoh-router:
-#   "tcp/localhost:17447"
 ENV ZENOH_CONFIG_OVERRIDE='connect/endpoints=["tcp/localhost:17447"]'
 
 RUN ls -l /opt/ros/overlay/install/lib/${SERVICE_PACKAGE}

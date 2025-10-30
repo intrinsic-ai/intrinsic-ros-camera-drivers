@@ -9,7 +9,7 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include "zivid_camera_wrapper.h"
+#include "flowstate_zivid/spawner_node.h"
 #include "snapshot_interfaces/srv/discover.hpp"
 #include "snapshot_interfaces/srv/snapshot.hpp"
 
@@ -74,7 +74,7 @@ void set_settings(const std::shared_ptr<rclcpp::Node> & node, const std::string 
   }
   auto parameters = {
     rclcpp::Parameter("aperture", 5.66),
-    rclcpp::Parameter("exposure_time", 0.008333),  // 8333 us
+    rclcpp::Parameter("exposure_time", 8333),  // 8333 us
     rclcpp::Parameter("outlier_removal_enabled", true),
     rclcpp::Parameter("outlier_removal_threshold", 5.0),
   };
@@ -153,30 +153,28 @@ auto create_snapshot_client(std::shared_ptr<rclcpp::Node> & node, std::string se
 
 void call_capture_color_image_service_once(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name, const std::string& service_name) {
 
-  // Create service client
+  set_settings(client_node, target_node_name);
+  set_srgb(client_node, target_node_name);
+
   auto client = create_snapshot_client(client_node, target_node_name + service_name);
 
-  // Wait for service to be available
   if (!client->wait_for_service(std::chrono::seconds(10))) {
     RCLCPP_ERROR(client_node->get_logger(), "Service %s not available", service_name.c_str());
     return;
   }
 
-  // Create subscription BEFORE calling capture so it's ready to receive data
   auto color_image_color_subscription = client_node->create_subscription<sensor_msgs::msg::Image>(
     target_node_name + "/color/image_color", 2, [&](sensor_msgs::msg::Image::ConstSharedPtr msg) -> void {
       RCLCPP_INFO(client_node->get_logger(), "Received image of size %d x %d", msg->width, msg->height);
     });
   
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Give the timer a chance to run
 
-  // Create request and call service
   auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
   RCLCPP_INFO(client_node->get_logger(), "Calling capture service %s...", service_name.c_str());
   
   auto future = client->async_send_request(request);
 
-  // Wait for response with timeout
   if (rclcpp::spin_until_future_complete(client_node, future, std::chrono::seconds(30)) == 
       rclcpp::FutureReturnCode::SUCCESS) {
     auto response = future.get();
@@ -193,20 +191,31 @@ void call_capture_color_image_service_once(std::shared_ptr<rclcpp::Node> & clien
 }
 
 void call_capture_color_image_service(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name, const std::string& service_name) {
-
-  // Create service client
+  set_settings(client_node, target_node_name);
+  set_srgb(client_node, target_node_name);
   auto client = create_snapshot_client(client_node, target_node_name + service_name);
 
+  std::function<void(rclcpp::Client<snapshot_interfaces::srv::Snapshot>::SharedFuture)> response_callback;
   auto trigger_capture = [&]() {
-    RCLCPP_INFO(client_node->get_logger(), "Triggering 2d capture");
-    client->async_send_request(std::make_shared<snapshot_interfaces::srv::Snapshot::Request>());
+    RCLCPP_INFO(client_node->get_logger(), "Triggering snapshot capture...");
+    auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
+    client->async_send_request(request, response_callback);
   };
 
+  response_callback = 
+    [logger = client_node->get_logger(), &trigger_capture](rclcpp::Client<snapshot_interfaces::srv::Snapshot>::SharedFuture future) mutable {
+      auto result = future.get();
+      if (result->success) {
+        RCLCPP_INFO(logger, "Snapshot successful. Triggering next capture.");
+        trigger_capture(); 
+      } else {
+        RCLCPP_ERROR(logger, "Snapshot failed: %s", result->error_message.c_str());
+      }
+    };
 
   auto color_image_color_subscription = client_node->create_subscription<sensor_msgs::msg::Image>(
     target_node_name + "/color/image_color", 2, [&](sensor_msgs::msg::Image::ConstSharedPtr msg) -> void {
       RCLCPP_INFO(client_node->get_logger(), "Received image of size %d x %d", msg->width, msg->height);
-      trigger_capture();
     });
   
   trigger_capture();
@@ -215,20 +224,33 @@ void call_capture_color_image_service(std::shared_ptr<rclcpp::Node> & client_nod
   
 }
 
-void call_depth_image_service(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name, const std::string& service_name) {
+void call_capture_depth_image_service(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name, const std::string& service_name) {
 
-  // Create service client
+  set_settings(client_node, target_node_name);
+  set_srgb(client_node, target_node_name);
   auto client = create_snapshot_client(client_node, target_node_name + service_name);
 
+  std::function<void(rclcpp::Client<snapshot_interfaces::srv::Snapshot>::SharedFuture)> response_callback;
   auto trigger_capture = [&]() {
-    RCLCPP_INFO(client_node->get_logger(), "Triggering depth capture");
-    client->async_send_request(std::make_shared<snapshot_interfaces::srv::Snapshot::Request>());
+    RCLCPP_INFO(client_node->get_logger(), "Triggering snapshot capture...");
+    auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
+    client->async_send_request(request, response_callback);
   };
 
-  auto depth_image_subscription = client_node->create_subscription<sensor_msgs::msg::Image>(
+  response_callback = 
+    [logger = client_node->get_logger(), &trigger_capture](rclcpp::Client<snapshot_interfaces::srv::Snapshot>::SharedFuture future) mutable {
+      auto result = future.get();
+      if (result->success) {
+        RCLCPP_INFO(logger, "Snapshot successful. Triggering next capture.");
+        trigger_capture(); 
+      } else {
+        RCLCPP_ERROR(logger, "Snapshot failed: %s", result->error_message.c_str());
+      }
+    };
+
+  auto color_image_color_subscription = client_node->create_subscription<sensor_msgs::msg::Image>(
     target_node_name + "/depth/image", 2, [&](sensor_msgs::msg::Image::ConstSharedPtr msg) -> void {
-      RCLCPP_INFO(client_node->get_logger(), "Received depth image of size %d x %d", msg->width, msg->height);
-      trigger_capture();
+      RCLCPP_INFO(client_node->get_logger(), "Received image of size %d x %d", msg->width, msg->height);
     });
   
   trigger_capture();
@@ -239,32 +261,26 @@ void call_depth_image_service(std::shared_ptr<rclcpp::Node> & client_node, const
 
 void call_depth_image_service_once(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name, const std::string& service_name) {
 
-  // Create service client
   auto client = create_snapshot_client(client_node, target_node_name + service_name);
 
-  // Wait for service to be available
   if (!client->wait_for_service(std::chrono::seconds(10))) {
     RCLCPP_ERROR(client_node->get_logger(), "Service %s not available", service_name.c_str());
     return;
   }
 
-  // Create subscription BEFORE calling capture so it's ready to receive data
   auto points_xyzrgba_subscription = client_node->create_subscription<sensor_msgs::msg::Image>(
     target_node_name + "/depth/image", 10, [&](sensor_msgs::msg::Image::ConstSharedPtr msg) -> void {
       RCLCPP_INFO(
         client_node->get_logger(), "Received depth image of size %d x %d", msg->width, msg->height);
     });
 
-  // Give subscription time to be established
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
   
-  // Create request and call service
   auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
   RCLCPP_INFO(client_node->get_logger(), "Calling capture service %s...", service_name.c_str());
   
   auto future = client->async_send_request(request);
 
-  // Wait for response with timeout
   if (rclcpp::spin_until_future_complete(client_node, future, std::chrono::seconds(30)) == 
       rclcpp::FutureReturnCode::SUCCESS) {
     auto response = future.get();
@@ -281,20 +297,31 @@ void call_depth_image_service_once(std::shared_ptr<rclcpp::Node> & client_node, 
 }
 
 void call_pc_service_continuous(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name, const std::string& service_name) {
-
-  // Create service client
+  set_settings(client_node, target_node_name);
+  set_srgb(client_node, target_node_name);
   auto client = create_snapshot_client(client_node, target_node_name + service_name);
 
+  std::function<void(rclcpp::Client<snapshot_interfaces::srv::Snapshot>::SharedFuture)> response_callback;
   auto trigger_capture = [&]() {
-    RCLCPP_INFO(client_node->get_logger(), "Triggering capture");
-    client->async_send_request(std::make_shared<snapshot_interfaces::srv::Snapshot::Request>());
+    RCLCPP_INFO(client_node->get_logger(), "Triggering snapshot capture...");
+    auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
+    client->async_send_request(request, response_callback);
   };
 
-  auto points_xyzrgba_subscription = client_node->create_subscription<sensor_msgs::msg::PointCloud2>(
-    target_node_name + "/points/xyz", 10, [&](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) -> void {
-      RCLCPP_INFO(
-        client_node->get_logger(), "Received point cloud of size %d x %d", msg->width, msg->height);
-      trigger_capture();
+  response_callback = 
+    [logger = client_node->get_logger(), &trigger_capture](rclcpp::Client<snapshot_interfaces::srv::Snapshot>::SharedFuture future) mutable {
+      auto result = future.get();
+      if (result->success) {
+        RCLCPP_INFO(logger, "Snapshot successful. Triggering next capture.");
+        trigger_capture(); 
+      } else {
+        RCLCPP_ERROR(logger, "Snapshot failed: %s", result->error_message.c_str());
+      }
+    };
+
+  auto color_image_color_subscription = client_node->create_subscription<sensor_msgs::msg::PointCloud2>(
+    target_node_name + "/points/xyz", 2, [&](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) -> void {
+      RCLCPP_INFO(client_node->get_logger(), "Received point cloud of size %d x %d", msg->width, msg->height);
     });
   
   trigger_capture();
@@ -305,32 +332,26 @@ void call_pc_service_continuous(std::shared_ptr<rclcpp::Node> & client_node, con
 
 void call_pc_service_once(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name, const std::string& service_name) {
 
-  // Create service client
   auto client = create_snapshot_client(client_node, target_node_name + service_name);
 
-  // Wait for service to be available
   if (!client->wait_for_service(std::chrono::seconds(10))) {
     RCLCPP_ERROR(client_node->get_logger(), "Service %s not available", service_name.c_str());
     return;
   }
 
-  // Create subscription BEFORE calling capture so it's ready to receive data
   auto points_xyzrgba_subscription = client_node->create_subscription<sensor_msgs::msg::PointCloud2>(
     target_node_name + "/points/xyz", 10, [&](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) -> void {
       RCLCPP_INFO(
         client_node->get_logger(), "Received point cloud of size %d x %d", msg->width, msg->height);
     });
 
-  // Give subscription time to be established
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
   
-  // Create request and call service
   auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
-  RCLCPP_INFO(client_node->get_logger(), "Calling snapshot service %s...", service_name.c_str());
-
+  RCLCPP_INFO(client_node->get_logger(), "Calling capture service %s...", service_name.c_str());
+  
   auto future = client->async_send_request(request);
 
-  // Wait for response with timeout
   if (rclcpp::spin_until_future_complete(client_node, future, std::chrono::seconds(30)) == 
       rclcpp::FutureReturnCode::SUCCESS) {
     auto response = future.get();
@@ -347,23 +368,31 @@ void call_pc_service_once(std::shared_ptr<rclcpp::Node> & client_node, const std
 }
 
 void call_capture_normals_service(std::shared_ptr<rclcpp::Node> & client_node, const std::string & target_node_name, const std::string& service_name) {
-
   set_settings(client_node, target_node_name);
   set_srgb(client_node, target_node_name);
-
-  // Create service client
   auto client = create_snapshot_client(client_node, target_node_name + service_name);
 
+  std::function<void(rclcpp::Client<snapshot_interfaces::srv::Snapshot>::SharedFuture)> response_callback;
   auto trigger_capture = [&]() {
-    RCLCPP_INFO(client_node->get_logger(), "Triggering capture");
-    client->async_send_request(std::make_shared<snapshot_interfaces::srv::Snapshot::Request>());
+    RCLCPP_INFO(client_node->get_logger(), "Triggering snapshot capture...");
+    auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
+    client->async_send_request(request, response_callback);
   };
 
-  auto points_normals_subscription = client_node->create_subscription<sensor_msgs::msg::PointCloud2>(
-    target_node_name + "/normals/xyz", 10, [&](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) -> void {
-      RCLCPP_INFO(
-        client_node->get_logger(), "Received normals xyz of size %d x %d", msg->width, msg->height);
-      trigger_capture();
+  response_callback = 
+    [logger = client_node->get_logger(), &trigger_capture](rclcpp::Client<snapshot_interfaces::srv::Snapshot>::SharedFuture future) mutable {
+      auto result = future.get();
+      if (result->success) {
+        RCLCPP_INFO(logger, "Snapshot successful. Triggering next capture.");
+        trigger_capture(); 
+      } else {
+        RCLCPP_ERROR(logger, "Snapshot failed: %s", result->error_message.c_str());
+      }
+    };
+
+  auto color_image_color_subscription = client_node->create_subscription<sensor_msgs::msg::PointCloud2>(
+    target_node_name + "/normals/xyz", 2, [&](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) -> void {
+      RCLCPP_INFO(client_node->get_logger(), "Received normal point cloud of size %d x %d", msg->width, msg->height);
     });
   
   trigger_capture();
@@ -377,32 +406,26 @@ void call_capture_normals_service_once(std::shared_ptr<rclcpp::Node> & client_no
   set_settings(client_node, target_node_name);
   set_srgb(client_node, target_node_name);
 
-  // Create service client
   auto client = create_snapshot_client(client_node, target_node_name + service_name);
 
-  // Wait for service to be available
   if (!client->wait_for_service(std::chrono::seconds(10))) {
     RCLCPP_ERROR(client_node->get_logger(), "Service %s not available", service_name.c_str());
     return;
   }
 
-  // Create subscription BEFORE calling capture so it's ready to receive data
   auto points_normals_subscription = client_node->create_subscription<sensor_msgs::msg::PointCloud2>(
-    target_node_name +"/normals/xyz", 10, [&](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) -> void {
+    target_node_name + "/normals/xyz", 10, [&](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) -> void {
       RCLCPP_INFO(
-        client_node->get_logger(), "Received normals xyz of size %d x %d", msg->width, msg->height);
-  });
+        client_node->get_logger(), "Received normal point cloud of size %d x %d", msg->width, msg->height);
+    });
 
-  // Give subscription time to be established
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
   
-  // Create request and call service
   auto request = std::make_shared<snapshot_interfaces::srv::Snapshot::Request>();
-  RCLCPP_INFO(client_node->get_logger(), "Calling snapshot service %s...", service_name.c_str());
+  RCLCPP_INFO(client_node->get_logger(), "Calling capture service %s...", service_name.c_str());
   
   auto future = client->async_send_request(request);
 
-  // Wait for response with timeout
   if (rclcpp::spin_until_future_complete(client_node, future, std::chrono::seconds(30)) == 
       rclcpp::FutureReturnCode::SUCCESS) {
     auto response = future.get();
@@ -503,7 +526,7 @@ int main(int argc, char** argv)
       RCLCPP_ERROR(rclcpp::get_logger("zivid_driver_main"), "Failed to execute ZividListCameras: %s", e.what());
   }
 
-  auto spawner_node = zivid_camera_wrapper::ZividCameraWrapper::Create();
+  auto spawner_node = flowstate_zivid::SpawnerNode::Create();
   if (!spawner_node.ok()) {
     RCLCPP_ERROR_STREAM((*spawner_node)->get_logger(),
                         "Zivid spawner failed to start: " << spawner_node.status());
@@ -516,21 +539,17 @@ int main(int argc, char** argv)
     rclcpp::spin(*spawner_node);
   });
 
-  // Give camera nodes time to start up
   std::this_thread::sleep_for(std::chrono::seconds(3));
 
 
-  // call discovery service
   discover();
 
-  // Get the generated camera node names
   auto camera_node_names = (*spawner_node)->getCameraNodeNames();
   RCLCPP_INFO((*spawner_node)->get_logger(), "Generated camera node names:");
   for (const auto& node_name : camera_node_names) {
     RCLCPP_INFO((*spawner_node)->get_logger(), "  - %s", node_name.c_str());
   }
 
-  // Use the first camera for captures if available
   std::string target_camera_node = "";
   if (!camera_node_names.empty()) {
     target_camera_node = "/" + camera_node_names[0];

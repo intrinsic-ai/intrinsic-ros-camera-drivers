@@ -19,15 +19,16 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
-#include "zivid_camera_wrapper.h"
-#include "zivid_camera_node.h"
+#include "flowstate_zivid/spawner_node.h"
+#include "flowstate_zivid/adapter_node.h"
 #include "snapshot_interfaces/srv/discover.hpp"
+#include "zivid_camera/zivid_camera.hpp"
 
 using ::snapshot_interfaces::srv::Describe;
 using ::snapshot_interfaces::srv::Discover;
 
 
-namespace zivid_camera_wrapper
+namespace flowstate_zivid
 {
 
 namespace ParamNames
@@ -39,30 +40,28 @@ constexpr auto color_space = "color_space";
 constexpr auto intrinsics_source = "intrinsics_source";
 }  // namespace ParamNames
 
-absl::StatusOr<std::shared_ptr<ZividCameraWrapper>> ZividCameraWrapper::Create()
+absl::StatusOr<std::shared_ptr<SpawnerNode>> SpawnerNode::Create()
 {
   try {
-    auto wrapper = std::make_shared<ZividCameraWrapper>();
+    auto spawner = std::make_shared<SpawnerNode>();
     
-    return wrapper;
+    return spawner;
   } catch (const std::exception& e) {
     return absl::Status(absl::StatusCode::kInternal, 
-                       absl::StrCat("Failed to create ZividCameraWrapper: ", e.what()));
+                       absl::StrCat("Failed to create SpawnerNode for flowstate Zivid camera: ", e.what()));
   }
 }
 
-ZividCameraWrapper::ZividCameraWrapper(const rclcpp::NodeOptions & options)
-  : rclcpp::Node("zivid_spawner", options) //("zivid_wrapper_node", options)
+SpawnerNode::SpawnerNode(const rclcpp::NodeOptions & options)
+  : rclcpp::Node("zivid_spawner", options)
 {
-  RCLCPP_INFO(get_logger(), "Starting Zivid Camera Wrapper Node...");
+  RCLCPP_INFO(get_logger(), "Starting Zivid SpawnerNode...");
 
-  // Initialize Zivid Application
   zivid_app_ = std::make_unique<Zivid::Application>();
 
   const auto file_camera_path = declare_parameter(ParamNames::file_camera_path, "");
   refreshCameraList(file_camera_path); 
 
-  // Create discovery service
   using namespace std::placeholders;
   discover_service_ = create_service<Discover>(
       "/cameras/discover",
@@ -76,7 +75,6 @@ ZividCameraWrapper::ZividCameraWrapper(const rclcpp::NodeOptions & options)
         RCLCPP_INFO(get_logger(), "Returning %d already discovered cameras", 
                     static_cast<int>(cameras_.size()));
         
-        // response->discovered_cameras.clear();
         response->cameras.clear();
 
         for (const auto& camera : cameras_) {
@@ -86,69 +84,61 @@ ZividCameraWrapper::ZividCameraWrapper(const rclcpp::NodeOptions & options)
         response->success = true;
         RCLCPP_INFO(get_logger(), "=== DISCOVERY SERVICE COMPLETE ===");
       });
-  RCLCPP_INFO(get_logger(), "Zivid Camera Wrapper ready!");
+  RCLCPP_INFO(get_logger(), "Zivid SpawnerNode is ready!");
   
 }
 
-ZividCameraWrapper::~ZividCameraWrapper() {
+SpawnerNode::~SpawnerNode() {
   shutdownCameraNodes();
   if (timer_) {
     timer_->reset();
   }
-  RCLCPP_INFO(get_logger(), "Zivid Camera Wrapper shutdown complete");
+  RCLCPP_INFO(get_logger(), "Zivid SpawnerNode shutdown complete");
   zivid_app_.reset();
 }
 
-std::vector<std::string> ZividCameraWrapper::getCameraNodeNames() const
+std::vector<std::string> SpawnerNode::getCameraNodeNames() const
 {
   absl::MutexLock lock(&cameras_mutex_);
   
   std::vector<std::string> node_names;
   for (const auto& camera : cameras_) {
-    // The node name should match the one created in refreshCameraList
     node_names.push_back("zivid_" + camera.camera_id);
   }
   
   return node_names;
 }
 
-void ZividCameraWrapper::refreshCameraList(const std::string & file_camera_path)
+void SpawnerNode::refreshCameraList(const std::string & file_camera_path)
 {
   absl::MutexLock lock(&cameras_mutex_);
   
-  // Clear existing cameras
   cameras_.clear();
+  cameras_discovered_.clear();
   
-  // Shutdown existing camera nodes before refreshing.
-  // This also handles resetting the Zivid::Application instance.
-  if (!camera_nodes_.empty()) {
+  if (!spawned_nodes_.empty()) {
     shutdownCameraNodes();
   }
-
-  // Discover cameras
-  std::vector<std::shared_ptr<Zivid::Camera>> cameras_discovered;
   
-  // Check if file_camera_path is explicitly set and not empty
   if (!file_camera_path.empty()) {
     RCLCPP_INFO(get_logger(), "Using file camera path: %s", file_camera_path.c_str());
-    cameras_discovered.push_back(std::make_shared<Zivid::Camera>(zivid_app_->createFileCamera(file_camera_path)));
+    cameras_discovered_.push_back(std::make_shared<Zivid::Camera>(zivid_app_->createFileCamera(file_camera_path)));
   } else {
     RCLCPP_INFO(get_logger(), "Discovering physical cameras...");
     for (auto& cam : zivid_app_->cameras()) {
-      cameras_discovered.push_back(std::make_shared<Zivid::Camera>(cam));
+      cameras_discovered_.push_back(std::make_shared<Zivid::Camera>(cam));
     }
-    RCLCPP_INFO(get_logger(), "Found %zu physical camera(s)", cameras_discovered.size());
+    RCLCPP_INFO(get_logger(), "Found %zu physical camera(s)", cameras_discovered_.size());
   }
-  RCLCPP_INFO_STREAM(get_logger(), cameras_discovered.size() << " camera(s) found");
+  RCLCPP_INFO_STREAM(get_logger(), cameras_discovered_.size() << " camera(s) found");
 
-  for (size_t i = 0; i < cameras_discovered.size(); ++i) {
-    const auto& camera_ptr = cameras_discovered[i];
+  for (size_t i = 0; i < cameras_discovered_.size(); ++i) {
+    const auto& camera_ptr = cameras_discovered_[i];
     RCLCPP_INFO(get_logger(), "Camera %zu: Serial = %s", i,
                 camera_ptr->info().serialNumber().toString().c_str());
   }
 
-  for (const auto& camera : cameras_discovered) {
-    // Create DiscoveredCamera message
+  for (const auto& camera : cameras_discovered_) {
     snapshot_interfaces::msg::DiscoveredCamera discovered_camera;
     discovered_camera.driver_type = "zivid";
     discovered_camera.camera_id = camera->info().serialNumber().toString();
@@ -156,9 +146,6 @@ void ZividCameraWrapper::refreshCameraList(const std::string & file_camera_path)
     rclcpp::NodeOptions node_options;
 
     cameras_.push_back(discovered_camera);
-
-    // Create unique node name based on discovered serial
-    std::string node_name = discovered_camera.driver_type + "_" + discovered_camera.camera_id; //std::string("zivid_camera_") + discovered_camera.serial;
 
     // Set the serial number parameter for this specific camera
     std::vector<rclcpp::Parameter> parameters;
@@ -172,33 +159,28 @@ void ZividCameraWrapper::refreshCameraList(const std::string & file_camera_path)
     node_options.parameter_overrides(parameters);
     
     try {
-      // Create ZividCamera node with the specific camera object (avoids duplication)
-      auto camera_node = std::make_shared<zivid_camera_node::ZividCamNode>(node_name, node_options, *camera, *zivid_app_.get());
-      camera_nodes_.push_back(camera_node);
-        RCLCPP_INFO(get_logger(), "Created ZividCamera node for camera %s", discovered_camera.camera_id.c_str());
-        
-      // Create a thread to spin this camera node
-      camera_threads_.emplace_back([camera_node]() {
-        rclcpp::spin(camera_node);
-      });
+      // Create AdapterNode node with the specific camera object (avoids duplication)
+      auto camera_node = std::make_shared<flowstate_zivid::AdapterNode>(discovered_camera.camera_id, node_options, *camera, *zivid_app_.get());
+      spawned_nodes_.push_back(camera_node);
+        RCLCPP_INFO(get_logger(), "Created AdapterNode for zivid camera %s", discovered_camera.camera_id.c_str());
       
     } catch (const std::exception& e) {
-      RCLCPP_ERROR_STREAM(get_logger(), "Failed to create ZividCamera node for camera "
+      RCLCPP_ERROR_STREAM(get_logger(), "Failed to create AdapterNode for zivid camera "
                                           << discovered_camera.camera_id << ": " << e.what());
     }
   }
 
 }
 
-void ZividCameraWrapper::shutdownCameraNodes()
+void SpawnerNode::shutdownCameraNodes()
 {
-  if (camera_nodes_.empty() && camera_threads_.empty()) {
+  if (spawned_nodes_.empty() && camera_threads_.empty()) {
     return;
   }
-  RCLCPP_INFO(get_logger(), "Shutting down %zu camera node(s)...", camera_nodes_.size());
+  RCLCPP_INFO(get_logger(), "Shutting down %zu camera node(s)...", spawned_nodes_.size());
 
   // Request nodes to shut down.
-  for (auto& node : camera_nodes_) {
+  for (auto& node : spawned_nodes_) {
     // The node might be null if creation failed but was still added to the list.
     if (node) {
       rclcpp::shutdown(node->get_node_base_interface()->get_context());
@@ -210,7 +192,7 @@ void ZividCameraWrapper::shutdownCameraNodes()
       thread.join();
     }
   }
-  camera_nodes_.clear();
+  spawned_nodes_.clear();
   camera_threads_.clear();
 
   if (zivid_app_) {
@@ -220,4 +202,3 @@ void ZividCameraWrapper::shutdownCameraNodes()
   }
 }
 }
-

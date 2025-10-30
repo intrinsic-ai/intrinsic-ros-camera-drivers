@@ -14,7 +14,7 @@
 <depend>zivid_camera</depend>
 <depend>snapshot_interfaces</depend>
 
-<depend>libabsl-dev</depend>
+<depend>abseil_cpp_vendor</depend>
 <depend>intrinsic_sdk_ros</depend>
 <depend>ament_index_cpp</depend>
 <depend>image_transport</depend>
