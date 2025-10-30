@@ -4,7 +4,7 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <atomic> // For individual_settings_dirty_
+#include <atomic>
 #include <string>
 #include <thread>
 #include <vector>
