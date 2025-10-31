@@ -159,10 +159,11 @@ void SpawnerNode::refreshCameraList(const std::string & file_camera_path)
     node_options.parameter_overrides(parameters);
     
     try {
+      auto zivid_app_shared = std::shared_ptr<Zivid::Application>(zivid_app_.get(), [](Zivid::Application*){});
       // Create AdapterNode node with the specific camera object (avoids duplication)
-      auto camera_node = std::make_shared<flowstate_zivid::AdapterNode>(discovered_camera.camera_id, node_options, *camera, *zivid_app_.get());
+      auto camera_node = std::make_shared<flowstate_zivid::AdapterNode>(discovered_camera.camera_id, node_options, camera, zivid_app_shared);
       spawned_nodes_.push_back(camera_node);
-        RCLCPP_INFO(get_logger(), "Created AdapterNode for zivid camera %s", discovered_camera.camera_id.c_str());
+      RCLCPP_INFO(get_logger(), "Created AdapterNode for zivid camera %s", discovered_camera.camera_id.c_str());
       
     } catch (const std::exception& e) {
       RCLCPP_ERROR_STREAM(get_logger(), "Failed to create AdapterNode for zivid camera "

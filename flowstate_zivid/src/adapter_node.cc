@@ -25,7 +25,8 @@ namespace flowstate_zivid {
 using snapshot_interfaces::srv::Describe;
 using snapshot_interfaces::srv::Snapshot;
 
-AdapterNode::AdapterNode(const std::string& serial, const rclcpp::NodeOptions & options, Zivid::Camera & camera, Zivid::Application & zivid_app)
+AdapterNode::AdapterNode(const std::string& serial, const rclcpp::NodeOptions & options, std::shared_ptr<Zivid::Camera> camera,
+                         std::shared_ptr<Zivid::Application> zivid_app)
     : Node(std::string("zivid_") + serial),
       serial_(serial),
       capture_params_(ZividCaptureParameters::boot_defaults()) 
@@ -66,11 +67,8 @@ AdapterNode::AdapterNode(const std::string& serial, const rclcpp::NodeOptions & 
           .append_parameter_override("file_camera_path", file_camera_path)
           .append_parameter_override("settings_yaml", this->get_parameter("settings_yaml").as_string());
 
-  auto external_app_ptr = std::shared_ptr<Zivid::Application>(&zivid_app, [](Zivid::Application*) {});
-  auto external_camera_ptr = std::shared_ptr<Zivid::Camera>(&camera, [](Zivid::Camera*) {});
-
   zivid_node_ = std::make_unique<zivid_camera::ZividCamera>(
-      zivid_node_options, zivid_node_name, zivid_ns, external_app_ptr, external_camera_ptr);
+      zivid_node_options, zivid_node_name, zivid_ns, zivid_app, camera);
 
   zivid_node_executor_ = std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
   zivid_node_executor_->add_node(zivid_node_->get_node_base_interface());
@@ -361,7 +359,7 @@ void AdapterNode::DescribeCallback(
   response->sensors.push_back(depth_info);
 
   snapshot_interfaces::msg::SensorInfo normal_info;
-  normal_info.sensor_name = "normals";
+  normal_info.sensor_name = "normal";
   normal_info.topic_name = NormalTopic();
   normal_info.sensor_type = snapshot_interfaces::msg::SensorInfo::NORMAL;
   normal_info.camera_t_sensor.transform.rotation.w = 1.0;

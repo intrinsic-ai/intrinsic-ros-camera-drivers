@@ -57,8 +57,8 @@ struct ZividCaptureParameters
 
 class AdapterNode : public rclcpp::Node {
  public:
-  AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options,
-              Zivid::Camera& camera, Zivid::Application& zivid_app);
+  AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options, std::shared_ptr<Zivid::Camera> camera,
+              std::shared_ptr<Zivid::Application> zivid_app);
 
   bool HasExitedThread() const { return exited_thread_; }
 
