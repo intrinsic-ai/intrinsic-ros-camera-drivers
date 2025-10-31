@@ -25,6 +25,7 @@ find_package(intrinsic_sdk_ros REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(ament_cmake REQUIRED)
+find_package(yaml-cpp REQUIRED)
 find_package(abseil_cpp_vendor REQUIRED)
 
 
@@ -50,12 +51,12 @@ intrinsic_sdk_generate_service_manifest(
 
 add_library(zivid_camera_node SHARED src/adapter_node.cc)
 
-target_include_directories(zivid_camera_node PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
+target_include_directories(
+  zivid_camera_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
-ament_target_dependencies(zivid_camera_node
-    rclcpp
+ament_target_dependencies(zivid_camera_node rclcpp
     std_msgs
     std_srvs
     zivid_camera
@@ -64,29 +65,31 @@ ament_target_dependencies(zivid_camera_node
     rcl_interfaces
     geometry_msgs
 )
-target_link_libraries(zivid_camera_node 
-    Zivid::Core
-    absl::base
-    absl::core_headers
-    absl::status
-    absl::statusor
-    absl::strings
-    absl::synchronization
+target_link_libraries(
+  zivid_camera_node
+  Zivid::Core
+  absl::base
+  absl::core_headers
+  absl::status
+  absl::statusor
+  absl::strings
+  absl::synchronization
+  yaml-cpp
 )
 install(TARGETS zivid_camera_node DESTINATION lib)
 
 
-add_library(zivid_nodes
-    src/spawner_node.cc
-  )
+add_library(zivid_nodes src/spawner_node.cc)
 
 
-target_include_directories(zivid_nodes PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
+target_include_directories(
+  zivid_nodes PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(zivid_nodes 
+target_link_libraries(
+  zivid_nodes
   Zivid::Core
   absl::base
   absl::core_headers
@@ -95,14 +98,13 @@ target_link_libraries(zivid_nodes
   absl::strings
   absl::synchronization
   zivid_camera_node
-  )
+)
 
 install(TARGETS zivid_nodes DESTINATION lib)
 
 
 # ROS dependencies
-ament_target_dependencies(zivid_nodes
-    rclcpp
+ament_target_dependencies(zivid_nodes rclcpp
     std_msgs
     std_srvs
     zivid_camera
@@ -200,7 +202,7 @@ if(BUILD_TESTING)
   )
 
   # Set C++ standard
-  target_compile_features(zivid_driver_main_test PUBLIC cxx_std_17)
+  target_compile_features(zivid_driver_main_test PUBLIC cxx_std_20)
 
   # Install executable
   install(TARGETS zivid_driver_main_test

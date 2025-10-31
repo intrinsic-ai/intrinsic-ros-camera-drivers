@@ -1,10 +1,10 @@
-#ifndef FLOWSTATE_ZIVID__ADAPTER_NODE_H_
-#define FLOWSTATE_ZIVID__ADAPTER_NODE_H_
+#ifndef FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_
+#define FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_
 
+#include <atomic>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <atomic>
 #include <string>
 #include <thread>
 #include <vector>
@@ -22,16 +22,15 @@
 
 namespace Zivid {
 class Application;
-class Camera; 
-class Settings; 
+class Camera;
+class Settings;
 }  // namespace Zivid
 namespace zivid_camera {
 class ZividCamera;
 }  // namespace zivid_camera
 namespace flowstate_zivid {
 
-struct ZividCaptureParameters
-{
+struct ZividCaptureParameters {
   double exposure_time;
   double gain;
   double gamma;
@@ -40,37 +39,34 @@ struct ZividCaptureParameters
   bool outlier_removal_enabled;
   double outlier_removal_threshold;
 
-  static ZividCaptureParameters boot_defaults()
-  {
+  static ZividCaptureParameters boot_defaults() {
     return {
-      8333,  // exposure_time (8333us)
-      1.0,       // gain
-      1.0,       // gamma
-      1.0,       // projector_brightness
-      5.66,      // aperture
-      true,      // outlier_removal_enabled
-      5.0        // outlier_removal_threshold
+        8333,  // exposure_time (8333us)
+        1.0,   // gain
+        1.0,   // gamma
+        1.0,   // projector_brightness
+        5.66,  // aperture
+        true,  // outlier_removal_enabled
+        5.0    // outlier_removal_threshold
     };
   };
 };
 
-
 class AdapterNode : public rclcpp::Node {
  public:
-  AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options, std::shared_ptr<Zivid::Camera> camera,
+  AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options,
+              std::shared_ptr<Zivid::Camera> camera,
               std::shared_ptr<Zivid::Application> zivid_app);
 
   bool HasExitedThread() const { return exited_thread_; }
 
-  bool HasSerial(const std::string& serial) const {
-    return serial_ == serial;
-  }
+  bool HasSerial(const std::string& serial) const { return serial_ == serial; }
 
   std::string GetSerial() const { return serial_; }
 
  private:
   rcl_interfaces::msg::SetParametersResult setParametersCallback(
-    const std::vector<rclcpp::Parameter> & parameters);
+      const std::vector<rclcpp::Parameter>& parameters);
   void updateSettingsYamlCallback();
   std::string generateZividSettings() const;
 
@@ -105,7 +101,8 @@ class AdapterNode : public rclcpp::Node {
   bool exited_thread_ = false;
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
   std::thread zivid_node_thread_;
-  std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> zivid_node_executor_;
+  std::unique_ptr<rclcpp::executors::SingleThreadedExecutor>
+      zivid_node_executor_;
 
   // ROS Services
   rclcpp::CallbackGroup::SharedPtr callback_group_;
@@ -118,7 +115,8 @@ class AdapterNode : public rclcpp::Node {
   // Mutex-protected CameraInfo storage and subscriptions
   std::mutex camera_info_mutex_;
   sensor_msgs::msg::CameraInfo::UniquePtr camera_info_;
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      camera_info_sub_;
 
   // Mutex-protected Image storage and subscriptions
   std::mutex data_mutex_;
@@ -142,11 +140,12 @@ class AdapterNode : public rclcpp::Node {
 
   rclcpp::TimerBase::SharedPtr update_settings_yaml_timer_;
   std::atomic<bool> individual_settings_dirty_{false};
-  rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr set_parameters_callback_handle_;
+  rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
+      set_parameters_callback_handle_;
   mutable std::mutex capture_params_mutex_;
   std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_;
 };
 
 }  // namespace flowstate_zivid
 
-#endif  // FLOWSTATE_ZIVID__ADAPTER_NODE_H_
+#endif  // FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_

@@ -21,7 +21,7 @@ git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/ros2/rmw_zenoh --branch 0.2.3
 git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
 git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon
-git clone https://github.com/intrinsic-dev/zivid-ros
+git clone https://github.com/intrinsic-dev/zivid-ros --branch flowstate
 ```
 
 The resulting directory structure should look like this:
@@ -85,7 +85,7 @@ source /opt/ros/jazzy/setup.bash
 colcon build
 ```
 
-To test the camera functions locally, use following command to trigger capuring.
+To test the camera functions locally, use the following command to trigger capturing.
 
 ```
 source install/setup.bash

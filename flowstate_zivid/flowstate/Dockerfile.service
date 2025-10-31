@@ -29,6 +29,8 @@ ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 # underlay stage: base + dependencies built
 FROM base AS underlay
 
+ARG ZIVID_VERSION=2.16.0+46cdaba6-1
+
 ADD src/zivid-ros /opt/ros/underlay/src/zivid-ros
 ADD src/flowstate-ros-camera-drivers /opt/ros/underlay/src/flowstate-ros-camera-drivers
 ADD src/sdk-ros /opt/ros/underlay/src/sdk-ros
@@ -62,10 +64,10 @@ ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 
 RUN apt-get update && apt-get install -y wget && \
     wget \
-    https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid_2.16.0+46cdaba6-1_amd64.deb \
-    https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-studio_2.16.0+46cdaba6-1_amd64.deb \
-    https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-tools_2.16.0+46cdaba6-1_amd64.deb \
-    https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-genicam_2.16.0+46cdaba6-1_amd64.deb && \
+    https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid_${ZIVID_VERSION}_amd64.deb \
+    https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-studio_${ZIVID_VERSION}_amd64.deb \
+    https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-tools_${ZIVID_VERSION}_amd64.deb \
+    https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-genicam_${ZIVID_VERSION}_amd64.deb && \
     apt-get install -y ./*.deb && \
     rm ./*.deb && \
     apt-get clean
@@ -126,6 +128,7 @@ FROM base
 ARG SERVICE_PACKAGE
 ARG SERVICE_NAME
 ARG DEPENDENCIES
+ARG ZIVID_VERSION=2.16.0+46cdaba6-1
 
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -141,8 +144,8 @@ RUN apt-get clean \
     ros-jazzy-std-srvs \
     wget && \
     # Download and install Zivid SDK runtime dependencies
-    wget -O zivid.deb https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid_2.16.0+46cdaba6-1_amd64.deb && \
-    wget -O zivid-tools.deb https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-tools_2.16.0+46cdaba6-1_amd64.deb && \
+    wget -O zivid.deb https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid_${ZIVID_VERSION}_amd64.deb && \
+    wget -O zivid-tools.deb https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-tools_${ZIVID_VERSION}_amd64.deb && \
     # The 'apt-get update' here is critical for installing dependencies of the .deb files
     apt-get update && apt-get install -y ./*.deb && \
     rm ./*.deb && rm -rf /var/lib/apt/lists/*
