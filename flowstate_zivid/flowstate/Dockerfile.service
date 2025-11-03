@@ -8,6 +8,8 @@
 # base stage: NVIDIA CUDA base + ROS Jazzy + configs
 FROM nvidia/cuda:12.5.1-devel-ubuntu24.04 AS base
 
+ARG ZIVID_VERSION=2.16.0+46cdaba6-1
+
 # Install ROS Jazzy
 RUN apt-get update && apt-get install -y \
     curl \
@@ -29,8 +31,7 @@ ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 # underlay stage: base + dependencies built
 FROM base AS underlay
 
-ARG ZIVID_VERSION=2.16.0+46cdaba6-1
-
+ARG ZIVID_VERSION
 ADD src/zivid-ros /opt/ros/underlay/src/zivid-ros
 ADD src/flowstate-ros-camera-drivers /opt/ros/underlay/src/flowstate-ros-camera-drivers
 ADD src/sdk-ros /opt/ros/underlay/src/sdk-ros
@@ -128,7 +129,7 @@ FROM base
 ARG SERVICE_PACKAGE
 ARG SERVICE_NAME
 ARG DEPENDENCIES
-ARG ZIVID_VERSION=2.16.0+46cdaba6-1
+ARG ZIVID_VERSION
 
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility

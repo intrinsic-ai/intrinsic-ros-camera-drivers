@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Unable to parse runtime context file" << std::endl;
     return EXIT_FAILURE;
   }
-  ZividDriverConfig config;
+  zivid_driver::ZividDriverConfig config;
   if (!runtime_context.config().UnpackTo(&config)) {
     std::cerr << "Unable to parse config proto" << std::endl;
     return EXIT_FAILURE;

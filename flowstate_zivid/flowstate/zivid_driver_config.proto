@@ -1,3 +1,7 @@
+syntax = "proto3";
+
+package zivid_driver;
+
 message ZividDriverConfig {
   repeated string ip_addresses = 1;
 }

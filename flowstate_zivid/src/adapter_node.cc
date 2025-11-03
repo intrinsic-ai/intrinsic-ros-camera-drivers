@@ -7,7 +7,9 @@
 #include <string>
 
 #include "absl/algorithm/container.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/image_encodings.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
@@ -30,7 +32,7 @@ AdapterNode::AdapterNode(const std::string& serial,
                          const rclcpp::NodeOptions& options,
                          std::shared_ptr<Zivid::Camera> camera,
                          std::shared_ptr<Zivid::Application> zivid_app)
-    : Node(std::string("zivid_") + serial),
+    : Node(std::string("zivid_") + serial, options),
       serial_(serial),
       capture_params_(ZividCaptureParameters::boot_defaults()) {
   // Declare parameters for AdapterNode
@@ -69,13 +71,11 @@ AdapterNode::AdapterNode(const std::string& serial,
   this->declare_parameter<std::string>("settings_2d_file_path", "");
   this->declare_parameter<std::string>("color_space", "srgb");
   this->declare_parameter<std::string>("intrinsics_source", "camera");
-  rclcpp::NodeOptions zivid_node_options =
-      rclcpp::NodeOptions()
-          .append_parameter_override("serial_number", serial)
-          .append_parameter_override("file_camera_path", file_camera_path)
-          .append_parameter_override(
-              "settings_yaml",
-              this->get_parameter("settings_yaml").as_string());
+  rclcpp::NodeOptions zivid_node_options = options;
+  zivid_node_options.append_parameter_override("serial_number", serial)
+      .append_parameter_override("file_camera_path", file_camera_path)
+      .append_parameter_override(
+          "settings_yaml", this->get_parameter("settings_yaml").as_string());
 
   zivid_node_ = std::make_unique<zivid_camera::ZividCamera>(
       zivid_node_name, zivid_ns, zivid_node_options, zivid_app, camera);
@@ -169,7 +169,7 @@ AdapterNode::AdapterNode(const std::string& serial,
              const std::shared_ptr<Describe::Response> response) {
         this->DescribeCallback(request_header, request, response);
       },
-      rmw_qos_profile_services_default, callback_group_);
+      rclcpp::ServicesQoS(), callback_group_);
 
   snapshot_service_ = create_service<Snapshot>(
       "~/snapshot",
@@ -178,7 +178,7 @@ AdapterNode::AdapterNode(const std::string& serial,
              const std::shared_ptr<Snapshot::Response> response) {
         this->SnapshotCallback(request_header, request, response);
       },
-      rmw_qos_profile_services_default, callback_group_);
+      rclcpp::ServicesQoS(), callback_group_);
   RCLCPP_INFO(this->get_logger(), "zivid_node_ = %s",
               zivid_node_->get_fully_qualified_name());
 
@@ -451,7 +451,6 @@ void AdapterNode::SnapshotCallback(
   {
     std::unique_lock<std::mutex> lock(snapshot_mutex_);
     if (!snapshot_cv_.wait_for(lock, std::chrono::seconds(5), [this] {
-          return new_color_image_received_ && new_depth_image_received_;
           return new_color_image_received_ && new_depth_image_received_ &&
                  new_normal_pc_received_;
         })) {
@@ -485,19 +484,19 @@ void AdapterNode::SnapshotCallback(
 
   std::lock_guard<std::mutex> lock(data_mutex_);
   if (!color_image_ || !depth_image_ || !normal_pc_) {
-    std::string error_message = "Did not receive";
+    std::vector<std::string> missing_data;
+    missing_data.reserve(3);
     if (!color_image_) {
-      error_message += " color image";
+      missing_data.push_back("color image");
     }
     if (!depth_image_) {
-      error_message += (!color_image_ ? ", " : "") + std::string("depth image");
+      missing_data.push_back("depth image");
     }
     if (!normal_pc_) {
-      error_message +=
-          (!color_image_ || !depth_image_ ? ", " : "") + std::string("normals point cloud");
+      missing_data.push_back("normals point cloud");
     }
-    error_message += " from camera.";
-    response->error_message = error_message;
+    response->error_message = absl::StrCat(
+        "Did not receive ", absl::StrJoin(missing_data, ", "), " from camera.");
     response->success = false;
     RCLCPP_ERROR(get_logger(), response->error_message.c_str());
     return;
