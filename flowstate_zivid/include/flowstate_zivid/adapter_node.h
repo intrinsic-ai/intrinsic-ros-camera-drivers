@@ -1,10 +1,8 @@
 #ifndef FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_
 #define FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_
 
-#include <atomic>
 #include <condition_variable>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -19,15 +17,8 @@
 #include "snapshot_interfaces/srv/describe.hpp"
 #include "snapshot_interfaces/srv/snapshot.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "zivid_camera/zivid_camera.hpp"
 
-namespace Zivid {
-class Application;
-class Camera;
-class Settings;
-}  // namespace Zivid
-namespace zivid_camera {
-class ZividCamera;
-}  // namespace zivid_camera
 namespace flowstate_zivid {
 
 struct ZividCaptureParameters {
@@ -52,6 +43,36 @@ struct ZividCaptureParameters {
   };
 };
 
+/**
+ * @class AdapterNode
+ * @brief A ROS 2 node that acts as an adapter for the zivid_camera::ZividCamera
+ * node from the official Zivid ROS driver
+ * (https://github.com/intrinsic-dev/zivid-ros/blob/flowstate/zivid_camera/include/zivid_camera/zivid_camera.hpp).
+ *
+ * The AdapterNode provides a simplified, high-level interface for interacting
+ * with a `zivid_camera::ZividCamera` node, which handles the direct hardware
+ * communication.
+ *
+ * -----
+ * Key Responsibilities:
+ * 1.  Encapsulation:
+ *     It creates and manages a zivid_camera::ZividCamera
+ *     node instance in an internal thread, hiding its detailed implementation.
+ *
+ * 2.  Parameter Abstraction:
+ *     It exposes capture parameters for Flowstate to set parameters during
+ *     runtime. When these are modified, it translates them into the full YAML
+ *     configuration required by the underlying `zivid_camera` node.
+ *
+ * 3.  Flowstate Service Interface:
+ *     It offers support for the `snapshot_interfaces` services from Flowstate
+ *     sdk-ros:
+ *     - "~/snapshot": Triggers a 3D capture, collects all resulting data
+ *       (color,depth images, normals), and returns them in a single,
+ *       synchronized response.
+ *     - "~/describe": Provides a structured description of the camera's
+ *       available sensors and their properties.
+ */
 class AdapterNode : public rclcpp::Node {
  public:
   AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options,
@@ -67,8 +88,11 @@ class AdapterNode : public rclcpp::Node {
  private:
   rcl_interfaces::msg::SetParametersResult setParametersCallback(
       const std::vector<rclcpp::Parameter>& parameters);
-  void updateSettingsYamlCallback();
-  std::string generateZividSettings() const;
+  /**
+   * @brief Generates a Zivid settings string in YAML format.
+   * @return A string containing the Zivid settings in YAML format.
+   */
+  std::string GenerateZividSettings() const;
 
   void DescribeCallback(
       const std::shared_ptr<rmw_request_id_t> request_header,
@@ -96,8 +120,8 @@ class AdapterNode : public rclcpp::Node {
 
   std::string serial_;
 
+  absl::CondVar snapshot_cv_;
   ZividCaptureParameters capture_params_;
-  std::thread thread_;
   bool exited_thread_ = false;
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
   std::thread zivid_node_thread_;
@@ -112,38 +136,39 @@ class AdapterNode : public rclcpp::Node {
       snapshot_service_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
 
-  // Mutex-protected CameraInfo storage and subscriptions
-  std::mutex camera_info_mutex_;
-  sensor_msgs::msg::CameraInfo::UniquePtr camera_info_;
+  mutable absl::Mutex camera_info_mutex_;
+  sensor_msgs::msg::CameraInfo::UniquePtr camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
       camera_info_sub_;
 
-  // Mutex-protected Image storage and subscriptions
-  std::mutex data_mutex_;
-  sensor_msgs::msg::Image::UniquePtr color_image_;
-  sensor_msgs::msg::Image::UniquePtr depth_image_;
-  sensor_msgs::msg::PointCloud2::UniquePtr normal_pc_;
+  mutable absl::Mutex data_mutex_;
+  sensor_msgs::msg::Image::UniquePtr color_image_ ABSL_GUARDED_BY(data_mutex_);
+  sensor_msgs::msg::Image::UniquePtr depth_image_ ABSL_GUARDED_BY(data_mutex_);
+  sensor_msgs::msg::PointCloud2::UniquePtr normal_pc_
+      ABSL_GUARDED_BY(data_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_image_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr normal_sub_;
 
   // Snapshot synchronization
-  std::mutex snapshot_mutex_;
-  std::condition_variable snapshot_cv_;
-  bool new_color_image_received_{false};
-  bool new_depth_image_received_{false};
-  bool new_normal_pc_received_{false};
+  mutable absl::Mutex snapshot_mutex_;
+  bool new_color_image_received_ ABSL_GUARDED_BY(snapshot_mutex_){false};
+  bool new_depth_image_received_ ABSL_GUARDED_BY(snapshot_mutex_){false};
+  bool new_normal_pc_received_ ABSL_GUARDED_BY(snapshot_mutex_){false};
 
   // Timeout monitoring
-  std::mutex timeout_mutex_;
-  rclcpp::Time t_last_color_image_;
+  mutable absl::Mutex timeout_mutex_;
+  rclcpp::Time t_last_color_image_ ABSL_GUARDED_BY(timeout_mutex_);
 
   rclcpp::TimerBase::SharedPtr update_settings_yaml_timer_;
-  std::atomic<bool> individual_settings_dirty_{false};
+
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
       set_parameters_callback_handle_;
-  mutable std::mutex capture_params_mutex_;
+  mutable absl::Mutex capture_params_mutex_;
   std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_;
+
+  std::thread thread_;
 };
 
 }  // namespace flowstate_zivid

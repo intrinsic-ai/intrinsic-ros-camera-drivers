@@ -12,27 +12,33 @@
 #include "adapter_node.h"
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
 #include "snapshot_interfaces/srv/discover.hpp"
-
-namespace zivid_camera {
-class ZividCamera;
-}
-
-namespace Zivid {
-class Application;
-class Camera;
-class CameraIntrinsics;
-struct ColorRGBA;
-struct ColorSRGB;
-class Frame;
-class Frame2D;
-template <typename T>
-class Image;
-class PointCloud;
-class Settings2D;
-class Settings;
-}  // namespace Zivid
+#include "zivid_camera/zivid_camera.hpp"
 
 namespace flowstate_zivid {
+/**
+ * @class SpawnerNode
+ * @brief A ROS 2 node that discovers cameras and manages adapter nodes for
+ * zivid_camera::ZividCamera node from the official Zivid ROS driver
+ * (https://github.com/intrinsic-dev/zivid-ros/blob/flowstate/zivid_camera/include/zivid_camera/zivid_camera.hpp).
+ *
+ * -----
+ * Key Responsibilities:
+ * 1.  Camera Discovery:
+ *     On startup, it automatically discovers all physically connected Zivid
+ *     cameras. It also supports using a "file camera" for testing and
+ *     development by reading from a ".zfc" file.
+ * 2.  Node Spawning:
+ *     For each discovered camera, it generates a AdapterNode.
+ *     Each AdapterNode is a separate ROS 2 node that directly
+ *     interacts with a single zivid_camera::ZividCamera ROS2 node from the
+ *     official Zivid ROS driver, translating Flowstate sdk-ros ROS2 service
+ *     calls into Zivid ROS2 driver service calls and publishing required
+ *     information for Flowstate services.
+ * 3.  Discovery Service:
+ *     It provides a ROS service ("/cameras/discover") for
+ *     Flowstate that allows to query for a list of available cameras with their
+ *     serial numbers.
+ */
 class SpawnerNode : public rclcpp::Node {
  public:
   SpawnerNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
@@ -41,24 +47,24 @@ class SpawnerNode : public rclcpp::Node {
   virtual ~SpawnerNode();
 
   // Get the generated camera node names
-  std::vector<std::string> getCameraNodeNames() const;
+  std::vector<std::string> GetCameraNodeNames() const;
 
  private:
   mutable absl::Mutex cameras_mutex_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 
-  void refreshCameraList(const std::string& file_camera_path = "");
-  void shutdownCameraNodes();
+  void RefreshCameraList(const std::string& file_camera_path = "");
+  void ShutdownCameraNodes();
 
   std::vector<std::shared_ptr<flowstate_zivid::AdapterNode>> spawned_nodes_;
   std::vector<std::thread> camera_threads_;
-  std::vector<std::shared_ptr<Zivid::Camera>> cameras_discovered_
+  std::vector<std::shared_ptr<Zivid::Camera>> zivid_cameras_
       ABSL_GUARDED_BY(cameras_mutex_);
 
   std::shared_ptr<Zivid::Application> zivid_app_;
-  std::vector<snapshot_interfaces::msg::DiscoveredCamera> cameras_
-      ABSL_GUARDED_BY(cameras_mutex_);
+  std::vector<snapshot_interfaces::msg::DiscoveredCamera>
+      discovered_camera_msgs_ ABSL_GUARDED_BY(cameras_mutex_);
   rclcpp::Service<snapshot_interfaces::srv::Discover>::SharedPtr
       discover_service_;
 };

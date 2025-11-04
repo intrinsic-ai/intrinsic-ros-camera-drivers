@@ -675,7 +675,7 @@ int main(int argc, char** argv) {
 
   discover();
 
-  auto camera_node_names = (*spawner_node)->getCameraNodeNames();
+  auto camera_node_names = (*spawner_node)->GetCameraNodeNames();
   RCLCPP_INFO((*spawner_node)->get_logger(), "Generated camera node names:");
   for (const auto& node_name : camera_node_names) {
     RCLCPP_INFO((*spawner_node)->get_logger(), "  - %s", node_name.c_str());
