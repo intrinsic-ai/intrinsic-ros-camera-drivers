@@ -10,15 +10,14 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/image_encodings.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "snapshot_interfaces/msg/image_snapshot.hpp"
+#include "yaml-cpp/yaml.h"
 #include "zivid_camera/capture_settings_controller.hpp"
 #include "zivid_camera/utility.hpp"
 #include "zivid_camera/zivid_camera.hpp"
-#include "yaml-cpp/yaml.h"
 namespace zivid_camera {
 class ZividCamera;
 }
@@ -33,7 +32,8 @@ AdapterNode::AdapterNode(const std::string& serial,
                          std::shared_ptr<Zivid::Camera> camera,
                          std::shared_ptr<Zivid::Application> zivid_app)
     : Node(std::string("zivid_") + serial, options),
-      serial_(serial), snapshot_cv_(),
+      serial_(serial),
+      snapshot_cv_(),
       capture_params_(ZividCaptureParameters::boot_defaults()) {
   // Declare parameters for AdapterNode
   declare_parameter<double>("exposure_time", capture_params_.exposure_time);
@@ -56,7 +56,6 @@ AdapterNode::AdapterNode(const std::string& serial,
                           capture_params_.outlier_removal_enabled);
   declare_parameter<double>("outlier_removal_threshold",
                             capture_params_.outlier_removal_threshold);
-
   // Declare parameters that will be passed through to zivid_camera node
   const std::string zivid_node_name = std::string("camera_") + serial;
   const std::string zivid_ns = "zivid/" + zivid_node_name;
@@ -71,19 +70,16 @@ AdapterNode::AdapterNode(const std::string& serial,
   this->declare_parameter<std::string>("settings_2d_file_path", "");
   this->declare_parameter<std::string>("color_space", "srgb");
   this->declare_parameter<std::string>("intrinsics_source", "camera");
+  this->declare_parameter<double>("fps", 10.0);
   rclcpp::NodeOptions zivid_node_options = options;
   zivid_node_options.append_parameter_override("serial_number", serial)
       .append_parameter_override("file_camera_path", file_camera_path)
       .append_parameter_override(
-          "settings_yaml", this->get_parameter("settings_yaml").as_string());
+          "settings_yaml", this->get_parameter("settings_yaml").as_string())
+      .append_parameter_override("fps", this->get_parameter("fps").as_double());
 
   zivid_node_ = std::make_unique<zivid_camera::ZividCamera>(
       zivid_node_name, zivid_ns, zivid_node_options, zivid_app, camera);
-
-  zivid_node_executor_ =
-      std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
-  zivid_node_executor_->add_node(zivid_node_->get_node_base_interface());
-  zivid_node_thread_ = std::thread([this]() { zivid_node_executor_->spin(); });
 
   zivid_camera_param_client_ = std::make_shared<rclcpp::AsyncParametersClient>(
       this, zivid_ns + "/" + zivid_node_name);
@@ -120,20 +116,16 @@ AdapterNode::AdapterNode(const std::string& serial,
           this->t_last_color_image_ = this->get_clock()->now();
         }
         {
-          absl::MutexLock snapshot_lock(&this->snapshot_mutex_);
           absl::MutexLock data_lock(&this->data_mutex_);
           this->color_image_ = std::move(msg);
-          this->new_color_image_received_ = true;
         }
         this->snapshot_cv_.Signal();
       });
   depth_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
       DepthImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
         {
-          absl::MutexLock snapshot_lock(&this->snapshot_mutex_);
           absl::MutexLock data_lock(&this->data_mutex_);
           this->depth_image_ = std::move(msg);
-          this->new_depth_image_received_ = true;
         }
         this->snapshot_cv_.Signal();
       });
@@ -141,10 +133,8 @@ AdapterNode::AdapterNode(const std::string& serial,
   normal_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       NormalTopic(), 2, [this](sensor_msgs::msg::PointCloud2::UniquePtr msg) {
         {
-          absl::MutexLock snapshot_lock(&this->snapshot_mutex_);
           absl::MutexLock data_lock(&this->data_mutex_);
           this->normal_pc_ = std::move(msg);
-          this->new_normal_pc_received_ = true;
         }
         this->snapshot_cv_.Signal();
       });
@@ -172,23 +162,16 @@ AdapterNode::AdapterNode(const std::string& serial,
   RCLCPP_INFO(this->get_logger(), "zivid_node_ = %s",
               zivid_node_->get_fully_qualified_name());
 
-  capture_client_ = this->create_client<std_srvs::srv::Trigger>(
-      absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()));
-
   thread_ = std::thread([this]() {
     const absl::Status status = this->Main();
     if (!status.ok()) {
-      RCLCPP_ERROR_STREAM(this->get_logger(), "node thread error: " << status);
+      RCLCPP_ERROR_STREAM(this->get_logger(),
+                          "Adapter node thread error: " << status);
     }
     RCLCPP_INFO(this->get_logger(), "Destroying zivid_camera_node...");
-    if (zivid_node_executor_) {
-      zivid_node_executor_->cancel();
-    }
-    if (zivid_node_thread_.joinable()) {
-      zivid_node_thread_.join();
-    }
     zivid_node_.reset();
-    RCLCPP_INFO(this->get_logger(), "Done destroying zivid_camera_node");
+    rclcpp::sleep_for(std::chrono::milliseconds(500));
+    RCLCPP_INFO(this->get_logger(), "Done destroying zivid_camera_node.");
     exited_thread_ = true;
   });
 }
@@ -236,6 +219,14 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::setParametersCallback(
     } else if (param.get_name() == "outlier_removal_threshold" ||
                param.get_name() == "OutlierRemovalThreshold") {
       capture_params_.outlier_removal_threshold = param.as_double();
+    } else if (param.get_name() == "color_space" ||
+               param.get_name() == "intrinsics_source") {
+      RCLCPP_INFO_STREAM(get_logger(), "Passing through '"
+                                           << param.get_name()
+                                           << "' to zivid_camera node.");
+      zivid_camera_param_client_->set_parameters({param});
+      is_individual_param =
+          false;  // It's handled, but not by regenerating YAML
     } else {
       is_individual_param = false;
     }
@@ -270,8 +261,9 @@ std::string AdapterNode::GenerateZividSettings() const {
   YAML::Emitter out;
   out << YAML::BeginMap;
   out << YAML::Key << "__version__";
-  out << YAML::Value << YAML::BeginMap << YAML::Key << "serializer" << YAML::Value
-      << 1 << YAML::Key << "data" << YAML::Value << 22 << YAML::EndMap;
+  out << YAML::Value << YAML::BeginMap << YAML::Key << "serializer"
+      << YAML::Value << 1 << YAML::Key << "data" << YAML::Value << 22
+      << YAML::EndMap;
   out << YAML::Key << "Settings";
   out << YAML::Value << YAML::BeginMap;
   out << YAML::Key << "Acquisitions";
@@ -321,11 +313,22 @@ std::string AdapterNode::CameraInfoTopic() const {
 
 absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main() for %s", this->get_name());
-  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(),
-                                                    4);
+  rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(this->get_node_base_interface());
+  executor.add_node(zivid_node_->get_node_base_interface());
 
-  executor.spin();
+  t_last_color_image_ = get_clock()->now();
+  while (rclcpp::ok()) {
+    executor.spin_some();
+    rclcpp::sleep_for(std::chrono::milliseconds(10));
+    {
+      absl::MutexLock timeout_lock(&timeout_mutex_);
+      if ((get_clock()->now() - t_last_color_image_).seconds() > 10.0) {
+        RCLCPP_ERROR(get_logger(), "No new image arrived for 10 seconds");
+        break;
+      }
+    }
+  }
   return absl::OkStatus();
 }
 
@@ -333,34 +336,22 @@ void AdapterNode::DescribeCallback(
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
-        response) 
-{
-  RCLCPP_INFO(get_logger(), "AdapterNode::DescribeCallback()");
+        response) {
+  RCLCPP_INFO(get_logger(), "AdapterNode::DescribeCallback() [Streaming Mode]");
 
-  { 
-    // absl::MutexLock lock(&camera_info_mutex_);
+  {
+    absl::MutexLock lock(&camera_info_mutex_);
     if (!camera_info_) {
       RCLCPP_INFO(get_logger(),
-                  "CameraInfo not available, triggering capture.");
-      auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-      auto future = capture_client_->async_send_request(request);
-      if (future.wait_for(std::chrono::seconds(10)) !=
-          std::future_status::ready) {
-        response->error_message =
-            "Failed to trigger capture on zivid_camera node (timeout)";
+                  "CameraInfo not yet available, waiting for it to arrive from "
+                  "stream...");
+      if (snapshot_cv_.WaitWithTimeout(&camera_info_mutex_, absl::Seconds(2))) {
+        // Timeout occurred
+        response->error_message = "CameraInfo not received from stream.";
         response->success = false;
         RCLCPP_ERROR(get_logger(), response->error_message.c_str());
         return;
       }
-      auto result = future.get();
-      if (!result->success) {
-        response->error_message =
-            "Capture on zivid_camera node failed: " + result->message;
-        response->success = false;
-        RCLCPP_ERROR(get_logger(), response->error_message.c_str());
-        return;
-      }
-      rclcpp::sleep_for(std::chrono::milliseconds(100));
     }
   }
 
@@ -408,59 +399,10 @@ void AdapterNode::SnapshotCallback(
         snapshot_interfaces::srv::Snapshot::Request> /*request*/,
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
         response) {
-  RCLCPP_INFO(get_logger(), "AdapterNode::SnapshotCallback()");
-
-  {
-    absl::MutexLock lock(&snapshot_mutex_);
-    new_color_image_received_ = false;
-    new_depth_image_received_ = false;
-    new_normal_pc_received_ = false;
-  }
-
-  RCLCPP_INFO(get_logger(), "Triggering capture on zivid_camera node");
-  auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-  auto future = capture_client_->async_send_request(request);
-  if (future.wait_for(std::chrono::seconds(10)) != std::future_status::ready) {
-    response->error_message =
-        "Failed to trigger capture on zivid_camera node (timeout)";
-    response->success = false;
-    RCLCPP_ERROR(get_logger(), response->error_message.c_str());
-    return;
-  }
-  auto result = future.get();
-  if (!result->success) {
-    response->error_message =
-        "Capture on zivid_camera node failed: " + result->message;
-    response->success = false;
-    RCLCPP_ERROR(get_logger(), response->error_message.c_str());
-    return;
-  }
-  RCLCPP_INFO(get_logger(),
-              "Capture trigger successful, waiting for images...");
-
-  {
-    absl::MutexLock lock(&snapshot_mutex_);
-    while (!(new_color_image_received_ && new_depth_image_received_ &&
-             new_normal_pc_received_)) {
-      if (snapshot_cv_.WaitWithTimeout(&snapshot_mutex_, absl::Seconds(5))) {
-        break;  // Timeout occurred
-      }
-    }
-    if (!(new_color_image_received_ && new_depth_image_received_ &&
-          new_normal_pc_received_)) {
-      response->error_message =
-          "Did not receive images from zivid_camera node within timeout";
-      response->success = false;
-      RCLCPP_ERROR(get_logger(), response->error_message.c_str());
-      return;
-    }
-  }
-
-  RCLCPP_INFO(get_logger(), "Received new images.");
+  RCLCPP_INFO(get_logger(), "AdapterNode::SnapshotCallback() [Streaming Mode]");
 
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
-
   color_snapshot.topic_name = ColorImageTopic();
   depth_snapshot.topic_name = DepthImageTopic();
 

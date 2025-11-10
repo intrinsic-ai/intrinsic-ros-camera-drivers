@@ -80,6 +80,4 @@ int main(int argc, char* argv[]) {
 
   RCLCPP_INFO((*spawner_node)->get_logger(), "Shutting down");
   rclcpp::shutdown();
-  spawner_node->reset();
-  return EXIT_SUCCESS;
 }

@@ -129,8 +129,7 @@ void SpawnerNode::RefreshCameraList(const std::string& file_camera_path) {
     RCLCPP_INFO(get_logger(), "Found %zu physical camera(s)",
                 zivid_cameras_.size());
   }
-  RCLCPP_INFO_STREAM(get_logger(), zivid_cameras_.size()
-                                       << " camera(s) found");
+  RCLCPP_INFO_STREAM(get_logger(), zivid_cameras_.size() << " camera(s) found");
 
   for (size_t i = 0; i < zivid_cameras_.size(); ++i) {
     const auto& camera_ptr = zivid_cameras_[i];

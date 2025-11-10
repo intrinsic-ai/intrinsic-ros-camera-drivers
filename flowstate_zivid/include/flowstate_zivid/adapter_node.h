@@ -123,10 +123,6 @@ class AdapterNode : public rclcpp::Node {
   absl::CondVar snapshot_cv_;
   ZividCaptureParameters capture_params_;
   bool exited_thread_ = false;
-  std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
-  std::thread zivid_node_thread_;
-  std::unique_ptr<rclcpp::executors::SingleThreadedExecutor>
-      zivid_node_executor_;
 
   // ROS Services
   rclcpp::CallbackGroup::SharedPtr callback_group_;
@@ -134,7 +130,8 @@ class AdapterNode : public rclcpp::Node {
       describe_service_;
   rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr
       snapshot_service_;
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
+
+  std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
 
   mutable absl::Mutex camera_info_mutex_;
   sensor_msgs::msg::CameraInfo::UniquePtr camera_info_
@@ -150,12 +147,6 @@ class AdapterNode : public rclcpp::Node {
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_image_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr normal_sub_;
-
-  // Snapshot synchronization
-  mutable absl::Mutex snapshot_mutex_;
-  bool new_color_image_received_ ABSL_GUARDED_BY(snapshot_mutex_){false};
-  bool new_depth_image_received_ ABSL_GUARDED_BY(snapshot_mutex_){false};
-  bool new_normal_pc_received_ ABSL_GUARDED_BY(snapshot_mutex_){false};
 
   // Timeout monitoring
   mutable absl::Mutex timeout_mutex_;

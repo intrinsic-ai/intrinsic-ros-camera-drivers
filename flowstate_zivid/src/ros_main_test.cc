@@ -698,8 +698,8 @@ int main(int argc, char** argv) {
   // Press Ctrl+C to exit");
 
   // capture 2d image service - continuous snapshot mode
-  call_capture_color_image_service(client_node, target_camera_node,
-  "/snapshot");
+  // call_capture_color_image_service(client_node, target_camera_node,
+  // "/snapshot");
 
   // capture 2d image service - single snapshot mode
   // call_capture_color_image_service_once(client_node, target_camera_node,
