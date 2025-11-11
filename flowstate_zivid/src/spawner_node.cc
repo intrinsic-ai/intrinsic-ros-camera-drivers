@@ -2,23 +2,12 @@
 
 #include <Zivid/Application.h>
 #include <Zivid/Camera.h>
-#include <Zivid/CaptureAssistant.h>
 #include <Zivid/Exception.h>
-#include <Zivid/Experimental/Calibration.h>
-#include <Zivid/Experimental/PointCloudExport.h>
-#include <Zivid/Firmware.h>
-#include <Zivid/Frame2D.h>
-#include <Zivid/Image.h>
-#include <Zivid/Settings2D.h>
-#include <Zivid/Version.h>
-
-#include <chrono>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "flowstate_zivid/adapter_node.h"
@@ -173,7 +162,7 @@ void SpawnerNode::RefreshCameraList(const std::string& file_camera_path) {
 }
 
 void SpawnerNode::ShutdownCameraNodes() {
-  if (spawned_nodes_.empty() && camera_threads_.empty()) {
+  if (spawned_nodes_.empty()) {
     return;
   }
   RCLCPP_INFO(get_logger(), "Shutting down %zu camera node(s)...",
@@ -188,13 +177,7 @@ void SpawnerNode::ShutdownCameraNodes() {
     }
   }
 
-  for (auto& thread : camera_threads_) {
-    if (thread.joinable()) {
-      thread.join();
-    }
-  }
   spawned_nodes_.clear();
-  camera_threads_.clear();
 
   if (zivid_app_) {
     RCLCPP_INFO(get_logger(),

@@ -1,7 +1,6 @@
 #ifndef FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_
 #define FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_
 
-#include <condition_variable>
 #include <memory>
 #include <string>
 #include <thread>
@@ -57,7 +56,7 @@ struct ZividCaptureParameters {
  * Key Responsibilities:
  * 1.  Encapsulation:
  *     It creates and manages a zivid_camera::ZividCamera
- *     node instance in an internal thread, hiding its detailed implementation.
+ *     node instance.
  *
  * 2.  Parameter Abstraction:
  *     It exposes capture parameters for Flowstate to set parameters during
@@ -78,12 +77,6 @@ class AdapterNode : public rclcpp::Node {
   AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options,
               std::shared_ptr<Zivid::Camera> camera,
               std::shared_ptr<Zivid::Application> zivid_app);
-
-  bool HasExitedThread() const { return exited_thread_; }
-
-  bool HasSerial(const std::string& serial) const { return serial_ == serial; }
-
-  std::string GetSerial() const { return serial_; }
 
  private:
   rcl_interfaces::msg::SetParametersResult setParametersCallback(
@@ -124,9 +117,7 @@ class AdapterNode : public rclcpp::Node {
 
   std::string serial_;
 
-  absl::CondVar snapshot_cv_;
   ZividCaptureParameters capture_params_;
-  bool exited_thread_ = false;
 
   // ROS Services
   rclcpp::CallbackGroup::SharedPtr callback_group_;
@@ -159,12 +150,10 @@ class AdapterNode : public rclcpp::Node {
   mutable absl::Mutex timeout_mutex_;
   rclcpp::Time t_last_color_image_ ABSL_GUARDED_BY(timeout_mutex_);
 
-  rclcpp::TimerBase::SharedPtr update_settings_yaml_timer_;
-
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
       set_parameters_callback_handle_;
   mutable absl::Mutex capture_params_mutex_;
-  std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_;
+  std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_ ABSL_GUARDED_BY(capture_params_mutex_);
 
   std::thread thread_;
 };

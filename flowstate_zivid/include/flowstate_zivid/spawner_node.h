@@ -7,7 +7,6 @@
 #include <absl/synchronization/mutex.h>
 
 #include <rclcpp/rclcpp.hpp>
-#include <thread>
 
 #include "adapter_node.h"
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
@@ -58,7 +57,6 @@ class SpawnerNode : public rclcpp::Node {
   void ShutdownCameraNodes();
 
   std::vector<std::shared_ptr<flowstate_zivid::AdapterNode>> spawned_nodes_;
-  std::vector<std::thread> camera_threads_;
   std::vector<std::shared_ptr<Zivid::Camera>> zivid_cameras_
       ABSL_GUARDED_BY(cameras_mutex_);
 

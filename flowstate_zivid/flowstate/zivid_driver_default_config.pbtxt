@@ -4,6 +4,4 @@
   # If no addresses are provided, the service will automatically discover
   # and use any zivid units that it finds.
 
-  # ip_address: "172.28.60.5"
-  # ip_address: "192.168.0.14"
 }

@@ -35,7 +35,6 @@ std::string exec(const char* cmd) {
 }
 
 int main(int argc, char* argv[]) {
-  // Execute ZividListCameras and log the output for debugging purposes.
   try {
     std::string camera_list = exec("ZividListCameras");
     printf("ZividListCameras output:\n%s", camera_list.c_str());
@@ -68,15 +67,9 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  std::thread spin_thread([&spawner_node]() {
-    RCLCPP_INFO((*spawner_node)->get_logger(),
+  RCLCPP_INFO((*spawner_node)->get_logger(),
                 "Spinning spawner... Ctrl+C to exit");
-    rclcpp::spin(*spawner_node);
-  });
-
-  if (spin_thread.joinable()) {
-    spin_thread.join();
-  }
+  rclcpp::spin(*spawner_node);
 
   RCLCPP_INFO((*spawner_node)->get_logger(), "Shutting down");
   rclcpp::shutdown();
