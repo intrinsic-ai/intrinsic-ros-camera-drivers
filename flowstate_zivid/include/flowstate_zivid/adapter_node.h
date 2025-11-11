@@ -89,6 +89,10 @@ class AdapterNode : public rclcpp::Node {
   rcl_interfaces::msg::SetParametersResult setParametersCallback(
       const std::vector<rclcpp::Parameter>& parameters);
   /**
+   * @brief (Re)starts the capture timer with a new frame rate.
+   */
+  void onCaptureTimer(double fps);
+  /**
    * @brief Generates a Zivid settings string in YAML format.
    * @return A string containing the Zivid settings in YAML format.
    */
@@ -130,6 +134,9 @@ class AdapterNode : public rclcpp::Node {
       describe_service_;
   rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr
       snapshot_service_;
+
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
+  rclcpp::TimerBase::SharedPtr capture_timer_;
 
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
 

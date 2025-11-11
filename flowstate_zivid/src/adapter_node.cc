@@ -56,6 +56,8 @@ AdapterNode::AdapterNode(const std::string& serial,
                           capture_params_.outlier_removal_enabled);
   declare_parameter<double>("outlier_removal_threshold",
                             capture_params_.outlier_removal_threshold);
+  declare_parameter<double>("fps", 10.0);
+
   // Declare parameters that will be passed through to zivid_camera node
   const std::string zivid_node_name = std::string("camera_") + serial;
   const std::string zivid_ns = "zivid/" + zivid_node_name;
@@ -70,13 +72,12 @@ AdapterNode::AdapterNode(const std::string& serial,
   this->declare_parameter<std::string>("settings_2d_file_path", "");
   this->declare_parameter<std::string>("color_space", "srgb");
   this->declare_parameter<std::string>("intrinsics_source", "camera");
-  this->declare_parameter<double>("fps", 10.0);
+  
   rclcpp::NodeOptions zivid_node_options = options;
   zivid_node_options.append_parameter_override("serial_number", serial)
       .append_parameter_override("file_camera_path", file_camera_path)
       .append_parameter_override(
-          "settings_yaml", this->get_parameter("settings_yaml").as_string())
-      .append_parameter_override("fps", this->get_parameter("fps").as_double());
+          "settings_yaml", this->get_parameter("settings_yaml").as_string());
 
   zivid_node_ = std::make_unique<zivid_camera::ZividCamera>(
       zivid_node_name, zivid_ns, zivid_node_options, zivid_app, camera);
@@ -162,6 +163,10 @@ AdapterNode::AdapterNode(const std::string& serial,
   RCLCPP_INFO(this->get_logger(), "zivid_node_ = %s",
               zivid_node_->get_fully_qualified_name());
 
+  capture_client_ = this->create_client<std_srvs::srv::Trigger>(
+      absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()));
+
+  onCaptureTimer(this->get_parameter("fps").as_double());
   thread_ = std::thread([this]() {
     const absl::Status status = this->Main();
     if (!status.ok()) {
@@ -227,6 +232,8 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::setParametersCallback(
       zivid_camera_param_client_->set_parameters({param});
       is_individual_param =
           false;  // It's handled, but not by regenerating YAML
+    } else if (param.get_name() == "fps") {
+      onCaptureTimer(param.as_double());
     } else {
       is_individual_param = false;
     }
@@ -252,6 +259,37 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::setParametersCallback(
   }
 
   return result;
+}
+
+void AdapterNode::onCaptureTimer(double fps) {
+  RCLCPP_INFO_STREAM(get_logger(), "FPS parameter is set to " << fps);
+
+  // Always stop the existing timer if it's running before potentially starting
+  // a new one.
+  if (capture_timer_) {
+    RCLCPP_INFO(get_logger(),
+                "Stopping current continuous capture before (re)starting.");
+    capture_timer_->cancel();
+    capture_timer_.reset();
+  }
+
+  if (fps > 0.0) {
+    const auto period = std::chrono::duration<double>(1.0 / fps);
+    RCLCPP_INFO(get_logger(),
+                "Starting continuous capture with a period of %.3f s (%.1f Hz)",
+                period.count(), fps);
+    capture_timer_ = this->create_wall_timer(period, [this]() {
+      if (!capture_client_->service_is_ready()) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *this->get_clock(), 5000,
+                             "Capture service is not ready.");
+        return;
+      }
+      capture_client_->async_send_request(
+          std::make_shared<std_srvs::srv::Trigger::Request>());
+    });
+  } else {  // fps <= 0.0
+    RCLCPP_INFO(get_logger(), "Continuous capture is disabled (fps <= 0.0).");
+  }
 }
 
 std::string AdapterNode::GenerateZividSettings() const {
