@@ -89,7 +89,7 @@ To test the camera functions locally, use the following command to trigger captu
 
 ```
 source install/setup.bash
-ros2 run flowstate_zivid zivid_driver_main_test
+ros2 run flowstate_zivid zivid_driver_main
 ```
 
 If everything is set, we can start to build the service container for the zivid camera:
