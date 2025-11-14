@@ -337,14 +337,16 @@ std::string AdapterNode::CameraInfoTopic() const {
 
 absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main() for %s", this->get_name());
-  rclcpp::executors::SingleThreadedExecutor executor;
+  rclcpp::executors::MultiThreadedExecutor executor;
   executor.add_node(this->get_node_base_interface());
   executor.add_node(zivid_node_->get_node_base_interface());
 
   t_last_color_image_ = get_clock()->now();
+
+  std::thread spin_thread([&executor]() { executor.spin(); });
+
   while (rclcpp::ok()) {
-    executor.spin_some();
-    rclcpp::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     {
       if (this->get_parameter("fps").as_double() > 0.0) {
         absl::MutexLock timeout_lock(&timeout_mutex_);
@@ -355,6 +357,12 @@ absl::Status AdapterNode::Main() {
       }
     }
   }
+
+  executor.cancel();
+  if (spin_thread.joinable()) {
+    spin_thread.join();
+  }
+
   return absl::OkStatus();
 }
 
@@ -371,10 +379,11 @@ void AdapterNode::DescribeCallback(
     absl::MutexLock lock(&camera_info_mutex_);
     need_capture = !camera_info_;
     if (need_capture) {
-      RCLCPP_WARN(get_logger(), "CameraInfo not yet received, triggering a capture...");
+      RCLCPP_WARN(get_logger(),
+                  "CameraInfo not yet received, triggering a capture...");
     }
   }
-  
+
   // If camera_info not available, trigger capture (without holding the lock)
   if (need_capture) {
     if (!capture_client_->service_is_ready()) {
@@ -383,20 +392,53 @@ void AdapterNode::DescribeCallback(
       RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
       return;
     }
-    
+
+    RCLCPP_INFO(get_logger(), "Sending capture request...");
     auto capture_request = std::make_shared<std_srvs::srv::Trigger::Request>();
     auto capture_result = capture_client_->async_send_request(capture_request);
-    auto wait_status = capture_result.wait_for(std::chrono::seconds(10));
-    auto capture_response = capture_result.get();
-    rclcpp::sleep_for(std::chrono::milliseconds(500));
-    
-    // Check again if camera_info is now available
-    absl::MutexLock lock(&camera_info_mutex_);
-    if (!camera_info_) {
-      response->error_message = "CameraInfo still not available after capture.";
+
+    // Wait for the capture to complete (with timeout of 10 seconds)
+    auto future_status = capture_result.wait_for(std::chrono::seconds(10));
+    if (future_status != std::future_status::ready) {
+      response->error_message = "Capture request timed out after 10 seconds.";
       response->success = false;
       RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
       return;
+    }
+
+    if (future_status == std::future_status::ready) {
+      auto capture_response = capture_result.get();
+      RCLCPP_INFO(get_logger(), "Capture request completed");
+
+      if (!capture_response->success) {
+        response->error_message =
+            absl::StrCat("Capture failed: ", capture_response->message);
+        response->success = false;
+        RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
+        return;
+      }
+
+      auto info_timeout =
+          std::chrono::steady_clock::now() + std::chrono::seconds(2);
+      bool info_received = false;
+      while (std::chrono::steady_clock::now() < info_timeout) {
+        {
+          absl::MutexLock lock(&camera_info_mutex_);
+          if (camera_info_) {
+            info_received = true;
+            break;
+          }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+
+      if (!info_received) {
+        response->error_message =
+            "CameraInfo still not available after capture.";
+        response->success = false;
+        RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
+        return;
+      }
     }
   }
 

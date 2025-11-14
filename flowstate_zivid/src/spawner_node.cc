@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "absl/algorithm/container.h"
 #include "flowstate_zivid/adapter_node.h"
 #include "snapshot_interfaces/srv/discover.hpp"
 #include "zivid_camera/zivid_camera.hpp"
@@ -98,7 +99,7 @@ void SpawnerNode::RefreshCameraList() {
   absl::MutexLock lock(&cameras_mutex_);
 
   RCLCPP_INFO(get_logger(), "Discovering physical cameras...");
-  auto zivid_cameras = zivid_app_->cameras();
+  const auto& zivid_cameras = zivid_app_->cameras();
   RCLCPP_INFO(get_logger(), "Found %zu physical camera(s)",
               zivid_cameras.size());
 
@@ -122,36 +123,30 @@ void SpawnerNode::RefreshCameraList() {
   spawned_nodes_ = still_active_nodes;
 
   // 2. Spawn nodes for newly discovered cameras.
-  for (auto& cam : zivid_cameras) {
-    std::string serial = cam.info().serialNumber().toString();
-    bool already_spawned = false;
-    for (const auto& node : spawned_nodes_) {
-      if (node && node->get_serial() == serial) {
-        already_spawned = true;
-        break;
-      }
+  for (const std::string& serial : discovered_serials) {
+    if (absl::c_any_of(spawned_nodes_, [&serial](const auto& node) {
+          return node && node->get_serial() == serial;
+        })) {
+      continue;
     }
+    RCLCPP_INFO(get_logger(), "New camera found: %s. Spawning node.",
+                serial.c_str());
+    try {
+      std::vector<rclcpp::Parameter> parameters;
+      parameters.emplace_back("serial_number", serial);
 
-    if (!already_spawned) {
-      RCLCPP_INFO(get_logger(), "New camera found: %s. Spawning node.",
+      rclcpp::NodeOptions node_options;
+      node_options.parameter_overrides(parameters);
+
+      auto camera_node = std::make_shared<flowstate_zivid::AdapterNode>(
+          serial, node_options, zivid_app_);
+      spawned_nodes_.push_back(camera_node);
+      RCLCPP_INFO(get_logger(), "Created AdapterNode for zivid camera %s",
                   serial.c_str());
-      try {
-        std::vector<rclcpp::Parameter> parameters;
-        parameters.emplace_back("serial_number", serial);
-
-        rclcpp::NodeOptions node_options;
-        node_options.parameter_overrides(parameters);
-
-        auto camera_node = std::make_shared<flowstate_zivid::AdapterNode>(
-            serial, node_options, zivid_app_);
-        spawned_nodes_.push_back(camera_node);
-        RCLCPP_INFO(get_logger(), "Created AdapterNode for zivid camera %s",
-                    serial.c_str());
-      } catch (const std::exception& e) {
-        RCLCPP_ERROR_STREAM(get_logger(),
-                            "Failed to create AdapterNode for zivid camera "
-                                << serial << ": " << e.what());
-      }
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR_STREAM(get_logger(),
+                          "Failed to create AdapterNode for zivid camera "
+                              << serial << ": " << e.what());
     }
   }
 
