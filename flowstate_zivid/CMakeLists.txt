@@ -119,7 +119,7 @@ ament_target_dependencies(zivid_nodes rclcpp
 
 # Add executable
 add_executable(zivid_driver_main 
-  src/ros_main.cc)
+  src/flowstate_service.cc)
 
 # Include directories - point to the package root's include directory
 target_include_directories(zivid_driver_main PUBLIC
@@ -164,52 +164,6 @@ target_compile_features(zivid_driver_main PUBLIC cxx_std_17)
 install(TARGETS zivid_driver_main
     DESTINATION lib/${PROJECT_NAME}
 )
-
-if(BUILD_TESTING)
-  # Add executable
-  add_executable(zivid_driver_main_test
-    src/ros_main_test.cc
-  )
-
-  # Include directories - point to the package root's include directory
-  target_include_directories(zivid_driver_main_test PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-      $<INSTALL_INTERFACE:include>
-  )
-
-  # Link libraries
-  target_link_libraries(zivid_driver_main_test
-      Zivid::Core
-      absl::status
-      absl::statusor
-      absl::strings
-      absl::synchronization
-      zivid_driver_protos
-      zivid_nodes
-      )
-
-
-  # ROS dependencies
-  ament_target_dependencies(zivid_driver_main_test
-      rclcpp
-      std_msgs
-      std_srvs
-      zivid_camera
-      snapshot_interfaces
-      rcl_interfaces
-      geometry_msgs
-      ament_index_cpp
-  )
-
-  # Set C++ standard
-  target_compile_features(zivid_driver_main_test PUBLIC cxx_std_20)
-
-  # Install executable
-  install(TARGETS zivid_driver_main_test
-      DESTINATION lib/${PROJECT_NAME}
-  )
-endif()
-
 
 # Export include directories
 ament_export_include_directories(include)

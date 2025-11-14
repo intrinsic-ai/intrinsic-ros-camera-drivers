@@ -24,8 +24,7 @@ namespace flowstate_zivid {
  * Key Responsibilities:
  * 1.  Camera Discovery:
  *     On startup, it automatically discovers all physically connected Zivid
- *     cameras. It also supports using a "file camera" for testing and
- *     development by reading from a ".zfc" file.
+ *     cameras.
  * 2.  Node Spawning:
  *     For each discovered camera, it generates a AdapterNode.
  *     Each AdapterNode is a separate ROS 2 node that directly
@@ -53,7 +52,7 @@ class SpawnerNode : public rclcpp::Node {
 
   rclcpp::TimerBase::SharedPtr timer_;
 
-  void RefreshCameraList(const std::string& file_camera_path = "");
+  void RefreshCameraList();
   void ShutdownCameraNodes();
 
   std::vector<std::shared_ptr<flowstate_zivid::AdapterNode>> spawned_nodes_;

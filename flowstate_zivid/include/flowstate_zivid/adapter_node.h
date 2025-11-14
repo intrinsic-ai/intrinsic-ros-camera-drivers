@@ -75,8 +75,9 @@ struct ZividCaptureParameters {
 class AdapterNode : public rclcpp::Node {
  public:
   AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options,
-              std::shared_ptr<Zivid::Camera> camera,
               std::shared_ptr<Zivid::Application> zivid_app);
+
+  std::string get_serial() const { return serial_; }
 
  private:
   rcl_interfaces::msg::SetParametersResult setParametersCallback(
@@ -117,8 +118,6 @@ class AdapterNode : public rclcpp::Node {
 
   std::string serial_;
 
-  ZividCaptureParameters capture_params_;
-
   // ROS Services
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::Service<snapshot_interfaces::srv::Describe>::SharedPtr
@@ -153,7 +152,8 @@ class AdapterNode : public rclcpp::Node {
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
       set_parameters_callback_handle_;
   mutable absl::Mutex capture_params_mutex_;
-  std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_ ABSL_GUARDED_BY(capture_params_mutex_);
+  ZividCaptureParameters capture_params_ ABSL_GUARDED_BY(capture_params_mutex_);
+  std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_;
 
   std::thread thread_;
 };

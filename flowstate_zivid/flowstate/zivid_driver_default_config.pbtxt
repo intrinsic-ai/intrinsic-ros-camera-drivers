@@ -1,7 +1,3 @@
 # proto-file: google/protobuf/any.proto
 # proto-message: Any
-[type.googleapis.com/zivid_driver.ZividDriverConfig] {
-  # If no addresses are provided, the service will automatically discover
-  # and use any zivid units that it finds.
-
-}
+[type.googleapis.com/zivid_driver.ZividDriverConfig] {}
