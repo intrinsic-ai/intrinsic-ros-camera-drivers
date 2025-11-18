@@ -20,7 +20,7 @@ git clone ssh://git@github.com/intrinsic-dev/flowstate-ros-camera-drivers
 git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/ros2/rmw_zenoh --branch 0.2.3
 git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
-git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon
+git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
 git clone https://github.com/intrinsic-dev/zivid-ros --branch flowstate
 ```
 
@@ -41,9 +41,20 @@ This can run conveniently on `gLinux` using `distrobox`.
 Assuming the distrobox is named `ubuntu-24-04` and that the typical [desktop ROS Jazzy instructions](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) have been followed, here are some packages to add:
 
 ```
+# distrobox setup
+sudo apt install distrobox
+sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 $USER && podman system migrate
+distrobox create -i ubuntu:24.04 -n ubuntu-24-04
 distrobox enter ubuntu-24-04
-sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher
+
+# additional packages
+sudo apt update
+sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jazzy-ament-cmake-vendor-package
+sudo apt install libzmq3-dev libczmq-dev nlohmann-json3-dev
+sudo apt-get install libprotobuf-dev protobuf-compiler
 ```
+For Zivid-related packages, please see the [Zivid details](#zivid-details) section below.
+
 
 Finally, let's build it!
 ```
@@ -76,7 +87,24 @@ colcon build --event-handlers console_direct+ --executor sequential
 
 # Zivid details
 
-Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.16.0` on your computer. `Zivid SDK` requires an OpenCL 1.2 compatible GPU with driver. Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation/gpu/install-opencl-drivers-ubuntu.html) to install OpenCL drivers for your system.
+Install `Zivid Core 2.16.0` on your computer.
+
+```
+wget \
+https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid_2.16.0+46cdaba6-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-studio_2.16.0+46cdaba6-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-tools_2.16.0+46cdaba6-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-genicam_2.16.0+46cdaba6-1_amd64.deb
+
+sudo apt update
+sudo apt install ./*.deb
+
+```
+
+`Zivid SDK` requires an OpenCL 1.2 compatible GPU with driver. Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation/gpu/install-opencl-drivers-ubuntu.html) to install OpenCL drivers inside the distrobox matching your system nvidia driver version. For example:
+```
+sudo apt install nvidia-driver-550
+```
 
 Finally, let's build it!
 ```
@@ -92,7 +120,7 @@ source install/setup.bash
 ros2 run flowstate_zivid zivid_driver_main
 ```
 
-If everything is set, we can start to build the service container for the zivid camera:
+If everything is set, we can start to build the service container for the zivid camera **outside the distrobox container**:
 
 ```
 cd ~/ros_cameras_ws

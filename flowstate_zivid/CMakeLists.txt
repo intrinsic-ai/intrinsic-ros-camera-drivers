@@ -10,7 +10,7 @@ endif()
 
 # Find required packages
 # Find Zivid SDK first (required by zivid_camera)
-find_package(Zivid 2.15.0 COMPONENTS Core REQUIRED)
+find_package(Zivid 2.16.0 COMPONENTS Core REQUIRED)
 message(STATUS "Found Zivid SDK version ${Zivid_VERSION}")
 
 find_package(rclcpp REQUIRED)
@@ -44,8 +44,6 @@ install(
 intrinsic_sdk_generate_service_manifest(
   SERVICE_NAME zivid_driver
   MANIFEST flowstate/zivid_driver.manifest.textproto
-  DEFAULT_CONFIGURATION ""
-  PARAMETER_DESCRIPTOR ""
 )
 
 add_library(zivid_camera_node SHARED src/adapter_node.cc)
@@ -165,23 +163,9 @@ install(TARGETS zivid_driver_main
 # Export include directories
 ament_export_include_directories(include)
 
-if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/zivid_driver_protos.desc")
-  # Install the proto descriptor database only if it was generated
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zivid_driver_protos.desc
-          DESTINATION "share/${PROJECT_NAME}/zivid_driver"
-  )
-endif()
-
 # Install the service manifest
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/service_manifest.binarypb
         DESTINATION "share/${PROJECT_NAME}/zivid_driver"
 )
-
-if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb")
-  # Install the default configuration only if it was generated
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
-          DESTINATION "share/${PROJECT_NAME}/zivid_driver"
-  )
-endif()
 
 ament_package()

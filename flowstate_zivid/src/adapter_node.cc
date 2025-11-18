@@ -159,7 +159,6 @@ AdapterNode::AdapterNode(const std::string& serial,
     }
     RCLCPP_INFO(this->get_logger(), "Destroying zivid_camera_node...");
     zivid_node_.reset();
-    rclcpp::sleep_for(std::chrono::milliseconds(500));
     RCLCPP_INFO(this->get_logger(), "Done destroying zivid_camera_node.");
   });
 }
@@ -406,40 +405,43 @@ void AdapterNode::DescribeCallback(
       return;
     }
 
-    if (future_status == std::future_status::ready) {
-      auto capture_response = capture_result.get();
-      RCLCPP_INFO(get_logger(), "Capture request completed");
+    auto capture_response = capture_result.get();
+    RCLCPP_INFO(get_logger(), "Capture request completed");
 
-      if (!capture_response->success) {
-        response->error_message =
-            absl::StrCat("Capture failed: ", capture_response->message);
-        response->success = false;
-        RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
-        return;
-      }
-
-      auto info_timeout =
-          std::chrono::steady_clock::now() + std::chrono::seconds(2);
-      bool info_received = false;
-      while (std::chrono::steady_clock::now() < info_timeout) {
-        {
-          absl::MutexLock lock(&camera_info_mutex_);
-          if (camera_info_) {
-            info_received = true;
-            break;
-          }
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      }
-
-      if (!info_received) {
-        response->error_message =
-            "CameraInfo still not available after capture.";
-        response->success = false;
-        RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
-        return;
-      }
+    if (!capture_response->success) {
+      response->error_message =
+          absl::StrCat("Capture failed: ", capture_response->message);
+      response->success = false;
+      RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
+      return;
     }
+
+    // The zivid_camera node publishes CameraInfo on a separate topic after a
+    // successful capture. We need to poll here to wait for the message to
+    // arrive at our subscriber. This is not instantaneous, so we wait a bit
+    // for it to become available.
+    auto info_timeout =
+        std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    bool info_received = false;
+    while (std::chrono::steady_clock::now() < info_timeout) {
+      {
+        absl::MutexLock lock(&camera_info_mutex_);
+        if (camera_info_) {
+          info_received = true;
+          break;
+        }
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    if (!info_received) {
+      response->error_message =
+          "CameraInfo still not available after capture.";
+      response->success = false;
+      RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
+      return;
+    }
+    
   }
 
   absl::MutexLock lock(&camera_info_mutex_);
