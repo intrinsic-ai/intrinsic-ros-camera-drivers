@@ -30,7 +30,5 @@ service_def {
   }
 }
 assets {
-  default_configuration_filename: "default_config.binarypb",
-  parameter_descriptor_filename: "parameter-descriptor-set.proto.bin",
   image_filenames: ["zivid_driver.tar"]
 }

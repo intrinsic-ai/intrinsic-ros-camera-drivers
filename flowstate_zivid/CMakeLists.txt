@@ -44,9 +44,8 @@ install(
 intrinsic_sdk_generate_service_manifest(
   SERVICE_NAME zivid_driver
   MANIFEST flowstate/zivid_driver.manifest.textproto
-  DEFAULT_CONFIGURATION flowstate/zivid_driver_default_config.pbtxt
-  PARAMETER_DESCRIPTOR flowstate/zivid_driver_config.proto
-  PROTOS_TARGET zivid_driver_protos
+  DEFAULT_CONFIGURATION ""
+  PARAMETER_DESCRIPTOR ""
 )
 
 add_library(zivid_camera_node SHARED src/adapter_node.cc)
@@ -134,14 +133,12 @@ target_link_libraries(zivid_driver_main
     absl::statusor
     absl::strings
     absl::synchronization
-    zivid_driver_protos
     zivid_nodes
     )
 
 
-add_dependencies(zivid_driver_main 
-    zivid_driver_manifest 
-    zivid_driver_default_config
+add_dependencies(zivid_driver_main
+    zivid_driver_manifest
   )
 
 # ROS dependencies
@@ -168,18 +165,23 @@ install(TARGETS zivid_driver_main
 # Export include directories
 ament_export_include_directories(include)
 
-# Install the proto descriptor database
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zivid_driver_protos.desc
-        DESTINATION "share/${PROJECT_NAME}/zivid_driver"
-)
+if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/zivid_driver_protos.desc")
+  # Install the proto descriptor database only if it was generated
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zivid_driver_protos.desc
+          DESTINATION "share/${PROJECT_NAME}/zivid_driver"
+  )
+endif()
 
 # Install the service manifest
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/service_manifest.binarypb
         DESTINATION "share/${PROJECT_NAME}/zivid_driver"
 )
-# Install the default configuration
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
-        DESTINATION "share/${PROJECT_NAME}/zivid_driver"
-)
+
+if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb")
+  # Install the default configuration only if it was generated
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
+          DESTINATION "share/${PROJECT_NAME}/zivid_driver"
+  )
+endif()
 
 ament_package()
