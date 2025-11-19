@@ -53,7 +53,6 @@ AdapterNode::AdapterNode(const std::string& serial,
                           capture_params_.outlier_removal_enabled);
   declare_parameter<double>("outlier_removal_threshold",
                             capture_params_.outlier_removal_threshold);
-  declare_parameter<double>("fps", 0.0);
 
   // Declare parameters that will be passed through to zivid_camera node
   const std::string zivid_node_name = std::string("camera_") + serial;
@@ -104,10 +103,6 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   color_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
       ColorImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
-        {
-          absl::MutexLock timeout_lock(&this->timeout_mutex_);
-          this->t_last_color_image_ = this->get_clock()->now();
-        }
         absl::MutexLock data_lock(&this->data_mutex_);
         this->color_image_ = std::move(msg);
       });
@@ -148,8 +143,6 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   capture_client_ = this->create_client<std_srvs::srv::Trigger>(
       absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()));
-
-  onCaptureTimer(this->get_parameter("fps").as_double());
 
   thread_ = std::thread([this]() {
     const absl::Status status = this->Main();
@@ -218,8 +211,6 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::setParametersCallback(
                                            << param.get_name()
                                            << "' to zivid_camera node.");
       zivid_camera_param_client_->set_parameters({param});
-    } else if (param.get_name() == "fps") {
-      onCaptureTimer(param.as_double());
     } else {
       RCLCPP_INFO_STREAM(get_logger(),
                          "Passing through parameter '"
@@ -239,42 +230,6 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::setParametersCallback(
   }
 
   return result;
-}
-
-void AdapterNode::onCaptureTimer(double fps) {
-  RCLCPP_INFO_STREAM(get_logger(), "FPS parameter is set to " << fps);
-
-  // Always stop the existing timer if it's running before potentially starting
-  // a new one.
-  if (capture_timer_) {
-    RCLCPP_INFO(get_logger(),
-                "Stopping current continuous capture before (re)starting.");
-    capture_timer_->cancel();
-    capture_timer_.reset();
-  }
-
-  if (fps > 0.0) {
-    const auto period = std::chrono::duration<double>(1.0 / fps);
-    RCLCPP_INFO(get_logger(),
-                "Starting continuous capture with a period of %.3f s (%.1f Hz)",
-                period.count(), fps);
-    {
-      absl::MutexLock timeout_lock(&timeout_mutex_);
-      t_last_color_image_ = this->get_clock()->now();
-      RCLCPP_INFO(get_logger(), "Resetting image timeout watchdog.");
-    }
-    capture_timer_ = this->create_wall_timer(period, [this]() {
-      if (!capture_client_->service_is_ready()) {
-        RCLCPP_WARN_THROTTLE(get_logger(), *this->get_clock(), 5000,
-                             "Capture service is not ready.");
-        return;
-      }
-      capture_client_->async_send_request(
-          std::make_shared<std_srvs::srv::Trigger::Request>());
-    });
-  } else {  // fps <= 0.0
-    RCLCPP_INFO(get_logger(), "Continuous capture is disabled (fps <= 0.0).");
-  }
 }
 
 std::string AdapterNode::GenerateZividSettings() const {
@@ -340,27 +295,7 @@ absl::Status AdapterNode::Main() {
   executor.add_node(this->get_node_base_interface());
   executor.add_node(zivid_node_->get_node_base_interface());
 
-  t_last_color_image_ = get_clock()->now();
-
-  std::thread spin_thread([&executor]() { executor.spin(); });
-
-  while (rclcpp::ok()) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    {
-      if (this->get_parameter("fps").as_double() > 0.0) {
-        absl::MutexLock timeout_lock(&timeout_mutex_);
-        if ((get_clock()->now() - t_last_color_image_).seconds() > 10.0) {
-          RCLCPP_ERROR(get_logger(), "No new image arrived for 10 seconds");
-          break;
-        }
-      }
-    }
-  }
-
-  executor.cancel();
-  if (spin_thread.joinable()) {
-    spin_thread.join();
-  }
+  executor.spin();
 
   return absl::OkStatus();
 }
@@ -486,14 +421,11 @@ void AdapterNode::SnapshotCallback(
         response) {
   RCLCPP_INFO(get_logger(), "=== SNAPSHOT SERVICE ===");
   
-  if (this->get_parameter("fps").as_double() == 0.0)
-  {
-    std::string error_message;
-    if (!TriggerOnDemandCapture(error_message)) {
-      response->error_message = error_message;
-      response->success = false;
-      return;
-    }
+  std::string error_message;
+  if (!TriggerOnDemandCapture(error_message)) {
+    response->error_message = error_message;
+    response->success = false;
+    return;
   }
 
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;

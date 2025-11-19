@@ -83,10 +83,6 @@ class AdapterNode : public rclcpp::Node {
   rcl_interfaces::msg::SetParametersResult setParametersCallback(
       const std::vector<rclcpp::Parameter>& parameters);
   /**
-   * @brief (Re)starts the capture timer with a new frame rate.
-   */
-  void onCaptureTimer(double fps);
-  /**
    * @brief Generates a Zivid settings string in YAML format.
    * @return A string containing the Zivid settings in YAML format.
    */
@@ -133,7 +129,6 @@ class AdapterNode : public rclcpp::Node {
       snapshot_service_;
 
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
-  rclcpp::TimerBase::SharedPtr capture_timer_;
 
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
 
@@ -151,10 +146,6 @@ class AdapterNode : public rclcpp::Node {
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_image_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr normal_sub_;
-
-  // Timeout monitoring
-  mutable absl::Mutex timeout_mutex_;
-  rclcpp::Time t_last_color_image_ ABSL_GUARDED_BY(timeout_mutex_);
 
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
       set_parameters_callback_handle_;
