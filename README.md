@@ -53,7 +53,7 @@ sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jaz
 sudo apt install libzmq3-dev libczmq-dev nlohmann-json3-dev
 sudo apt-get install libprotobuf-dev protobuf-compiler
 ```
-For Zivid-related packages, please see the [Zivid details](#zivid-details) section below.
+For Zivid-related packages, please follow the [Zivid details](#zivid-details) section below.
 
 
 Finally, let's build it!
@@ -61,6 +61,9 @@ Finally, let's build it!
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build
+
+# if you want to skip setting up environment and building with unused ros camera driver packages, you can use the following command:
+colcon build --packages-skip <camera driver package name>
 ```
 
 # Orbbec details
@@ -110,7 +113,7 @@ Finally, let's build it!
 ```
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
-colcon build
+colcon build --packages-skip flowstate_orbbec
 ```
 
 To test the camera functions locally, use the following command to trigger capturing.

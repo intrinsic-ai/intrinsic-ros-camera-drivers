@@ -365,12 +365,46 @@ absl::Status AdapterNode::Main() {
   return absl::OkStatus();
 }
 
+bool AdapterNode::TriggerOnDemandCapture(std::string& error_message) {
+  RCLCPP_INFO(get_logger(), "Triggering on-demand capture...");
+
+  if (!capture_client_->service_is_ready()) {
+    error_message = "Capture service is not ready.";
+    RCLCPP_ERROR(get_logger(), "%s", error_message.c_str());
+    return false;
+  }
+
+  RCLCPP_INFO(get_logger(), "Sending capture request...");
+  auto capture_request = std::make_shared<std_srvs::srv::Trigger::Request>();
+  auto capture_result = capture_client_->async_send_request(capture_request);
+
+  // Wait for the capture to complete (with timeout of 10 seconds)
+  auto future_status = capture_result.wait_for(std::chrono::seconds(10));
+  if (future_status != std::future_status::ready) {
+    error_message = "Capture request timed out after 10 seconds.";
+    RCLCPP_ERROR(get_logger(), "%s", error_message.c_str());
+    return false;
+  }
+
+  auto capture_response = capture_result.get();
+  RCLCPP_INFO(get_logger(), "Capture request completed");
+
+  if (!capture_response->success) {
+    error_message =
+        absl::StrCat("Capture failed: ", capture_response->message);
+    RCLCPP_ERROR(get_logger(), "%s", error_message.c_str());
+    return false;
+  }
+
+  return true;
+}
+
 void AdapterNode::DescribeCallback(
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {
-  RCLCPP_INFO(get_logger(), "AdapterNode::DescribeCallback()");
+  RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
 
   // Check if camera_info is available, if not try to capture once
   bool need_capture = false;
@@ -385,45 +419,17 @@ void AdapterNode::DescribeCallback(
 
   // If camera_info not available, trigger capture (without holding the lock)
   if (need_capture) {
-    if (!capture_client_->service_is_ready()) {
-      response->error_message = "Capture service is not ready.";
+    std::string error_message;
+    if (!TriggerOnDemandCapture(error_message)) {
+      response->error_message = error_message;
       response->success = false;
-      RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
       return;
     }
-
-    RCLCPP_INFO(get_logger(), "Sending capture request...");
-    auto capture_request = std::make_shared<std_srvs::srv::Trigger::Request>();
-    auto capture_result = capture_client_->async_send_request(capture_request);
-
-    // Wait for the capture to complete (with timeout of 10 seconds)
-    auto future_status = capture_result.wait_for(std::chrono::seconds(10));
-    if (future_status != std::future_status::ready) {
-      response->error_message = "Capture request timed out after 10 seconds.";
-      response->success = false;
-      RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
-      return;
-    }
-
-    auto capture_response = capture_result.get();
-    RCLCPP_INFO(get_logger(), "Capture request completed");
-
-    if (!capture_response->success) {
-      response->error_message =
-          absl::StrCat("Capture failed: ", capture_response->message);
-      response->success = false;
-      RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
-      return;
-    }
-
-    // The zivid_camera node publishes CameraInfo on a separate topic after a
-    // successful capture. We need to poll here to wait for the message to
-    // arrive at our subscriber. This is not instantaneous, so we wait a bit
-    // for it to become available.
-    auto info_timeout =
-        std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    
+    // Wait for camera_info to arrive after capture (with timeout)
+    auto start_time = get_clock()->now();
     bool info_received = false;
-    while (std::chrono::steady_clock::now() < info_timeout) {
+    while ((get_clock()->now() - start_time).seconds() < 5.0) {
       {
         absl::MutexLock lock(&camera_info_mutex_);
         if (camera_info_) {
@@ -431,17 +437,14 @@ void AdapterNode::DescribeCallback(
           break;
         }
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-
+    
     if (!info_received) {
-      response->error_message =
-          "CameraInfo still not available after capture.";
+      response->error_message = "CameraInfo not received after capture within timeout";
       response->success = false;
       RCLCPP_ERROR(get_logger(), "%s", response->error_message.c_str());
       return;
     }
-    
   }
 
   absl::MutexLock lock(&camera_info_mutex_);
@@ -481,7 +484,17 @@ void AdapterNode::SnapshotCallback(
         snapshot_interfaces::srv::Snapshot::Request> /*request*/,
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
         response) {
-  RCLCPP_INFO(get_logger(), "AdapterNode::SnapshotCallback()");
+  RCLCPP_INFO(get_logger(), "=== SNAPSHOT SERVICE ===");
+  
+  if (this->get_parameter("fps").as_double() == 0.0)
+  {
+    std::string error_message;
+    if (!TriggerOnDemandCapture(error_message)) {
+      response->error_message = error_message;
+      response->success = false;
+      return;
+    }
+  }
 
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;

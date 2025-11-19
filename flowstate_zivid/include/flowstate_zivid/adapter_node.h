@@ -106,6 +106,13 @@ class AdapterNode : public rclcpp::Node {
       const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
           response);
 
+  /**
+   * @brief Triggers an on-demand capture and waits for CameraInfo to be available.
+   * @param error_message Output parameter for error message if capture fails.
+   * @return true if capture succeeded and CameraInfo is available, false otherwise.
+   */
+  bool TriggerOnDemandCapture(std::string& error_message);
+
   absl::Status Main();
 
   std::string ColorImageTopic() const;
