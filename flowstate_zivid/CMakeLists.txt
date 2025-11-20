@@ -10,7 +10,7 @@ endif()
 
 # Find required packages
 # Find Zivid SDK first (required by zivid_camera)
-find_package(Zivid 2.16.0 COMPONENTS Core REQUIRED)
+find_package(Zivid 2.17.0 COMPONENTS Core REQUIRED)
 message(STATUS "Found Zivid SDK version ${Zivid_VERSION}")
 
 find_package(rclcpp REQUIRED)
@@ -61,6 +61,7 @@ ament_target_dependencies(zivid_camera_node rclcpp
     sensor_msgs
     rcl_interfaces
     geometry_msgs
+    image_transport
 )
 target_link_libraries(
   zivid_camera_node

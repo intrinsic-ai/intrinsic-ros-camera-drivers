@@ -8,6 +8,8 @@
 
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/synchronization/notification.h"
+#include "image_transport/image_transport.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
@@ -103,11 +105,28 @@ class AdapterNode : public rclcpp::Node {
           response);
 
   /**
-   * @brief Triggers an on-demand capture and waits for CameraInfo to be available.
-   * @param error_message Output parameter for error message if capture fails.
-   * @return true if capture succeeded and CameraInfo is available, false otherwise.
+   * @brief Triggers an on-demand capture.
+   * @return absl::OkStatus() if capture succeeded, error status with message otherwise.
    */
-  bool TriggerOnDemandCapture(std::string& error_message);
+  absl::Status TriggerOnDemandCapture();
+
+  /**
+   * @brief Callback for FPS parameter changes to start/stop continuous capture.
+   * @param fps The desired capture rate in Hz. If <= 0, continuous capture is disabled.
+   */
+  void onCaptureTimer(double fps);
+
+  /**
+   * @brief Waits for an ongoing capture to complete.
+   * @return absl::OkStatus() if capture completed successfully, error status otherwise.
+   */
+  absl::Status WaitForOngoingCapture();
+
+  /**
+   * @brief Checks if all capture data is available and clears the in-progress flag if so.
+   * @note Must be called with data_mutex_ already locked.
+   */
+  void CheckAndClearCaptureFlag() ABSL_EXCLUSIVE_LOCKS_REQUIRED(data_mutex_);
 
   absl::Status Main();
 
@@ -133,19 +152,26 @@ class AdapterNode : public rclcpp::Node {
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
 
   mutable absl::Mutex camera_info_mutex_;
-  sensor_msgs::msg::CameraInfo::UniquePtr camera_info_
+  sensor_msgs::msg::CameraInfo::UniquePtr color_camera_info_
       ABSL_GUARDED_BY(camera_info_mutex_);
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
-      camera_info_sub_;
+  sensor_msgs::msg::CameraInfo::UniquePtr depth_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
 
   mutable absl::Mutex data_mutex_;
   sensor_msgs::msg::Image::UniquePtr color_image_ ABSL_GUARDED_BY(data_mutex_);
   sensor_msgs::msg::Image::UniquePtr depth_image_ ABSL_GUARDED_BY(data_mutex_);
   sensor_msgs::msg::PointCloud2::UniquePtr normal_pc_
       ABSL_GUARDED_BY(data_mutex_);
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_image_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
+  
+  // Flag to track if a capture is currently being processed from the timer
+  bool capture_in_progress_ ABSL_GUARDED_BY(data_mutex_) = false;
+  
+  image_transport::CameraSubscriber color_image_sub_;
+  image_transport::CameraSubscriber depth_image_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr normal_sub_;
+
+  // Timer for continuous capture
+  rclcpp::TimerBase::SharedPtr capture_timer_;
 
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
       set_parameters_callback_handle_;

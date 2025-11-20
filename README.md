@@ -21,7 +21,7 @@ git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/ros2/rmw_zenoh --branch 0.2.3
 git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
 git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
-git clone https://github.com/intrinsic-dev/zivid-ros --branch flowstate
+git clone https://github.com/zivid/zivid-ros.git
 ```
 
 The resulting directory structure should look like this:
@@ -90,14 +90,14 @@ colcon build --event-handlers console_direct+ --executor sequential
 
 # Zivid details
 
-Install `Zivid Core 2.16.0` inside distrobox container.
+Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.17.0` inside distrobox container.
 
 ```
 wget \
-https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid_2.16.0+46cdaba6-1_amd64.deb \
-https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-studio_2.16.0+46cdaba6-1_amd64.deb \
-https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-tools_2.16.0+46cdaba6-1_amd64.deb \
-https://downloads.zivid.com/sdk/releases/2.16.0+46cdaba6-1/u24/amd64/zivid-genicam_2.16.0+46cdaba6-1_amd64.deb
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-studio_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-tools_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-genicam_2.17.0+5fc9f05e-1_amd64.deb
 
 sudo apt update
 sudo apt install ./*.deb
