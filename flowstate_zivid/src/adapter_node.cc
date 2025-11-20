@@ -316,10 +316,6 @@ std::string AdapterNode::NormalTopic() const {
   return absl::StrFormat("/zivid/camera_%s/normals/xyz", serial_.c_str());
 }
 
-std::string AdapterNode::CameraInfoTopic() const {
-  return absl::StrFormat("/zivid/camera_%s/camera_info", serial_.c_str());
-}
-
 absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main() for %s", this->get_name());
   rclcpp::executors::MultiThreadedExecutor executor;
@@ -560,6 +556,10 @@ void AdapterNode::DescribeCallback(
   normal_info.topic_name = NormalTopic();
   normal_info.sensor_type = snapshot_interfaces::msg::SensorInfo::NORMAL;
   normal_info.camera_t_sensor.transform.rotation.w = 1.0;
+  {
+    absl::MutexLock lock(&camera_info_mutex_);
+    normal_info.info.push_back(*depth_camera_info_);
+  }
   response->sensors.push_back(normal_info);
 
   response->success = true;

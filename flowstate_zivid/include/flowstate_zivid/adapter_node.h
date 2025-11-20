@@ -134,8 +134,6 @@ class AdapterNode : public rclcpp::Node {
 
   std::string DepthImageTopic() const;
 
-  std::string CameraInfoTopic() const;
-
   std::string NormalTopic() const;
 
   std::string serial_;
