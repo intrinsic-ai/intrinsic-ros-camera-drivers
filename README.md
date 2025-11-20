@@ -62,7 +62,7 @@ cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build
 
-# if you want to skip setting up environment and building with unused ros camera driver packages, you can use the following command:
+# if you want to skip building with unused ros camera driver packages, you can use the following command:
 colcon build --packages-skip <camera driver package name>
 ```
 
@@ -90,7 +90,7 @@ colcon build --event-handlers console_direct+ --executor sequential
 
 # Zivid details
 
-Install `Zivid Core 2.16.0` on your computer.
+Install `Zivid Core 2.16.0` inside distrobox container.
 
 ```
 wget \
