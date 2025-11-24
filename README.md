@@ -23,6 +23,7 @@ git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_wi
 git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon
 git clone https://github.com/codebot/depthai-core --branch kilted && cd depthai-core && git submodule update --init --recursive && cd ..
 git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
+git clone https://github.com/zivid/zivid-ros.git
 ```
 
 The resulting directory structure should look like this:
@@ -35,6 +36,7 @@ ros_cameras_ws/
     ├── OrbbecSDK
     ├── OrbbecSDK_ROS2
     ├── rmw_zenoh
+    ├── zivid-ros
     └── sdk-ros
 ```
 
@@ -43,15 +45,29 @@ This can run conveniently on `gLinux` using `distrobox`.
 Assuming the distrobox is named `ubuntu-24-04` and that the typical [desktop ROS Jazzy instructions](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) have been followed, here are some packages to add:
 
 ```
+# distrobox setup
+sudo apt install distrobox
+sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 $USER && podman system migrate
+distrobox create -i ubuntu:24.04 -n ubuntu-24-04
 distrobox enter ubuntu-24-04
-sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher
+
+# additional packages
+sudo apt update
+sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jazzy-ament-cmake-vendor-package
+sudo apt install libzmq3-dev libczmq-dev nlohmann-json3-dev
+sudo apt-get install libprotobuf-dev protobuf-compiler
 ```
+For Zivid-related packages, please follow the [Zivid details](#zivid-details) section below.
+
 
 Finally, let's build it!
 ```
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build
+
+# if you want to skip building with unused ros camera driver packages, you can use the following command:
+colcon build --packages-skip <camera driver package name>
 ```
 
 # Orbbec details
@@ -99,4 +115,60 @@ Then click "Specify IP", and type an IP address on the local network, such as `1
 Sometimes there is just too much going on in parallel, and it's hard to sift through the console traffic. This invocation builds things one-at-a-time:
 ```
 colcon build --event-handlers console_direct+ --executor sequential
+```
+
+
+# Zivid details
+
+Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.17.0` inside distrobox container.
+
+```
+wget \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-studio_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-tools_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-genicam_2.17.0+5fc9f05e-1_amd64.deb
+
+sudo apt update
+sudo apt install ./*.deb
+
+```
+
+`Zivid SDK` requires an OpenCL 1.2 compatible GPU with driver. Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation/gpu/install-opencl-drivers-ubuntu.html) to install OpenCL drivers inside the distrobox matching your system nvidia driver version. For example:
+```
+sudo apt install nvidia-driver-550
+```
+
+Finally, let's build it!
+```
+cd ~/ros_cameras_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --packages-skip flowstate_orbbec
+```
+
+To test the camera functions locally, use the following command to trigger capturing.
+
+```
+source install/setup.bash
+ros2 run flowstate_zivid zivid_driver_main
+```
+
+If everything is set, we can start to build the service container for the zivid camera **outside the distrobox container**:
+
+```
+cd ~/ros_cameras_ws
+./src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/build_service_bundle.sh
+```
+
+Sideload and install the service container in flowstate:
+```
+export SERVICE_BUNDLE=~/ros_cameras_ws/images/zivid_driver.bundle.tar 
+
+export INTRINSIC_ORGANIZATION=<org name>
+
+inctl cluster list --org $INTRINSIC_ORGANIZATION
+
+export INTRINSIC_CONTEXT=<cluster id>
+
+inctl service install --org $INTRINSIC_ORGANIZATION --cluster $INTRINSIC_CONTEXT $SERVICE_BUNDLE
 ```
