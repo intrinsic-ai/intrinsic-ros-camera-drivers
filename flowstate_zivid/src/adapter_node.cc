@@ -359,12 +359,18 @@ void AdapterNode::DescribeCallback(
         response) {
   RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
 
-  // Trigger a capture to get fresh camera info
-  auto capture_data = Capture();
-  if (!capture_data.ok()) {
-    response->error_message = std::string(capture_data.status().message());
-    response->success = false;
-    return;
+  absl::MutexLock lock(&data_mutex_);
+  sensor_msgs::msg::CameraInfo::ConstSharedPtr camera_info = data_.camera_info;
+
+  if (!camera_info) {
+    RCLCPP_INFO(get_logger(), "No cached camera_info available, triggering capture");
+    auto capture_data = Capture();
+    if (!capture_data.ok()) {
+      response->error_message = std::string(capture_data.status().message());
+      response->success = false;
+      return;
+    }
+    camera_info = capture_data->camera_info;
   }
 
   // Color sensor info
@@ -373,7 +379,7 @@ void AdapterNode::DescribeCallback(
   color_info.topic_name = ColorImageTopic();
   color_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
   color_info.camera_t_sensor.transform.rotation.w = 1.0;
-  color_info.info.push_back(*capture_data->camera_info);
+  color_info.info.push_back(*camera_info);
   response->sensors.push_back(color_info);
 
   // Depth sensor info
@@ -382,7 +388,7 @@ void AdapterNode::DescribeCallback(
   depth_info.topic_name = DepthImageTopic();
   depth_info.sensor_type = snapshot_interfaces::msg::SensorInfo::DEPTH;
   depth_info.camera_t_sensor.transform.rotation.w = 1.0;
-  depth_info.info.push_back(*capture_data->camera_info);
+  depth_info.info.push_back(*camera_info);
   response->sensors.push_back(depth_info);
 
   snapshot_interfaces::msg::SensorInfo normal_info;
@@ -390,7 +396,7 @@ void AdapterNode::DescribeCallback(
   normal_info.topic_name = NormalTopic();
   normal_info.sensor_type = snapshot_interfaces::msg::SensorInfo::NORMAL;
   normal_info.camera_t_sensor.transform.rotation.w = 1.0;
-  normal_info.info.push_back(std::move(*capture_data->camera_info));
+  normal_info.info.push_back(std::move(*camera_info));
   response->sensors.push_back(normal_info);
 
   response->success = true;

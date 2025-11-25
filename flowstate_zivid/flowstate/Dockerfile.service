@@ -52,7 +52,9 @@ RUN . /opt/ros/jazzy/setup.sh && \
         --continue-on-error \
         --event-handlers=console_direct+ \
         --merge-install \
-        --packages-up-to intrinsic_sdk 
+        --packages-up-to intrinsic_sdk \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /root/.ros/rosdep 
 
 # Configure OpenCL for NVIDIA GPU
 RUN mkdir -p /etc/OpenCL/vendors && \
@@ -71,7 +73,8 @@ RUN apt-get update && apt-get install -y wget && \
     https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-genicam_${ZIVID_VERSION}_amd64.deb && \
     apt-get install -y ./*.deb && \
     rm ./*.deb && \
-    apt-get clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 # Set LD_LIBRARY_PATH to include NVIDIA libraries for OpenCL discovery during build
 ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
@@ -82,13 +85,15 @@ RUN cd /opt/ros/underlay/src/ \
 RUN . /opt/ros/jazzy/setup.sh \
     && apt-get update \
     && rosdep update \
-    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr
+    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
         --event-handlers=console_direct+ \
         --merge-install \
-        --packages-up-to=rmw_zenoh_cpp
+        --packages-up-to=rmw_zenoh_cpp \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log
 
 
 # overlay stage: underlay + service code built
@@ -112,13 +117,23 @@ RUN . /opt/ros/jazzy/setup.sh \
       --event-handlers=console_direct+ \
       --merge-install \
       --packages-up-to=${SERVICE_PACKAGE} \
-      --packages-skip intrinsic_sdk grpc_vendor rmw_zenoh_cpp flowstate_orbbec
+      --packages-skip intrinsic_sdk grpc_vendor rmw_zenoh_cpp flowstate_orbbec flowstate_luxonis \
+    && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log
 
 RUN echo "Searching for and copying vendored libprotobuf..." && \
     find /opt/ros/underlay/build -name "libprotobuf.so.29.0.0" -exec cp {} /opt/ros/overlay/install/lib/ \;
 
 RUN echo "Searching for and copying vendored absl libraries..." && \
     find /opt/ros/underlay/build/abseil_cpp_vendor -name "libabsl*.so*" -exec cp -d {} /opt/ros/overlay/install/lib/ \;
+
+# Clean up build artifacts and caches
+RUN rm -rf /opt/ros/underlay/build \
+    && rm -rf /opt/ros/underlay/log \
+    && rm -rf /opt/ros/underlay/src \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /root/.cache
 
 RUN ls -l /opt/ros/overlay/install/lib/${SERVICE_PACKAGE}
 RUN ls -R /opt/ros/overlay/install

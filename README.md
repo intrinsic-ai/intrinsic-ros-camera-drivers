@@ -60,7 +60,7 @@ sudo mkdir -p /etc/OpenCL/vendors
 echo "libnvidia-opencl.so.1" | sudo tee /etc/OpenCL/vendors/nvidia.icd
 ```
 
-Assuming the distrobox is named `ubuntu-24-04` or `ubuntu and that the typical [desktop ROS Jazzy instructions](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) have been followed, here are some packages to add:
+Assuming the distrobox is named `ubuntu-24-04` or `ubuntu-24-04-nvidia` and that the typical [desktop ROS Jazzy instructions](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) have been followed, here are some packages to add:
 ```
 # additional packages
 sudo apt update
@@ -125,6 +125,13 @@ python3 device_manager.py
 Then click "Specify IP", and type an IP address on the local network, such as `192.168.1.203`
 
 # Debugging builds
+```
+
+
+# Zivid details
+
+Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.17.0` inside distrobox container.
+
 
 Sometimes there is just too much going on in parallel, and it's hard to sift through the console traffic. This invocation builds things one-at-a-time:
 ```
@@ -153,7 +160,7 @@ Finally, let's build it!
 ```
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
-colcon build --packages-skip flowstate_orbbec flowstate_luxonis
+colcon build --packages-skip flowstate_orbbec orbbec_camera flowstate_luxonis 
 ```
 
 To test the camera functions locally, use the following command to start camera driver:
@@ -162,7 +169,7 @@ To test the camera functions locally, use the following command to start camera 
 source install/setup.bash
 ros2 run flowstate_zivid zivid_driver_main
 ```
-Open the second terminal to call ros2 services for testing camera driver functionality locally:
+Open a second terminal to call ros2 services for testing camera driver locally:
 ```
 distrobox enter ubuntu-24-04-nvidia
 cd ~/ros_cameras_ws
