@@ -337,7 +337,7 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
     RCLCPP_INFO(get_logger(), "Capture succeeded.");
     // Move all data out and cache only camera_info for future describe() calls
     CaptureData result{
-        .color_image = data_.color_image, 
+        .color_image = std::move(data_.color_image), 
         .depth_image = std::move(data_.depth_image), 
         .normal_pc = std::move(data_.normal_pc), 
         .camera_info = data_.camera_info
@@ -364,14 +364,12 @@ void AdapterNode::DescribeCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {
   RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
-  sensor_msgs::msg::CameraInfo::ConstSharedPtr camera_info;
-
-  {
+  const auto requires_capture = [this](){
     absl::MutexLock lock(&data_mutex_);
-    camera_info = data_.camera_info;
-  }
-  // If no camera_info, trigger capture (without holding lock)
-  if (!camera_info) {
+    return data_.camera_info == nullptr;
+  };
+
+  if (requires_capture()) {
     RCLCPP_INFO(get_logger(), "No cached camera_info available, triggering capture");
     auto capture_data = Capture();
     if (!capture_data.ok()) {

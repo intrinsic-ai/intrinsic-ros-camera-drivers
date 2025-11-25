@@ -125,8 +125,7 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
       --event-handlers=console_direct+ \
       --merge-install \
-      --packages-up-to=${SERVICE_PACKAGE} \
-      --packages-skip intrinsic_sdk grpc_vendor rmw_zenoh_cpp flowstate_orbbec flowstate_luxonis \
+      --packages-above-and-dependencies=${SERVICE_PACKAGE} \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log
 
 # Clean up source code and caches (vendored libs already copied in underlay stage)
