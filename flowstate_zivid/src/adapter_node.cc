@@ -144,7 +144,8 @@ AdapterNode::AdapterNode(const std::string& serial,
               zivid_node_->get_fully_qualified_name());
 
   capture_client_ = this->create_client<std_srvs::srv::Trigger>(
-      absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()));
+      absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()),
+      rclcpp::ServicesQoS(), callback_group_);
 
   thread_ = std::thread([this]() {
     const absl::Status status = this->Main();
@@ -334,9 +335,14 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
   if (data_mutex_.AwaitWithTimeout(
           absl::Condition(&data_, &CaptureData::AllAvailable), timeout)) {
     RCLCPP_INFO(get_logger(), "Capture succeeded.");
-    CaptureData data;
-    std::swap(data, data_);
-    return data;
+    // Move all data out and cache only camera_info for future describe() calls
+    CaptureData result{
+        .color_image = data_.color_image, 
+        .depth_image = std::move(data_.depth_image), 
+        .normal_pc = std::move(data_.normal_pc), 
+        .camera_info = data_.camera_info
+    };
+    return result;
   }
 
   std::vector<std::string> missing_items;
@@ -358,10 +364,13 @@ void AdapterNode::DescribeCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {
   RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
+  sensor_msgs::msg::CameraInfo::ConstSharedPtr camera_info;
 
-  absl::MutexLock lock(&data_mutex_);
-  sensor_msgs::msg::CameraInfo::ConstSharedPtr camera_info = data_.camera_info;
-
+  {
+    absl::MutexLock lock(&data_mutex_);
+    camera_info = data_.camera_info;
+  }
+  // If no camera_info, trigger capture (without holding lock)
   if (!camera_info) {
     RCLCPP_INFO(get_logger(), "No cached camera_info available, triggering capture");
     auto capture_data = Capture();
@@ -370,7 +379,6 @@ void AdapterNode::DescribeCallback(
       response->success = false;
       return;
     }
-    camera_info = capture_data->camera_info;
   }
 
   // Color sensor info
@@ -379,7 +387,7 @@ void AdapterNode::DescribeCallback(
   color_info.topic_name = ColorImageTopic();
   color_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
   color_info.camera_t_sensor.transform.rotation.w = 1.0;
-  color_info.info.push_back(*camera_info);
+  color_info.info.push_back(*data_.camera_info);
   response->sensors.push_back(color_info);
 
   // Depth sensor info
@@ -388,7 +396,7 @@ void AdapterNode::DescribeCallback(
   depth_info.topic_name = DepthImageTopic();
   depth_info.sensor_type = snapshot_interfaces::msg::SensorInfo::DEPTH;
   depth_info.camera_t_sensor.transform.rotation.w = 1.0;
-  depth_info.info.push_back(*camera_info);
+  depth_info.info.push_back(*data_.camera_info);
   response->sensors.push_back(depth_info);
 
   snapshot_interfaces::msg::SensorInfo normal_info;
@@ -396,7 +404,7 @@ void AdapterNode::DescribeCallback(
   normal_info.topic_name = NormalTopic();
   normal_info.sensor_type = snapshot_interfaces::msg::SensorInfo::NORMAL;
   normal_info.camera_t_sensor.transform.rotation.w = 1.0;
-  normal_info.info.push_back(std::move(*camera_info));
+  normal_info.info.push_back(*data_.camera_info);
   response->sensors.push_back(normal_info);
 
   response->success = true;

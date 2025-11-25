@@ -92,8 +92,17 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
         --event-handlers=console_direct+ \
         --merge-install \
-        --packages-up-to=rmw_zenoh_cpp \
-    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log
+        --packages-up-to=rmw_zenoh_cpp
+
+# Copy vendored libraries to install before cleaning up build directory
+RUN echo "Searching for and copying vendored libprotobuf..." && \
+    find /opt/ros/underlay/build -name "libprotobuf.so.29.0.0" -exec cp {} /opt/ros/underlay/install/lib/ \;
+
+RUN echo "Searching for and copying vendored absl libraries..." && \
+    find /opt/ros/underlay/build/abseil_cpp_vendor -name "libabsl*.so*" -exec cp -d {} /opt/ros/underlay/install/lib/ \;
+
+# Now clean up build artifacts
+RUN rm -rf /opt/ros/underlay/build /opt/ros/underlay/log
 
 
 # overlay stage: underlay + service code built
@@ -120,16 +129,8 @@ RUN . /opt/ros/jazzy/setup.sh \
       --packages-skip intrinsic_sdk grpc_vendor rmw_zenoh_cpp flowstate_orbbec flowstate_luxonis \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log
 
-RUN echo "Searching for and copying vendored libprotobuf..." && \
-    find /opt/ros/underlay/build -name "libprotobuf.so.29.0.0" -exec cp {} /opt/ros/overlay/install/lib/ \;
-
-RUN echo "Searching for and copying vendored absl libraries..." && \
-    find /opt/ros/underlay/build/abseil_cpp_vendor -name "libabsl*.so*" -exec cp -d {} /opt/ros/overlay/install/lib/ \;
-
-# Clean up build artifacts and caches
-RUN rm -rf /opt/ros/underlay/build \
-    && rm -rf /opt/ros/underlay/log \
-    && rm -rf /opt/ros/underlay/src \
+# Clean up source code and caches (vendored libs already copied in underlay stage)
+RUN rm -rf /opt/ros/underlay/src \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \

@@ -80,8 +80,8 @@ cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build
 
-# if you want to skip building with unused ros camera driver packages, you can use the following command:
-colcon build --packages-skip <camera driver package name>
+# if you want to skip building with other unused ros camera driver packages, you can use the following command:
+colcon build --packages-above-and-dependencies <camera driver package name>
 ```
 
 # Orbbec details
@@ -125,19 +125,11 @@ python3 device_manager.py
 Then click "Specify IP", and type an IP address on the local network, such as `192.168.1.203`
 
 # Debugging builds
-```
-
-
-# Zivid details
-
-Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.17.0` inside distrobox container.
-
 
 Sometimes there is just too much going on in parallel, and it's hard to sift through the console traffic. This invocation builds things one-at-a-time:
 ```
 colcon build --event-handlers console_direct+ --executor sequential
 ```
-
 
 # Zivid details
 
@@ -160,7 +152,7 @@ Finally, let's build it!
 ```
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
-colcon build --packages-skip flowstate_orbbec orbbec_camera flowstate_luxonis 
+colcon build --packages-above-and-dependencies flowstate_zivid
 ```
 
 To test the camera functions locally, use the following command to start camera driver:
