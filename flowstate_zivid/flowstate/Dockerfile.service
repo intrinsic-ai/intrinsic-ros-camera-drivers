@@ -6,7 +6,7 @@
 
 # base stage: ros:jazzy + configs
 # base stage: NVIDIA CUDA base + ROS Jazzy + configs
-FROM nvidia/cuda:12.5.1-devel-ubuntu24.04 AS base
+FROM nvidia/cuda:12.5.1-base-ubuntu24.04 AS base
 
 ARG ZIVID_VERSION=2.17.0+5fc9f05e-1
 
@@ -40,7 +40,7 @@ ADD src/sdk-ros /opt/ros/underlay/src/sdk-ros
 RUN . /opt/ros/jazzy/setup.sh && \
     apt-get update && \
     apt-get install -y \
-    ocl-icd-libopencl1 gcc clinfo \
+    ocl-icd-libopencl1 gcc g++ clinfo \
     python3-rosdep \
     python3-colcon-common-extensions \
     ros-jazzy-ament-cmake-vendor-package \
