@@ -52,7 +52,7 @@ For cameras which require OpenCL and GPU-support, follow the instructions below 
 ```
 sudo apt install distrobox
 sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
-distrobox create --additional-flags "--gpus all" -i docker.io/nvidia/cuda:12.5.1-devel-ubuntu24.04 -n ubuntu-24-04-nvidia
+distrobox create --additional-flags "--gpus all" -i docker.io/nvidia/cuda:12.5.1-base-ubuntu24.04 -n ubuntu-24-04-nvidia
 
 distrobox enter ubuntu-24-04-nvidia
 sudo apt install ocl-icd-libopencl1
@@ -149,7 +149,7 @@ rm *.deb
 ```
 
 Finally, let's build it!
-```
+```Hi! Basler-<Device-ID>
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build --packages-above-and-dependencies flowstate_zivid
