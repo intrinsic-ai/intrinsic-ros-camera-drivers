@@ -149,7 +149,7 @@ rm *.deb
 ```
 
 Finally, let's build it!
-```Hi! Basler-<Device-ID>
+```
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build --packages-above-and-dependencies flowstate_zivid
