@@ -64,6 +64,7 @@ Assuming the distrobox is named `ubuntu-24-04` or `ubuntu-24-04-nvidia` and that
 ```
 # additional packages
 sudo apt update
+sudo apt install g++ libbz2-dev
 sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jazzy-ament-cmake-vendor-package
 sudo apt install libzmq3-dev libczmq-dev nlohmann-json3-dev
 sudo apt-get install libprotobuf-dev protobuf-compiler
