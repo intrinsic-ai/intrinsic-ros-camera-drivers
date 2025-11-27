@@ -55,6 +55,7 @@ sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
 distrobox create --additional-flags "--gpus all" -i docker.io/nvidia/cuda:12.5.1-base-ubuntu24.04 -n ubuntu-24-04-nvidia
 
 distrobox enter ubuntu-24-04-nvidia
+
 sudo apt install ocl-icd-libopencl1
 sudo mkdir -p /etc/OpenCL/vendors
 echo "libnvidia-opencl.so.1" | sudo tee /etc/OpenCL/vendors/nvidia.icd
@@ -64,11 +65,10 @@ Assuming the distrobox is named `ubuntu-24-04` or `ubuntu-24-04-nvidia` and that
 ```
 # additional packages
 sudo apt update
-sudo apt install g++ libbz2-dev
-sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jazzy-ament-cmake-vendor-package
-sudo apt install libzmq3-dev libczmq-dev nlohmann-json3-dev
-sudo apt-get install libprotobuf-dev protobuf-compiler
-sudo apt install python3-colcon-common-extensions
+
+sudo apt install g++ libbz2-dev libzmq3-dev libczmq-dev nlohmann-json3-dev libprotobuf-dev protobuf-compiler
+sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jazzy-ament-cmake-vendor-package python3-colcon-common-extensions
+
 curl https://sh.rustup.rs -sSf | sh
 . "$HOME/.cargo/env"
 ```
