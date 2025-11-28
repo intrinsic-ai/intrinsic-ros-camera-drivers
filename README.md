@@ -23,6 +23,7 @@ git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_wi
 git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon
 git clone https://github.com/codebot/depthai-core --branch kilted && cd depthai-core && git submodule update --init --recursive && cd ..
 git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
+git clone https://github.com/zivid/zivid-ros.git
 ```
 
 The resulting directory structure should look like this:
@@ -35,23 +36,53 @@ ros_cameras_ws/
     ├── OrbbecSDK
     ├── OrbbecSDK_ROS2
     ├── rmw_zenoh
+    ├── zivid-ros
     └── sdk-ros
 ```
 
 ROS Jazzy expects to run on Ubuntu 24.04 LTS.
 This can run conveniently on `gLinux` using `distrobox`.
-Assuming the distrobox is named `ubuntu-24-04` and that the typical [desktop ROS Jazzy instructions](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) have been followed, here are some packages to add:
-
 ```
+# distrobox setup
+sudo apt install distrobox
+distrobox create -i ubuntu:24.04 -n ubuntu-24-04
 distrobox enter ubuntu-24-04
-sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher
 ```
+For cameras which require OpenCL and GPU-support, follow the instructions below to generate a `distrobox` container with OpenCL and GPU-support:
+```
+sudo apt install distrobox
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+distrobox create --additional-flags "--gpus all" -i docker.io/nvidia/cuda:12.5.1-base-ubuntu24.04 -n ubuntu-24-04-nvidia
+
+distrobox enter ubuntu-24-04-nvidia
+
+sudo apt install ocl-icd-libopencl1
+sudo mkdir -p /etc/OpenCL/vendors
+echo "libnvidia-opencl.so.1" | sudo tee /etc/OpenCL/vendors/nvidia.icd
+```
+
+Assuming the distrobox is named `ubuntu-24-04` or `ubuntu-24-04-nvidia` and that the typical [desktop ROS Jazzy instructions](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) have been followed, here are some packages to add:
+```
+# additional packages
+sudo apt update
+
+sudo apt install g++ libbz2-dev libzmq3-dev libczmq-dev nlohmann-json3-dev libprotobuf-dev protobuf-compiler
+sudo apt install ros-jazzy-camera-info-manager ros-jazzy-image-publisher ros-jazzy-ament-cmake-vendor-package python3-colcon-common-extensions
+
+curl https://sh.rustup.rs -sSf | sh
+. "$HOME/.cargo/env"
+```
+For Zivid-related packages, please follow the [Zivid details](#zivid-details) section below.
+
 
 Finally, let's build it!
 ```
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
 colcon build
+
+# if you want to skip building with other unused ros camera driver packages, you can use the following command:
+colcon build --packages-above-and-dependencies <camera driver package name>
 ```
 
 # Orbbec details
@@ -99,4 +130,73 @@ Then click "Specify IP", and type an IP address on the local network, such as `1
 Sometimes there is just too much going on in parallel, and it's hard to sift through the console traffic. This invocation builds things one-at-a-time:
 ```
 colcon build --event-handlers console_direct+ --executor sequential
+```
+
+# Zivid details
+
+Follow this [Guide](https://support.zivid.com/en/latest/getting-started/software-installation.html) to install `Zivid Core 2.17.0` inside distrobox container.
+
+```
+wget \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-studio_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-tools_2.17.0+5fc9f05e-1_amd64.deb \
+https://downloads.zivid.com/sdk/releases/2.17.0+5fc9f05e-1/u24/amd64/zivid-genicam_2.17.0+5fc9f05e-1_amd64.deb
+
+sudo apt update
+sudo apt install ./*.deb
+
+rm *.deb
+```
+
+Finally, let's build it!
+```
+cd ~/ros_cameras_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --packages-above-and-dependencies flowstate_zivid
+```
+
+To test the camera functions locally, use the following command to start camera driver:
+
+```
+source install/setup.bash
+ros2 run flowstate_zivid zivid_driver_main
+```
+Open a second terminal to call ros2 services for testing camera driver locally:
+```
+distrobox enter ubuntu-24-04-nvidia
+cd ~/ros_cameras_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+# discover
+ros2 service call /cameras/discover snapshot_interfaces/srv/Discover
+
+# snapshot
+ros2 service call /zivid_<serial_id>/snapshot snapshot_interfaces/srv/Snapshot
+
+# describe
+ros2 service call /zivid_<serial_id>/describe snapshot_interfaces/srv/Describe
+
+# see all available ros2 services
+ros2 service list
+```
+If everything is set, we can start to build the service container for the zivid camera **outside the distrobox container**:
+
+```
+cd ~/ros_cameras_ws
+./src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/build_service_bundle.sh
+```
+
+Sideload and install the service container in flowstate:
+```
+export SERVICE_BUNDLE=~/ros_cameras_ws/images/zivid_driver.bundle.tar 
+
+export INTRINSIC_ORGANIZATION=<org name>
+
+inctl cluster list --org $INTRINSIC_ORGANIZATION
+
+export INTRINSIC_CONTEXT=<cluster id>
+
+inctl service install --org $INTRINSIC_ORGANIZATION --cluster $INTRINSIC_CONTEXT $SERVICE_BUNDLE
 ```
