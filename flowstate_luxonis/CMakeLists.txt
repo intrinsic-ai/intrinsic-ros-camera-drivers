@@ -11,6 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(depthai REQUIRED VERBOSE)
 find_package(depthai_ros_driver REQUIRED VERBOSE)
+find_package(flowstate_common REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -25,6 +26,7 @@ add_library(flowstate_luxonis
   src/spawner_node.cc
 )
 target_link_libraries(flowstate_luxonis
+  flowstate_common
   absl::status
   absl::synchronization
   rclcpp::rclcpp
@@ -36,6 +38,7 @@ ament_target_dependencies(flowstate_luxonis
   cv_bridge
   depthai
   depthai_ros_driver
+  flowstate_common
   OpenCV
 )
 install(TARGETS flowstate_luxonis

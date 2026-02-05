@@ -9,6 +9,7 @@ add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(flowstate_common REQUIRED)
 find_package(orbbec_camera REQUIRED)
 find_package(orbbec_camera_msgs REQUIRED)
 find_package(OpenCV 4 REQUIRED
@@ -34,6 +35,7 @@ add_library(flowstate_orbbec
 )
 target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_orbbec
+  flowstate_common
   absl::status
   absl::synchronization
   rclcpp::rclcpp
@@ -45,6 +47,7 @@ target_link_libraries(flowstate_orbbec
 )
 ament_target_dependencies(flowstate_orbbec
   cv_bridge
+  flowstate_common
   OpenCV
   orbbec_camera
 )

@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>flowstate_common</name>
+  <version>0.0.1</version>
+  <description>Common base classes and utilities for Flowstate camera adapter nodes</description>
+  <maintainer email="flowstate-dev@intrinsic.ai">Flowstate Development</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <depend>absl_cpp</depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>snapshot_interfaces</depend>
+  <depend>OpenCV</depend>
+  <depend>cv_bridge</depend>
+
+  <build_depend>abseil_cpp_vendor</build_depend>
+  <build_depend>cv_bridge</build_depend>
+  <build_depend>OpenCV</build_depend>
+
+  <exec_depend>abseil_cpp_vendor</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>OpenCV</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
