@@ -3,34 +3,35 @@
 
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "absl/status/status.h"
-#include "flowstate_common/camera_spawner_node.h"
+#include "absl/synchronization/mutex.h"
 #include "flowstate_luxonis/adapter_node.h"
 #include <XLink/XLinkPublicDefines.h>
 
+#include "rclcpp/rclcpp.hpp"
+#include "snapshot_interfaces/srv/discover.hpp"
+
 namespace flowstate_luxonis {
 
-/**
- * @class SpawnerNode
- * @brief Discovers and spawns adapter nodes for Luxonis (OAK) cameras.
- *
- * Inherits from the common CameraSpawnerNode base class and implements
- * Luxonis-specific camera discovery using the XLink API.
- */
-class SpawnerNode : public flowstate_common::CameraSpawnerNode {
+class SpawnerNode : public rclcpp::Node {
  public:
   SpawnerNode();
 
  private:
-  void UpdateCameraList() override;
-  bool IsAlreadySpawned(const std::string& serial) const override;
-  std::string GetDiscoveredCameraSerial(size_t index) const override;
+  rclcpp::Service<snapshot_interfaces::srv::Discover>::SharedPtr
+      discover_service_;
+  rclcpp::TimerBase::SharedPtr timer_;
 
-  std::string DeviceStateToString(XLinkDeviceState_t state);
-
+  mutable absl::Mutex serials_mutex_;
+  std::vector<std::string> serials_;
   std::vector<std::unique_ptr<AdapterNode>> spawned_nodes_;
+
+  void UpdateCameras();
+  bool IsAlreadySpawned(const std::string& serial) const;
+  std::string DeviceStateToString(XLinkDeviceState_t state);
 };
 
 }  // namespace flowstate_luxonis

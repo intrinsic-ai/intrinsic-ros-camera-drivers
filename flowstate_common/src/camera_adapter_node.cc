@@ -47,17 +47,11 @@ void CameraAdapterNode::DescribeCallback(
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
-        response) {
-  absl::MutexLock lock(&camera_info_mutex_);
-  if (!color_camera_info_) {
-    response->error_message = "CameraInfo not yet received from camera";
-    response->success = false;
-    RCLCPP_ERROR(get_logger(), response->error_message.c_str());
-    return;
-  }
-
+        response) {  
   if (!BuildDescribeResponse(*response)) {
-    response->error_message = "Failed to build describe response";
+    if (response->error_message.empty()) {
+        response->error_message = "Failed to build describe response (data not ready)";
+    }
     response->success = false;
     RCLCPP_ERROR(get_logger(), response->error_message.c_str());
     return;
@@ -66,32 +60,32 @@ void CameraAdapterNode::DescribeCallback(
   response->success = true;
 }
 
+void CameraAdapterNode::AppendSensorDescription(
+    snapshot_interfaces::srv::Describe::Response& response,
+    const sensor_msgs::msg::CameraInfo& info,
+    const std::string& sensor_name,
+    const std::string& topic_name) {
+  
+  snapshot_interfaces::msg::SensorInfo sensor_info;
+  sensor_info.sensor_name = sensor_name;
+  sensor_info.topic_name = topic_name;
+  sensor_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
+  
+  sensor_info.camera_t_sensor.transform.rotation.w = 1.0; // todo: get static transform
+  
+  sensor_info.info.push_back(info);
+  response.sensors.push_back(std::move(sensor_info));
+}
+
 void CameraAdapterNode::SnapshotCallback(
-    const std::shared_ptr<rmw_request_id_t> /*request_header*/,
-    const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>
-        /*request*/,
+    const std::shared_ptr<rmw_request_id_t>,
+    const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
         response) {
-  {
-    absl::MutexLock lock(&camera_info_mutex_);
-    if (!color_camera_info_) {
-      response->error_message = "CameraInfo not yet received";
-      response->success = false;
-      RCLCPP_ERROR(get_logger(), response->error_message.c_str());
-      return;
-    }
-  }
-
-  absl::MutexLock lock(&image_mutex_);
-  if (!color_image_) {
-    response->error_message = "images not yet received from camera";
-    response->success = false;
-    RCLCPP_ERROR(get_logger(), response->error_message.c_str());
-    return;
-  }
-
   if (!BuildSnapshotResponse(*response)) {
-    response->error_message = "Failed to build snapshot response";
+    if (response->error_message.empty()) {
+        response->error_message = "Failed to capture snapshot (data not ready)";
+    }
     response->success = false;
     RCLCPP_ERROR(get_logger(), response->error_message.c_str());
     return;

@@ -63,7 +63,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   ir_info_sub_ = SubscribeToCameraInfo(
       absl::StrFormat("orbbec/camera_%s/left_ir/camera_info", serial_),
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
-        absl::MutexLock lock(&this->ir_camera_info_mutex_);
+        absl::MutexLock lock(&this->camera_info_mutex_);
         this->ir_camera_info_ = std::move(msg);
       });
 
@@ -71,7 +71,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   depth_info_sub_ = SubscribeToCameraInfo(
       absl::StrFormat("orbbec/camera_%s/depth/camera_info", serial_),
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
-        absl::MutexLock lock(&this->depth_camera_info_mutex_);
+        absl::MutexLock lock(&this->camera_info_mutex_);
         this->depth_camera_info_ = std::move(msg);
       });
 #endif
@@ -92,7 +92,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   ir_image_sub_ = SubscribeToImage(
       IrImageTopic(),
       [this](sensor_msgs::msg::Image::UniquePtr msg) {
-        absl::MutexLock lock(&this->ir_image_mutex_);
+        absl::MutexLock lock(&this->image_mutex_);
         this->ir_image_ = std::move(msg);
       });
 
@@ -100,7 +100,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   depth_image_sub_ = SubscribeToImage(
       DepthImageTopic(),
       [this](sensor_msgs::msg::Image::UniquePtr msg) {
-        absl::MutexLock lock(&this->depth_image_mutex_);
+        absl::MutexLock lock(&this->image_mutex_);
         this->depth_image_ = std::move(msg);
       });
 #endif
@@ -332,44 +332,19 @@ absl::Status AdapterNode::Main() {
 
 bool AdapterNode::BuildDescribeResponse(
     snapshot_interfaces::srv::Describe::Response& response) {
+  
   absl::MutexLock lock(&camera_info_mutex_);
-  if (!color_camera_info_) {
+  if (!color_camera_info_ || !ir_camera_info_) {
+    response.error_message = "CameraInfo not yet received (waiting for RGB+IR)";
     return false;
   }
 
-  snapshot_interfaces::msg::SensorInfo color_info;
-  color_info.sensor_name = "rgb";
-  color_info.topic_name = ColorImageTopic();
-  color_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
-  color_info.camera_t_sensor.transform.rotation.w = 1.0;
-  color_info.info.push_back(*color_camera_info_);
-  response.sensors.push_back(color_info);
-
-  {
-    absl::MutexLock ir_lock(&ir_camera_info_mutex_);
-    if (ir_camera_info_) {
-      snapshot_interfaces::msg::SensorInfo ir_info;
-      ir_info.sensor_name = "ir_left";
-      ir_info.topic_name = IrImageTopic();
-      ir_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
-      ir_info.camera_t_sensor.transform.rotation.w = 1.0;
-      ir_info.info.push_back(*ir_camera_info_);
-      response.sensors.push_back(ir_info);
-    }
-  }
+  AppendSensorDescription(response, *color_camera_info_, "rgb", ColorImageTopic());
+  AppendSensorDescription(response, *ir_camera_info_, "ir_left", IrImageTopic());
 
 #if SEND_DEPTH
-  {
-    absl::MutexLock depth_lock(&depth_camera_info_mutex_);
-    if (depth_camera_info_) {
-      snapshot_interfaces::msg::SensorInfo depth_info;
-      depth_info.sensor_name = "depth";
-      depth_info.topic_name = DepthImageTopic();
-      depth_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
-      depth_info.camera_t_sensor.transform.rotation.w = 1.0;
-      depth_info.info.push_back(*depth_camera_info_);
-      response.sensors.push_back(depth_info);
-    }
+  if (depth_camera_info_) {
+    AppendSensorDescription(response, *depth_camera_info_, "depth", DepthImageTopic());
   }
 #endif
 
@@ -390,76 +365,58 @@ bool AdapterNode::BuildSnapshotResponse(
   depth_snapshot.topic_name = DepthImageTopic();
 #endif
 
-  // Lock and copy camera info
+  // Lock and copy the most recent CameraInfo messages
   {
     absl::MutexLock lock(&camera_info_mutex_);
-    if (!color_camera_info_) {
+    if (!color_camera_info_ || !ir_camera_info_) {
+      response->error_message = "CameraInfo not yet received";
       return false;
     }
     color_snapshot.camera_info = *color_camera_info_;
-  }
-
-  {
-    absl::MutexLock ir_lock(&ir_camera_info_mutex_);
-    if (ir_camera_info_) {
-      ir_snapshot.camera_info = *ir_camera_info_;
-    }
-  }
-
+    ir_snapshot.camera_info = *ir_camera_info_;
 #if SEND_DEPTH
-  {
-    absl::MutexLock depth_lock(&depth_camera_info_mutex_);
     if (depth_camera_info_) {
       depth_snapshot.camera_info = *depth_camera_info_;
     }
-  }
 #endif
-
-  // Lock and copy images
-  {
-    absl::MutexLock lock(&image_mutex_);
-    if (!color_image_) {
-      return false;
-    }
-    color_snapshot.image = *color_image_;
   }
 
-  {
-    absl::MutexLock ir_lock(&ir_image_mutex_);
-    if (ir_image_) {
-      ir_snapshot.image = *ir_image_;
-    }
+  // Lock and copy the most recent Image messages
+  absl::MutexLock lock(&image_mutex_);
+  if (!color_image_ || !ir_image_) {
+    response->error_message = "images not yet received from camera";
+    return false;
   }
 
-  response.images.push_back(std::move(color_snapshot));
-  if (ir_snapshot.image.data.size() > 0) {
-    response.images.push_back(std::move(ir_snapshot));
-  }
+  color_snapshot.image = *color_image_;
+  response->images.push_back(std::move(color_snapshot));
+
+  ir_snapshot.image = *ir_image_;
+  response->images.push_back(std::move(ir_snapshot));
 
 #if SEND_DEPTH
-  {
-    absl::MutexLock depth_lock(&depth_image_mutex_);
-    if (!depth_image_) {
-      return false;
-    }
-    // Convert depth from uint16 (mm) to float32 (m)
-    depth_snapshot.image.header = depth_image_->header;
-    depth_snapshot.image.height = depth_image_->height;
-    depth_snapshot.image.width = depth_image_->width;
-    depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-    depth_snapshot.image.is_bigendian = false;
-    depth_snapshot.image.step = 4 * depth_snapshot.image.width;
-    depth_snapshot.image.data.resize(depth_snapshot.image.step *
-                                     depth_snapshot.image.height);
-
-    const cv::Mat depth_unsigned(depth_image_->height, depth_image_->width,
-                                 CV_16U, depth_image_->data.data());
-    cv::Mat depth_float(depth_snapshot.image.height, depth_snapshot.image.width,
-                        CV_32F, depth_snapshot.image.data.data());
-    depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
-
-    response.images.push_back(std::move(depth_snapshot));
+  if (!depth_image_) {
+    response->error_message = "depth image not yet received from camera";
+    return false;
   }
+  // The Orbbec camera returns the depth image as 16-bit images in millimeters.
+  // We want to convert that to 32-bit float (meters) for Flowstate.
+  depth_snapshot.image.header = depth_image_->header;
+  depth_snapshot.image.height = depth_image_->height;
+  depth_snapshot.image.width = depth_image_->width;
+  depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+  depth_snapshot.image.is_bigendian = false;
+  depth_snapshot.image.step = 4 * depth_snapshot.image.width;
+  depth_snapshot.image.data.resize(depth_snapshot.image.step *
+                                   depth_snapshot.image.height);
+  // Use OpenCV's amazingly optimized implementation to do the conversion
+  const cv::Mat depth_unsigned(depth_image_->height, depth_image_->width,
+                               CV_16U, depth_image_->data.data());
+  cv::Mat depth_float(depth_snapshot.image.height, depth_snapshot.image.width,
+                      CV_32F, depth_snapshot.image.data.data());
+  depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
+
+  response->images.push_back(std::move(depth_snapshot));
 #endif
 
   return true;

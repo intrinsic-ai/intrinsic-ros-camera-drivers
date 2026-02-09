@@ -90,20 +90,7 @@ class CameraAdapterNode : public rclcpp::Node {
    * @return true on success, false on error (caller will set error_message)
    */
   virtual bool BuildDescribeResponse(
-      snapshot_interfaces::srv::Describe::Response& response) {
-    // Default implementation: only color image
-    if (!color_camera_info_) {
-      return false;
-    }
-    snapshot_interfaces::msg::SensorInfo color_info;
-    color_info.sensor_name = "color";
-    color_info.topic_name = ColorImageTopic();
-    color_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
-    color_info.camera_t_sensor.transform.rotation.w = 1.0;
-    color_info.info.push_back(*color_camera_info_);
-    response.sensors.push_back(color_info);
-    return true;
-  }
+      snapshot_interfaces::srv::Describe::Response& response) = 0;
 
   /**
    * @brief Build the response for the snapshot service.
@@ -112,18 +99,7 @@ class CameraAdapterNode : public rclcpp::Node {
    * @return true on success, false on error (caller will set error_message)
    */
   virtual bool BuildSnapshotResponse(
-      snapshot_interfaces::srv::Snapshot::Response& response) {
-    // Default implementation: only color image
-    if (!color_camera_info_ || !color_image_) {
-      return false;
-    }
-    snapshot_interfaces::msg::ImageSnapshot color_snapshot;
-    color_snapshot.topic_name = ColorImageTopic();
-    color_snapshot.camera_info = *color_camera_info_;
-    color_snapshot.image = *color_image_;
-    response.images.push_back(std::move(color_snapshot));
-    return true;
-  }
+      snapshot_interfaces::srv::Snapshot::Response& response) = 0;
 
   /**
    * @brief Get color camera info.
@@ -179,6 +155,20 @@ class CameraAdapterNode : public rclcpp::Node {
    * Call this in derived class constructor after all subscriptions are set up.
    */
   void StartExecutorThread();
+
+  /**
+   * @brief Helper to pack CameraInfo into the Response.
+   * Call this from BuildDescribeResponse() in derived classes to add a sensor description for the color camera.
+    * @param response Describe service response to populate
+    * @param info CameraInfo message to extract sensor parameters from
+    * @param sensor_name Logical name for the sensor (e.g., "rgb")
+    * @param topic_name ROS topic name for the sensor's image stream
+   */
+  void AppendSensorDescription(
+      snapshot_interfaces::srv::Describe::Response& response,
+      const sensor_msgs::msg::CameraInfo& info,
+      const std::string& sensor_name,
+      const std::string& topic_name);
 
   // Thread management
   std::thread thread_;
