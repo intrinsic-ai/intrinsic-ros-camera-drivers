@@ -4,47 +4,6 @@ Welcome.
 
 This repo is intended to contain Flowstate-compatible ROS adapter nodes for existing ROS camera drivers.
 
-## Quick Links
-
-- **Adding a new camera?** See [ADDING_NEW_CAMERA.md](./ADDING_NEW_CAMERA.md) for a step-by-step guide
-- **Want to understand the architecture?** Continue reading below
-
-## Architecture
-
-This codebase has been refactored to minimize duplication and make it easy to add new camera drivers. The key components are:
-
-### Common Base Classes (`flowstate_common`)
-
-- **`CameraAdapterNode`**: Abstract base class handling camera interfacing
-  - Manages Flowstate `describe` and `snapshot` services  
-  - Subscribes to camera info and image topics
-  - Runs camera driver in background thread with liveness monitoring
-  - Provides helper methods for topic subscription and data access
-
-- **`CameraSpawnerNode`**: Abstract base class for camera discovery
-  - Periodically discovers connected cameras
-  - Spawns adapter nodes for new cameras
-  - Handles crashed node cleanup
-  - Provides `discover` service for Flowstate
-
-- **`image_utils`**: Common image processing utilities
-  - BGR to RGB conversion for cameras that output BGR data
-
-### Camera-Specific Implementations
-
-Each camera driver (Luxonis, Orbbec, Zivid) provides:
-
-- **`AdapterNode`**: Inherits from `CameraAdapterNode`
-  - Initializes camera-specific driver
-  - Subscribes to camera topics
-  - Overrides `Main()` to run executor with camera driver
-  - Optionally overrides `BuildDescribeResponse()` and `BuildSnapshotResponse()` for multiple sensors
-
-- **`SpawnerNode`**: Inherits from `CameraSpawnerNode`
-  - Implements `UpdateCameraList()` with camera-specific discovery
-  - Spawns adapter nodes for discovered cameras
-  - Cleans up exited nodes
-
 # Building
 
 This repo is a collection of ROS packages, intended to build and run on ROS Jazzy.
