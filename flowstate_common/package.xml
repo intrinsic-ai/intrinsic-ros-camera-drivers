@@ -13,16 +13,10 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>snapshot_interfaces</depend>
-  <depend>OpenCV</depend>
-  <depend>cv_bridge</depend>
 
   <build_depend>abseil_cpp_vendor</build_depend>
-  <build_depend>cv_bridge</build_depend>
-  <build_depend>OpenCV</build_depend>
 
   <exec_depend>abseil_cpp_vendor</exec_depend>
-  <exec_depend>cv_bridge</exec_depend>
-  <exec_depend>OpenCV</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

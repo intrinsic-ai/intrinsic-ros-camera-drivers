@@ -112,8 +112,7 @@ void AdapterNode::InitializeParameters() {
   declare_parameter<bool>("outlier_removal_enabled", capture_params_.outlier_removal_enabled);
   declare_parameter<double>("outlier_removal_threshold", capture_params_.outlier_removal_threshold);
 
-  declare_parameter<std::string>("settings_yaml",
-                                       "");  // For zivid_camera node
+  declare_parameter<std::string>("settings_yaml", "");  // For zivid_camera node
   declare_parameter<std::string>("settings_2d_yaml", "");
   declare_parameter<std::string>("settings_2d_file_path", "");
   declare_parameter<std::string>("color_space", "srgb");
