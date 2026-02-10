@@ -25,12 +25,9 @@ AdapterNode::AdapterNode(const std::string& serial,
     // Zivid usually connects via USB/PCIe, so IP is empty.
     : flowstate_common::CameraAdapterNode(serial, "", "zivid"),
       capture_params_(CaptureParameters::boot_defaults()) {
+  InitializeParameters();
   const std::string zivid_node_name = std::string("camera_") + serial;
   const std::string zivid_ns = "zivid/" + zivid_node_name;
-
-  // We need to declare the parameter locally so we can pass it to the child node
-  this->declare_parameter<std::string>("settings_yaml",
-                                       "");  // For zivid_camera node
   
   rclcpp::NodeOptions zivid_node_options = options;
   zivid_node_options.append_parameter_override("serial_number", serial)
@@ -51,7 +48,6 @@ AdapterNode::AdapterNode(const std::string& serial,
     throw std::runtime_error("zivid_camera parameter service not available.");
   }
 
-  InitializeParameters();
   RCLCPP_INFO(get_logger(),
               "Applying initial default settings to zivid_camera node.");
   const auto initial_settings_yaml = GenerateZividSettings();
@@ -90,15 +86,17 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   callback_group_ =
       this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  
+  CreateFlowstateServices();
+  RCLCPP_INFO(this->get_logger(), "zivid_node_ = %s",
+              zivid_node_->get_fully_qualified_name());
   capture_client_ = this->create_client<std_srvs::srv::Trigger>(
       absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()),
-      rmw_qos_profile_services_default, callback_group_);
-  CreateFlowstateServices();
+      rclcpp::ServicesQoS(), callback_group_);
   StartExecutorThread();
 }
 
 void AdapterNode::InitializeParameters() {
-  // Declare parameters
   declare_parameter<double>("exposure_time", capture_params_.exposure_time);
   declare_parameter<double>("ExposureTime", capture_params_.exposure_time); // Alias
   declare_parameter<double>("gain", capture_params_.gain);
@@ -114,6 +112,8 @@ void AdapterNode::InitializeParameters() {
   declare_parameter<bool>("outlier_removal_enabled", capture_params_.outlier_removal_enabled);
   declare_parameter<double>("outlier_removal_threshold", capture_params_.outlier_removal_threshold);
 
+  declare_parameter<std::string>("settings_yaml",
+                                       "");  // For zivid_camera node
   declare_parameter<std::string>("settings_2d_yaml", "");
   declare_parameter<std::string>("settings_2d_file_path", "");
   declare_parameter<std::string>("color_space", "srgb");
@@ -339,7 +339,7 @@ bool AdapterNode::BuildDescribeResponse(
   AppendSensorDescription(response, *data_.camera_info, "rgb", ColorImageTopic());
   // Depth sensor info
   AppendSensorDescription(response, *data_.camera_info, "depth", DepthImageTopic());
-  AppendSensorDescription(response, *data_.camera_info, "normals", NormalTopic());
+  AppendSensorDescription(response, *data_.camera_info, "normal", NormalTopic());
 
   return true;
 }

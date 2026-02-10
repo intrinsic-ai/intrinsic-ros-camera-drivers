@@ -119,8 +119,9 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
    */
   absl::StatusOr<CaptureData> Capture();
 
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
+
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
-  std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_;
   
   // Internal client to trigger the Zivid driver
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
@@ -137,6 +138,8 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
       set_parameters_callback_handle_;
   mutable absl::Mutex capture_params_mutex_;
   CaptureParameters capture_params_ ABSL_GUARDED_BY(capture_params_mutex_);
+  std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_;
+
 };
 
 }  // namespace flowstate_zivid

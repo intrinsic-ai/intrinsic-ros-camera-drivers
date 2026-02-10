@@ -1,5 +1,5 @@
-#ifndef FLOWSTATE_ORBBEC_ADAPTER_NODE_H_
-#define FLOWSTATE_ORBBEC_ADAPTER_NODE_H_
+#ifndef FLOWSTATE_ORBBEC_FLOWSTATE_ORBBEC_ADAPTER_NODE_H_
+#define FLOWSTATE_ORBBEC_FLOWSTATE_ORBBEC_ADAPTER_NODE_H_
 
 #include <memory>
 #include <string>
@@ -24,7 +24,6 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
   bool BuildSnapshotResponse(
       snapshot_interfaces::srv::Snapshot::Response& response) override;
 
- private:
   std::string IrImageTopic() const;
   std::string DepthImageTopic() const;
 
@@ -46,9 +45,9 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
           if (future.valid()) {
             auto response = future.get();
             if (response->success) {
-              RCLCPP_INFO_STREAM(this->get_logger(),
-                                 client->get_service_name() << "(" << value
-                                                           << ") succeeded");
+              RCLCPP_INFO_STREAM(this->get_logger(), client->get_service_name()
+                                                         << "(" << value
+                                                         << ") succeeded");
               if (shadow != nullptr) {
                 *shadow = value;
               }
@@ -58,10 +57,16 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
                                       << "(" << value << ") failed: "
                                       << response->message.c_str());
             }
+          } else {
+            RCLCPP_ERROR_STREAM(this->get_logger(),
+                                client->get_service_name()
+                                    << "(" << value
+                                    << ") did not return a valid future");
           }
         });
   }
 
+  bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
     
   // IR Data
@@ -76,7 +81,6 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
   std::unique_ptr<sensor_msgs::msg::Image> depth_image_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
 
-  bool auto_white_balance_ = true;
 
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr set_auto_exposure_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
@@ -85,9 +89,10 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
       set_auto_white_balance_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_white_balance_client_;
-  rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr set_gain_client_;
+  rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr 
+      set_gain_client_;
 };
 
 }  // namespace flowstate_orbbec
 
-#endif  // FLOWSTATE_ORBBEC_ADAPTER_NODE_H_
+#endif  // FLOWSTATE_ORBBEC_FLOWSTATE_ORBBEC_ADAPTER_NODE_H_

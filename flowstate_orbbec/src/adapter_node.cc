@@ -19,8 +19,8 @@ namespace flowstate_orbbec {
 AdapterNode::AdapterNode(const std::string& serial,
                          const std::string& ip_address)
     : flowstate_common::CameraAdapterNode(serial, ip_address, "orbbec") {
-  const std::string orbbec_node_name = "orbbec_camera_node";
-  const std::string orbbec_ns = "orbbec/camera_" + serial;
+  const std::string orbbec_node_name = std::string("orbbec_camera_node");
+  const std::string orbbec_ns = std::string("orbbec/camera_") + serial;
 
   rclcpp::NodeOptions orbbec_node_options =
       rclcpp::NodeOptions()
@@ -46,10 +46,10 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
           .append_parameter_override(rclcpp::Parameter("left_ir_height", 800))
           .append_parameter_override(rclcpp::Parameter("enable_left_ir", true));
+  InitializeParameters();
 
-  orbbec_node_ =
-      std::make_unique<orbbec_camera::OBCameraNodeDriver>(
-          orbbec_node_name, orbbec_ns, orbbec_node_options);
+  orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
+      orbbec_node_name, orbbec_ns, orbbec_node_options);
 
   // Subscribe to color camera info
   color_info_sub_ = SubscribeToCameraInfo(
@@ -105,8 +105,6 @@ AdapterNode::AdapterNode(const std::string& serial,
       });
 #endif
 
-  InitializeParameters();
-
   // Create Flowstate services
   CreateFlowstateServices();
 
@@ -150,7 +148,6 @@ void AdapterNode::InitializeParameters() {
       add_post_set_parameters_callback(std::bind(
           &AdapterNode::PostSetParametersCallback, this, std::placeholders::_1));
 
-  // Auto exposure parameter
   rcl_interfaces::msg::ParameterDescriptor auto_exposure_descriptor;
   auto_exposure_descriptor.name = "auto_exposure";
   auto_exposure_descriptor.type = rclcpp::ParameterType::PARAMETER_BOOL;
@@ -158,7 +155,6 @@ void AdapterNode::InitializeParameters() {
   auto_exposure_descriptor.read_only = false;
   declare_parameter("auto_exposure", true, auto_exposure_descriptor);
 
-  // Exposure parameter
   rcl_interfaces::msg::FloatingPointRange exposure_range;
   exposure_range.from_value = 0.0001;
   exposure_range.to_value = 0.1;
@@ -171,7 +167,6 @@ void AdapterNode::InitializeParameters() {
   exposure_descriptor.floating_point_range.push_back(exposure_range);
   declare_parameter("exposure", 0.01, exposure_descriptor);
 
-  // Auto white balance parameter
   rcl_interfaces::msg::ParameterDescriptor auto_white_balance_descriptor;
   auto_white_balance_descriptor.name = "auto_white_balance";
   auto_white_balance_descriptor.type = rclcpp::ParameterType::PARAMETER_BOOL;
@@ -179,7 +174,6 @@ void AdapterNode::InitializeParameters() {
   auto_white_balance_descriptor.read_only = false;
   declare_parameter("auto_white_balance", true, auto_white_balance_descriptor);
 
-  // White balance parameter
   rcl_interfaces::msg::IntegerRange white_balance_range;
   white_balance_range.from_value = 2800;
   white_balance_range.to_value = 6500;
@@ -192,7 +186,6 @@ void AdapterNode::InitializeParameters() {
   white_balance_descriptor.integer_range.push_back(white_balance_range);
   declare_parameter("white_balance", 4000, white_balance_descriptor);
 
-  // Gain parameter
   rcl_interfaces::msg::IntegerRange gain_range;
   gain_range.from_value = 0;
   gain_range.to_value = 128;
@@ -206,6 +199,7 @@ void AdapterNode::InitializeParameters() {
   declare_parameter("gain", 0, gain_descriptor);
 }
 
+// PreSetParametersCallback is used to add or adjust the parameter vector
 void AdapterNode::PreSetParametersCallback(
     std::vector<rclcpp::Parameter>& parameters) {
   const bool sets_exposure =
@@ -228,6 +222,11 @@ void AdapterNode::PreSetParametersCallback(
                       rclcpp::Parameter("auto_exposure", false));
   }
 
+  // it seems white balance can't be handled this way; it always
+  // resets white balance to a known value whenever it is disabled.
+  // This probably needs to be handled by querying if auto_white_balance
+  // is set to true, and if it is, set it to false, and start a one-shot
+  // timer that will set the target white balance value after 100ms or so.
   const bool sets_white_balance =
       std::find_if(parameters.begin(), parameters.end(),
                    [](const rclcpp::Parameter& param) {
@@ -291,14 +290,20 @@ void AdapterNode::PostSetParametersCallback(
     RCLCPP_INFO(get_logger(), "PostSetParametersCallback: %s %s",
                 parameter.get_name().c_str(), value_str.c_str());
 
+    // Set the parameter by using the relevant service client to
+    // send an async request
     if (parameter.get_name() == "exposure") {
       CallAsyncSet(set_exposure_client_,
                    static_cast<int>(10000.0 * parameter.as_double()));
     } else if (parameter.get_name() == "auto_exposure") {
       CallAsyncSet(set_auto_exposure_client_, parameter.as_bool());
     } else if (parameter.get_name() == "auto_white_balance") {
-      if ((parameter.as_bool() != auto_white_balance_) ||
-          parameter.as_bool()) {
+      // This one is tricky. Only disable it if it's requested to be disabled
+      // and it is currently enabled. If it is "re-disabled" while already
+      // set to disabled, then it resets the target white balance.
+      // But we don't want it to "get stuck", if the driver reboots, so always
+      // send requests to enable it.
+      if ((parameter.as_bool() != auto_white_balance_) || parameter.as_bool()) {
         CallAsyncSet(set_auto_white_balance_client_, parameter.as_bool(),
                      &auto_white_balance_);
       }
@@ -314,7 +319,6 @@ absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main()");
   t_last_color_image_ = get_clock()->now();
   rclcpp::executors::SingleThreadedExecutor executor;
-
   liveness_timer_ =
       create_wall_timer(std::chrono::seconds(1), [this, &executor]() {
         absl::MutexLock timeout_lock(&timeout_mutex_);
