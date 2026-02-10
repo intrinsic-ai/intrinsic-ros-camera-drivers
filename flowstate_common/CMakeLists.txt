@@ -17,8 +17,6 @@ include_directories(include)
 # Flowstate common library
 add_library(flowstate_common
   src/camera_adapter_node.cc
-  src/camera_spawner_node.cc
-  src/image_utils.cc
 )
 
 target_link_libraries(flowstate_common
