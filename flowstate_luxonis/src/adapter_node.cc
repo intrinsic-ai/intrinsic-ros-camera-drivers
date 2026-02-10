@@ -2,8 +2,9 @@
 
 #include <memory>
 
+#include "opencv2/core.hpp"
+#include "opencv2/imgproc.hpp"
 #include "absl/strings/str_format.h"
-#include "flowstate_common/image_utils.h"
 #include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_luxonis {
@@ -37,7 +38,6 @@ AdapterNode::AdapterNode(const std::string& serial,
   luxonis_node_ =
       std::make_shared<depthai_ros_driver::Driver>(luxonis_node_options);
 
-  // Subscribe to camera info
   color_info_sub_ = SubscribeToCameraInfo(
       absl::StrFormat("luxonis/camera_%s/driver/rgb/camera_info", serial_),
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
@@ -45,7 +45,6 @@ AdapterNode::AdapterNode(const std::string& serial,
         this->color_camera_info_ = std::move(msg);
       });
 
-  // Subscribe to color image
   color_image_sub_ = SubscribeToImage(
       ColorImageTopic(),
       [this](sensor_msgs::msg::Image::UniquePtr msg) {
@@ -83,14 +82,8 @@ absl::Status AdapterNode::Main() {
       });
 
   executor.add_node(this->get_node_base_interface());
-  executor.add_node(luxonis_node_);
-  executor.spin();
-  
-  RCLCPP_INFO(this->get_logger(), "Destroying luxonis_camera_node...");
-  luxonis_node_.reset();
-  rclcpp::sleep_for(std::chrono::milliseconds(500));
-  RCLCPP_INFO(this->get_logger(), "Done destroying luxonis_camera_node");
-  
+  executor.add_node(luxonis_node_); //->get_node_base_interface());
+  executor.spin(); 
   return absl::OkStatus();
 }
 
@@ -112,6 +105,7 @@ bool AdapterNode::BuildSnapshotResponse(
     snapshot_interfaces::srv::Snapshot::Response& response) {
   
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
+
   color_snapshot.topic_name = ColorImageTopic();
 
   // Lock and copy the most recent CameraInfo messages
@@ -126,7 +120,11 @@ bool AdapterNode::BuildSnapshotResponse(
 
   // Lock and copy the most recent Image messages
   absl::MutexLock lock(&image_mutex_);
-  if (!color_image_) return false;
+  if (!color_image_) {
+      response.error_message = "images not yet received from camera";
+      RCLCPP_ERROR(get_logger(), response.error_message.c_str());
+      return false;
+  }
 
   // The rgb.i_color_order parameter didn't seem to change the data, so we
   // need to convert BGR->RGB here, as the Flowstate ROS Image Source can
@@ -140,12 +138,10 @@ bool AdapterNode::BuildSnapshotResponse(
   color_snapshot.image.data.resize(color_snapshot.image.width *
                                    color_snapshot.image.step);
 
-  cv::Mat bgr_image(color_image_->height, color_image_->width, CV_8UC3,
-                    const_cast<uint8_t*>(color_image_->data.data()), 
-                    color_image_->step);
-  cv::Mat rgb_image(color_snapshot.image.height, color_snapshot.image.width, CV_8UC3,
-                    color_snapshot.image.data.data(), 
-                    color_snapshot.image.step);
+  const cv::Mat bgr_image(color_image_->height, color_image_->width, CV_8UC3,
+                          color_image_->data.data(), color_image_->step);
+  cv::Mat rgb_image(color_image_->height, color_image_->width, CV_8UC3,
+                    color_snapshot.image.data.data(), color_image_->step);
   cv::cvtColor(bgr_image, rgb_image, cv::COLOR_BGR2RGB);
 
   response.images.push_back(std::move(color_snapshot));
