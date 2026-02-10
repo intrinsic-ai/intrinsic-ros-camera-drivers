@@ -12,6 +12,8 @@ CameraAdapterNode::CameraAdapterNode(const std::string& serial,
       ip_address_(ip_address) {}
 
 void CameraAdapterNode::CreateFlowstateServices() {
+  callback_group_ =
+      this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
   describe_service_ = create_service<snapshot_interfaces::srv::Describe>(
       "~/describe",
       [this](const std::shared_ptr<rmw_request_id_t> request_header,
@@ -20,7 +22,9 @@ void CameraAdapterNode::CreateFlowstateServices() {
              const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
                  response) {
         this->DescribeCallback(request_header, request, response);
-      });
+      },
+      rclcpp::ServicesQoS(), 
+      callback_group_);
 
   snapshot_service_ = create_service<snapshot_interfaces::srv::Snapshot>(
       "~/snapshot",
@@ -30,7 +34,9 @@ void CameraAdapterNode::CreateFlowstateServices() {
              const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
                  response) {
         this->SnapshotCallback(request_header, request, response);
-      });
+      },
+      rclcpp::ServicesQoS(), 
+      callback_group_);
 }
 
 void CameraAdapterNode::StartExecutorThread() {
@@ -48,6 +54,7 @@ void CameraAdapterNode::DescribeCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {  
+  RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
   if (!BuildDescribeResponse(*response)) {
     if (response->error_message.empty()) {
         response->error_message = "Failed to build describe response (data not ready)";
@@ -82,6 +89,7 @@ void CameraAdapterNode::SnapshotCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
         response) {
+  RCLCPP_INFO(get_logger(), "=== SNAPSHOT SERVICE ===");
   if (!BuildSnapshotResponse(*response)) {
     if (response->error_message.empty()) {
         response->error_message = "Failed to capture snapshot (data not ready)";

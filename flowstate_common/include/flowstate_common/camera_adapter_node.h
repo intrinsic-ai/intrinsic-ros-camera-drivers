@@ -193,6 +193,7 @@ class CameraAdapterNode : public rclcpp::Node {
   rclcpp::TimerBase::SharedPtr liveness_timer_;
 
   // Flowstate services
+  rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::Service<snapshot_interfaces::srv::Describe>::SharedPtr
       describe_service_;
   rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr

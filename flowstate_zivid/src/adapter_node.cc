@@ -2,6 +2,7 @@
 
 #include <Zivid/Settings.h>
 
+#include <memory>
 #include <string>
 
 #include "absl/algorithm/container.h"
@@ -10,16 +11,8 @@
 #include "absl/strings/str_join.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/image_encodings.hpp"
-#include "sensor_msgs/msg/camera_info.hpp"
-#include "sensor_msgs/msg/image.hpp"
-#include "snapshot_interfaces/msg/image_snapshot.hpp"
 #include "yaml-cpp/yaml.h"
-#include "zivid_camera/capture_settings_controller.hpp"
-#include "zivid_camera/utility.hpp"
 #include "zivid_camera/zivid_camera.hpp"
-namespace zivid_camera {
-class ZividCamera;
-}
 
 namespace flowstate_zivid {
 
@@ -29,42 +22,16 @@ using snapshot_interfaces::srv::Snapshot;
 AdapterNode::AdapterNode(const std::string& serial,
                          const rclcpp::NodeOptions& options,
                          std::shared_ptr<Zivid::Application> zivid_app)
-    : Node(std::string("zivid_") + serial, options),
-      serial_(serial),
+    // Zivid usually connects via USB/PCIe, so IP is empty.
+    : flowstate_common::CameraAdapterNode(serial, "", "zivid"),
       capture_params_(CaptureParameters::boot_defaults()) {
-  // Declare parameters for AdapterNode
-  declare_parameter<double>("exposure_time", capture_params_.exposure_time);
-  declare_parameter<double>("ExposureTime",
-                            capture_params_.exposure_time);  // Alias
-  declare_parameter<double>("gain", capture_params_.gain);
-  declare_parameter<double>("Gain", capture_params_.gain);  // Alias
-  declare_parameter<double>("gamma", capture_params_.gamma);
-  declare_parameter<double>("Gamma", capture_params_.gamma);  // Alias
-  declare_parameter<double>("projector_brightness",
-                            capture_params_.projector_brightness);
-  declare_parameter<double>("brightness", capture_params_.projector_brightness);
-  declare_parameter<double>("Brightness",
-                            capture_params_.projector_brightness);  // Alias
-
-  declare_parameter<double>("aperture", capture_params_.aperture);
-  declare_parameter<double>("Aperture", capture_params_.aperture);  // Alias
-
-  declare_parameter<bool>("outlier_removal_enabled",
-                          capture_params_.outlier_removal_enabled);
-  declare_parameter<double>("outlier_removal_threshold",
-                            capture_params_.outlier_removal_threshold);
-
-  // Declare parameters that will be passed through to zivid_camera node
   const std::string zivid_node_name = std::string("camera_") + serial;
   const std::string zivid_ns = "zivid/" + zivid_node_name;
+
+  // We need to declare the parameter locally so we can pass it to the child node
   this->declare_parameter<std::string>("settings_yaml",
                                        "");  // For zivid_camera node
-
-  this->declare_parameter<std::string>("settings_2d_yaml", "");
-  this->declare_parameter<std::string>("settings_2d_file_path", "");
-  this->declare_parameter<std::string>("color_space", "srgb");
-  this->declare_parameter<std::string>("intrinsics_source", "camera");
-
+  
   rclcpp::NodeOptions zivid_node_options = options;
   zivid_node_options.append_parameter_override("serial_number", serial)
       .append_parameter_override(
@@ -84,6 +51,7 @@ AdapterNode::AdapterNode(const std::string& serial,
     throw std::runtime_error("zivid_camera parameter service not available.");
   }
 
+  InitializeParameters();
   RCLCPP_INFO(get_logger(),
               "Applying initial default settings to zivid_camera node.");
   const auto initial_settings_yaml = GenerateZividSettings();
@@ -92,7 +60,7 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   set_parameters_callback_handle_ =
       this->add_on_set_parameters_callback(std::bind(
-          &AdapterNode::setParametersCallback, this, std::placeholders::_1));
+          &AdapterNode::SetParametersCallback, this, std::placeholders::_1));
 
   // Subscribe to color image + camera_info pair
   color_image_sub_ = image_transport::create_camera_subscription(
@@ -122,44 +90,37 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   callback_group_ =
       this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-
-  describe_service_ = create_service<Describe>(
-      "~/describe",
-      [this](const std::shared_ptr<rmw_request_id_t> request_header,
-             const std::shared_ptr<Describe::Request> request,
-             const std::shared_ptr<Describe::Response> response) {
-        this->DescribeCallback(request_header, request, response);
-      },
-      rclcpp::ServicesQoS(), callback_group_);
-
-  snapshot_service_ = create_service<Snapshot>(
-      "~/snapshot",
-      [this](const std::shared_ptr<rmw_request_id_t> request_header,
-             const std::shared_ptr<Snapshot::Request> request,
-             const std::shared_ptr<Snapshot::Response> response) {
-        this->SnapshotCallback(request_header, request, response);
-      },
-      rclcpp::ServicesQoS(), callback_group_);
-  RCLCPP_INFO(this->get_logger(), "zivid_node_ = %s",
-              zivid_node_->get_fully_qualified_name());
-
   capture_client_ = this->create_client<std_srvs::srv::Trigger>(
       absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()),
-      rclcpp::ServicesQoS(), callback_group_);
-
-  thread_ = std::thread([this]() {
-    const absl::Status status = this->Main();
-    if (!status.ok()) {
-      RCLCPP_ERROR_STREAM(this->get_logger(),
-                          "Adapter node thread error: " << status);
-    }
-    RCLCPP_INFO(this->get_logger(), "Destroying zivid_camera_node...");
-    zivid_node_.reset();
-    RCLCPP_INFO(this->get_logger(), "Done destroying zivid_camera_node.");
-  });
+      rmw_qos_profile_services_default, callback_group_);
+  CreateFlowstateServices();
+  StartExecutorThread();
 }
 
-rcl_interfaces::msg::SetParametersResult AdapterNode::setParametersCallback(
+void AdapterNode::InitializeParameters() {
+  // Declare parameters
+  declare_parameter<double>("exposure_time", capture_params_.exposure_time);
+  declare_parameter<double>("ExposureTime", capture_params_.exposure_time); // Alias
+  declare_parameter<double>("gain", capture_params_.gain);
+  declare_parameter<double>("Gain", capture_params_.gain); // Alias
+  declare_parameter<double>("gamma", capture_params_.gamma);
+  declare_parameter<double>("Gamma", capture_params_.gamma); // Alias
+  declare_parameter<double>("projector_brightness", capture_params_.projector_brightness);
+  declare_parameter<double>("brightness", capture_params_.projector_brightness);
+  declare_parameter<double>("Brightness", capture_params_.projector_brightness); // Alias
+  declare_parameter<double>("aperture", capture_params_.aperture);
+  declare_parameter<double>("Aperture", capture_params_.aperture); // Alias
+
+  declare_parameter<bool>("outlier_removal_enabled", capture_params_.outlier_removal_enabled);
+  declare_parameter<double>("outlier_removal_threshold", capture_params_.outlier_removal_threshold);
+
+  declare_parameter<std::string>("settings_2d_yaml", "");
+  declare_parameter<std::string>("settings_2d_file_path", "");
+  declare_parameter<std::string>("color_space", "srgb");
+  declare_parameter<std::string>("intrinsics_source", "camera");
+}
+
+rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
     const std::vector<rclcpp::Parameter>& parameters) {
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
@@ -358,12 +319,8 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
   return absl::DeadlineExceededError(error_msg);
 }
 
-void AdapterNode::DescribeCallback(
-    const std::shared_ptr<rmw_request_id_t>,
-    const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
-    const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
-        response) {
-  RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
+bool AdapterNode::BuildDescribeResponse(
+    snapshot_interfaces::srv::Describe::Response& response) {
   const auto requires_capture = [this](){
     absl::MutexLock lock(&data_mutex_);
     return data_.camera_info == nullptr;
@@ -374,55 +331,27 @@ void AdapterNode::DescribeCallback(
     auto capture_data = Capture();
     if (!capture_data.ok()) {
       response->error_message = std::string(capture_data.status().message());
-      response->success = false;
-      return;
+      return false;
     }
   }
 
   // Color sensor info
-  snapshot_interfaces::msg::SensorInfo color_info;
-  color_info.sensor_name = "color";
-  color_info.topic_name = ColorImageTopic();
-  color_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
-  color_info.camera_t_sensor.transform.rotation.w = 1.0;
-  color_info.info.push_back(*data_.camera_info);
-  response->sensors.push_back(color_info);
-
+  AppendSensorDescription(response, *data_.camera_info, "rgb", ColorImageTopic());
   // Depth sensor info
-  snapshot_interfaces::msg::SensorInfo depth_info;
-  depth_info.sensor_name = "depth";
-  depth_info.topic_name = DepthImageTopic();
-  depth_info.sensor_type = snapshot_interfaces::msg::SensorInfo::DEPTH;
-  depth_info.camera_t_sensor.transform.rotation.w = 1.0;
-  depth_info.info.push_back(*data_.camera_info);
-  response->sensors.push_back(depth_info);
+  AppendSensorDescription(response, *data_.camera_info, "depth", DepthImageTopic());
+  AppendSensorDescription(response, *data_.camera_info, "normals", NormalTopic());
 
-  snapshot_interfaces::msg::SensorInfo normal_info;
-  normal_info.sensor_name = "normal";
-  normal_info.topic_name = NormalTopic();
-  normal_info.sensor_type = snapshot_interfaces::msg::SensorInfo::NORMAL;
-  normal_info.camera_t_sensor.transform.rotation.w = 1.0;
-  normal_info.info.push_back(*data_.camera_info);
-  response->sensors.push_back(normal_info);
-
-  response->success = true;
+  return true;
 }
 
-void AdapterNode::SnapshotCallback(
-    const std::shared_ptr<rmw_request_id_t>,
-    const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>,
-    const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
-        response) {
-  RCLCPP_INFO(get_logger(), "=== SNAPSHOT SERVICE ===");
-
+bool AdapterNode::BuildSnapshotResponse(
+    snapshot_interfaces::srv::Snapshot::Response& response) {
   // Trigger a capture
   auto capture_data = Capture();
   if (!capture_data.ok()) {
-    response->error_message = std::string(capture_data.status().message());
-    response->success = false;
-    return;
+    response.error_message = std::string(capture_data.status().message());
+    return false;
   }
-
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
   snapshot_interfaces::msg::PointCloud2Snapshot normal_snapshot;
@@ -442,6 +371,6 @@ void AdapterNode::SnapshotCallback(
   response->images.push_back(std::move(depth_snapshot));
   response->point_clouds.push_back(std::move(normal_snapshot));
 
-  response->success = true;
+  return true;
 }
 }  // namespace flowstate_zivid
