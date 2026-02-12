@@ -12,6 +12,26 @@
 
 namespace flowstate_common {
 
+/**
+ * @class CameraSpawnerNode
+ * @brief Abstract base class for managing the lifecycle and discovery of Flowstate camera adapters.
+ *
+ * This class serves as a "Factory" or "Manager" for camera adapter nodes. It provides
+ * standard functionality for reporting available devices to the system and automatically 
+ * managing the lifecycle (creation, monitoring, and cleanup) of adapter nodes.
+ *
+ * Key responsibilities:
+ * - Provide a standard "/cameras/discover" service that lists all active cameras.
+ * - Maintain a thread-safe list of active camera serial numbers.
+ * - Manage a list of `CameraAdapterNode` instances (the workers).
+ * - Monitor adapter liveness and automatically clean up nodes that have crashed or exited.
+ * - Run a periodic timer to trigger camera discovery and updates.
+ *
+ * To create a new camera spawner:
+ * 1. Inherit from CameraSpawnerNode.
+ * 2. In the constructor, call the base constructor with your specific driver type (e.g., "luxonis").
+ * 3. Implement the pure virtual method `UpdateCameras()`.
+ */
 class CameraSpawnerNode : public rclcpp::Node {
  public:
   /**
@@ -46,7 +66,8 @@ class CameraSpawnerNode : public rclcpp::Node {
   bool IsAlreadySpawned(const std::string& serial) const;
 
   /**
-   * @brief Iterates through spawned_nodes_ and removes any that have exited.
+   * @brief Iterates through spawned_nodes_ and removes any that have exited. 
+   * Should be used in UpdateCameras() after checking for new devices to also clean up any dead nodes.
    */
   void CleanupExitedNodes();
 

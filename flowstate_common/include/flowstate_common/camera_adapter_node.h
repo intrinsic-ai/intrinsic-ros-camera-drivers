@@ -35,8 +35,8 @@ namespace flowstate_common {
  * 1. Inherit from CameraAdapterNode
  * 2. Implement the pure virtual methods
  * 3. Subscribe to camera topics in the derived class constructor
- * 4. Override DescribeCallback to provide sensor information
- * 5. Override SnapshotCallback to return camera snapshot data
+ * 4. Override BuildDescribeResponse to build the describe response with sensor information for the describe service
+ * 5. Override BuildSnapshotResponse to build the snapshot response with image data for the snapshot service
  */
 class CameraAdapterNode : public rclcpp::Node {
  public:
