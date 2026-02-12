@@ -8,6 +8,7 @@
 #include "absl/synchronization/mutex.h"
 #include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/srv/discover.hpp"
+#include "flowstate_common/camera_adapter_node.h"
 
 namespace flowstate_common {
 

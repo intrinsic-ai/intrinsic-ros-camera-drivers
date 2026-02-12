@@ -34,12 +34,18 @@ CameraSpawnerNode::CameraSpawnerNode(const std::string& node_name,
                              [this]() { this->UpdateCameras(); });
 }
 
+CameraSpawnerNode::~CameraSpawnerNode() {
+  if (timer_) {
+    timer_.reset();
+  }
+}
+
 void CameraSpawnerNode::SetDiscoveredSerials(const std::vector<std::string>& serials) {
   absl::MutexLock lock(&discovery_mutex_);
   discovered_serials_ = serials;
 }
 
-bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
+bool CameraSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   for (const auto& node : spawned_nodes_) {
     // Uses the helper from CameraAdapterNode
     if (node && node->HasSerial(serial)) return true;
@@ -47,7 +53,7 @@ bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   return false;
 }
 
-void BaseSpawnerNode::CleanupExitedNodes() {
+void CameraSpawnerNode::CleanupExitedNodes() {
   auto it = spawned_nodes_.begin();
   while (it != spawned_nodes_.end()) {
     // Uses the helper from CameraAdapterNode
