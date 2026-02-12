@@ -18,7 +18,7 @@ find_package(intrinsic_sdk_ros QUIET)
 
 include_directories(include)
 
-add_library(flowstate_common
+add_library(flowstate_common SHARED
   src/camera_adapter_node.cc
   src/camera_spawner_node.cc
 )

@@ -37,6 +37,8 @@ class SpawnerNode : public flowstate_common::CameraSpawnerNode {
  public:
   SpawnerNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
+  ~SpawnerNode() override;
+
   static absl::StatusOr<std::shared_ptr<SpawnerNode>> Create();
 
   // Get the generated camera node names
