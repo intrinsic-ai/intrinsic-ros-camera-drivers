@@ -48,7 +48,9 @@ void CameraSpawnerNode::SetDiscoveredSerials(const std::vector<std::string>& ser
 bool CameraSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   for (const auto& node : spawned_nodes_) {
     // Uses the helper from CameraAdapterNode
-    if (node && node->HasSerial(serial)) return true;
+    if (node && node->HasSerial(serial)) {
+      return true;
+    }
   }
   return false;
 }

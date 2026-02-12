@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "absl/strings/str_format.h"
-#include "flowstate_common/image_utils.h"
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
 #include "rcl_interfaces/msg/floating_point_range.hpp"

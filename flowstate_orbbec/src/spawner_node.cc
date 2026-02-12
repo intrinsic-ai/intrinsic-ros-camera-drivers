@@ -35,14 +35,4 @@ void SpawnerNode::UpdateCameras() {
   // Update the Base Class with the list of active serials
   SetDiscoveredSerials(current_serials);
 }
-
-bool SpawnerNode::IsAlreadySpawned(const std::string& serial) const {
-  for (const auto& spawned_node : spawned_nodes_) {
-    if (spawned_node->HasSerial(serial)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 }  // namespace flowstate_orbbec
