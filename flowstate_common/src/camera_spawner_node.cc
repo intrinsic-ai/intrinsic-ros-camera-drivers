@@ -38,6 +38,7 @@ CameraSpawnerNode::~CameraSpawnerNode() {
   if (timer_) {
     timer_.reset();
   }
+  RCLCPP_INFO(get_logger(), "Camera SpawnerNode shutdown complete");
 }
 
 void CameraSpawnerNode::SetDiscoveredSerials(const std::vector<std::string>& serials) {

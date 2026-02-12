@@ -5,7 +5,7 @@
 #include <vector>
 #include <absl/status/statusor.h>
 
-#include "flowstate_common/base_spawner_node.h"
+#include "flowstate_common/camera_spawner_node.h"
 #include "flowstate_zivid/adapter_node.h"
 #include <Zivid/Application.h>
 
@@ -36,8 +36,6 @@ namespace flowstate_zivid {
 class SpawnerNode : public flowstate_common::CameraSpawnerNode {
  public:
   SpawnerNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
-
-  ~SpawnerNode() override;
 
   static absl::StatusOr<std::shared_ptr<SpawnerNode>> Create();
 

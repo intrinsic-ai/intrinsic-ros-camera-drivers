@@ -24,14 +24,6 @@ SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
   RCLCPP_INFO(get_logger(), "Zivid SpawnerNode is ready!");
 }
 
-SpawnerNode::~SpawnerNode() {
-  ShutdownCameraNodes();
-  if (timer_) {
-    timer_->reset();
-  }
-  RCLCPP_INFO(get_logger(), "Zivid SpawnerNode shutdown complete");
-}
-
 std::vector<std::string> SpawnerNode::GetCameraNodeNames() const {
     std::vector<std::string> names;
   for (const auto& node : spawned_nodes_) {

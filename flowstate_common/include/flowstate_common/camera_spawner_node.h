@@ -71,7 +71,7 @@ class CameraSpawnerNode : public rclcpp::Node {
    */
   void CleanupExitedNodes();
 
-  // We use shared_ptr because Zivid (and potentially others) require shared ownership.
+  // shared_ptr because Zivid (and potentially others) require shared ownership.
   std::vector<std::shared_ptr<flowstate_common::CameraAdapterNode>> spawned_nodes_;
 
  private:
