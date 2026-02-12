@@ -25,7 +25,7 @@ class CameraSpawnerNode : public rclcpp::Node {
                   std::chrono::duration<double> update_period,
                   const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
-  virtual ~CameraSpawnerNode() = default;
+  virtual ~CameraSpawnerNode();
 
  protected:
   /**

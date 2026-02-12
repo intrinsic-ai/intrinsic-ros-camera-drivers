@@ -25,7 +25,7 @@ add_library(flowstate_luxonis
   src/spawner_node.cc
 )
 target_link_libraries(flowstate_luxonis
-  flowstate_common
+  ${flowstate_common_LIBRARIES}
   absl::status
   absl::synchronization
   rclcpp::rclcpp

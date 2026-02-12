@@ -16,6 +16,7 @@
   <depend>libopencv-dev</depend>
   <depend>sensor_msgs</depend>
   <depend>snapshot_interfaces</depend>
+  <depend>flowstate_common</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

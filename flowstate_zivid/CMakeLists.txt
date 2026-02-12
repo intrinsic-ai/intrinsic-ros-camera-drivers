@@ -27,6 +27,7 @@ find_package(image_transport REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(abseil_cpp_vendor REQUIRED)
+find_package(flowstate_common REQUIRED)
 
 
 if(BUILD_TESTING)
@@ -62,9 +63,11 @@ ament_target_dependencies(zivid_camera_node rclcpp
     rcl_interfaces
     geometry_msgs
     image_transport
+    flowstate_common
 )
 target_link_libraries(
   zivid_camera_node
+  ${flowstate_common_LIBRARIES}
   Zivid::Core
   absl::base
   absl::core_headers
@@ -88,6 +91,7 @@ target_include_directories(
 
 target_link_libraries(
   zivid_nodes
+  ${flowstate_common_LIBRARIES}
   Zivid::Core
   absl::base
   absl::core_headers
@@ -111,6 +115,7 @@ ament_target_dependencies(zivid_nodes rclcpp
     rcl_interfaces
     geometry_msgs
     ament_index_cpp
+    flowstate_common
 )
 
 

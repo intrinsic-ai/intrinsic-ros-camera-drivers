@@ -34,7 +34,7 @@ add_library(flowstate_orbbec
 )
 target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_orbbec
-  flowstate_common
+  ${flowstate_common_LIBRARIES}
   absl::status
   absl::synchronization
   rclcpp::rclcpp
