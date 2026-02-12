@@ -329,7 +329,7 @@ bool AdapterNode::BuildDescribeResponse(
     RCLCPP_INFO(get_logger(), "No cached camera_info available, triggering capture");
     auto capture_data = Capture();
     if (!capture_data.ok()) {
-      response->error_message = std::string(capture_data.status().message());
+      response.error_message = std::string(capture_data.status().message());
       return false;
     }
   }
@@ -366,9 +366,9 @@ bool AdapterNode::BuildSnapshotResponse(
   depth_snapshot.image = std::move(*capture_data->depth_image);
   normal_snapshot.point_cloud = std::move(*capture_data->normal_pc);
 
-  response->images.push_back(std::move(color_snapshot));
-  response->images.push_back(std::move(depth_snapshot));
-  response->point_clouds.push_back(std::move(normal_snapshot));
+  response.images.push_back(std::move(color_snapshot));
+  response.images.push_back(std::move(depth_snapshot));
+  response.point_clouds.push_back(std::move(normal_snapshot));
 
   return true;
 }

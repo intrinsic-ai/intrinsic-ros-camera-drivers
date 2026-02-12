@@ -119,8 +119,6 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
    */
   absl::StatusOr<CaptureData> Capture();
 
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
-
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
   
   // Internal client to trigger the Zivid driver
