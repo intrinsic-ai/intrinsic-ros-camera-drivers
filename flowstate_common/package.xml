@@ -1,22 +1,24 @@
 <?xml version="1.0"?>
-<package format="2">
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
   <name>flowstate_common</name>
   <version>0.0.1</version>
-  <description>Common base classes and utilities for Flowstate camera adapter nodes</description>
-  <maintainer email="flowstate-dev@intrinsic.ai">Flowstate Development</maintainer>
-  <license>Apache-2.0</license>
+  <description>Flowstate Luxonis driver adapter</description>
+  <maintainer email="morganquigley@intrinsic.ai">morganquigley</maintainer>
+  <license>TODO</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>rosidl_default_generators</buildtool_depend>
-
-  <depend>absl_cpp</depend>
-  <depend>rclcpp</depend>
+  <depend>abseil_cpp_vendor</depend>
+  <depend>camera_info_manager</depend>
+  <depend>intrinsic_sdk_ros</depend>
+  <depend>depthai</depend>
+  <depend>depthai_ros_driver</depend>
   <depend>sensor_msgs</depend>
   <depend>snapshot_interfaces</depend>
 
-  <build_depend>abseil_cpp_vendor</build_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <exec_depend>abseil_cpp_vendor</exec_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

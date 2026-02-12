@@ -8,39 +8,38 @@ add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 
 find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
+find_package(depthai REQUIRED VERBOSE)
+find_package(depthai_ros_driver REQUIRED VERBOSE)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
 
+find_package(intrinsic_sdk_ros QUIET)
+
 include_directories(include)
 
-# Flowstate common library
 add_library(flowstate_common
   src/camera_adapter_node.cc
+  src/camera_spawner_node.cc
 )
-
 target_link_libraries(flowstate_common
   absl::status
   absl::synchronization
   rclcpp::rclcpp
+  depthai::core
   ${sensor_msgs_TARGETS}
   ${snapshot_interfaces_TARGETS}
 )
-
-ament_target_dependencies(flowstate_common)
-
+ament_target_dependencies(flowstate_common
+  depthai
+  depthai_ros_driver
+)
 install(TARGETS flowstate_common
         DESTINATION lib)
 
-install(DIRECTORY include/
-        DESTINATION include)
-
-ament_export_targets(flowstate_common HAS_LIBRARY_TARGET)
-ament_export_dependencies(
-  rclcpp
-  sensor_msgs
-  snapshot_interfaces
-  absl_cpp
+install(
+  DIRECTORY include/
+  DESTINATION include
 )
 
 ament_package()

@@ -1,39 +1,11 @@
 #include "flowstate_zivid/spawner_node.h"
-
-#include <Zivid/Application.h>
-#include <Zivid/Camera.h>
-#include <Zivid/Exception.h>
-
-#include <memory>
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/string.hpp>
-#include <std_srvs/srv/trigger.hpp>
-#include <string>
-#include <unordered_set>
-#include <vector>
-
-#include "absl/algorithm/container.h"
-#include "flowstate_zivid/adapter_node.h"
-#include "snapshot_interfaces/srv/discover.hpp"
-#include "zivid_camera/zivid_camera.hpp"
-
-using ::snapshot_interfaces::srv::Describe;
-using ::snapshot_interfaces::srv::Discover;
+#include <absl/algorithm/container.h>
 
 namespace flowstate_zivid {
 
-namespace ParamNames {
-constexpr auto serial_number = "serial_number";
-constexpr auto frame_id = "frame_id";
-constexpr auto color_space = "color_space";
-constexpr auto intrinsics_source = "intrinsics_source";
-}  // namespace ParamNames
-
 absl::StatusOr<std::shared_ptr<SpawnerNode>> SpawnerNode::Create() {
   try {
-    auto spawner = std::make_shared<SpawnerNode>();
-
-    return spawner;
+    return std::make_shared<SpawnerNode>();
   } catch (const std::exception& e) {
     return absl::Status(
         absl::StatusCode::kInternal,
@@ -44,35 +16,10 @@ absl::StatusOr<std::shared_ptr<SpawnerNode>> SpawnerNode::Create() {
 }
 
 SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
-    : rclcpp::Node("zivid_spawner", options),
+    : flowstate_common::CameraSpawnerNode("zivid_spawner", "zivid", std::chrono::seconds(30), options),
       zivid_app_(std::make_shared<Zivid::Application>()) {
   RCLCPP_INFO(get_logger(), "Starting Zivid SpawnerNode...");
-
-  using namespace std::placeholders;
-  discover_service_ = create_service<Discover>(
-      "/cameras/discover",
-      [this](const std::shared_ptr<rmw_request_id_t>,
-             const std::shared_ptr<Discover::Request>,
-             const std::shared_ptr<Discover::Response> response) {
-        RCLCPP_INFO(get_logger(), "=== DISCOVERY SERVICE CALLED ===");
-
-        absl::MutexLock lock(&cameras_mutex_);
-
-        RCLCPP_INFO(get_logger(), "Returning %d already discovered cameras",
-                    static_cast<int>(discovered_camera_msgs_.size()));
-
-        response->cameras.clear();
-
-        for (const auto& camera : discovered_camera_msgs_) {
-          response->cameras.push_back(camera);
-        }
-
-        response->success = true;
-        RCLCPP_INFO(get_logger(), "=== DISCOVERY SERVICE COMPLETE ===");
-      });
-  timer_ = create_wall_timer(std::chrono::seconds(30),
-                             [this]() { this->RefreshCameraList(); });
-  RefreshCameraList();
+  UpdateCameras();
   RCLCPP_INFO(get_logger(), "Zivid SpawnerNode is ready!");
 }
 
@@ -85,27 +32,28 @@ SpawnerNode::~SpawnerNode() {
 }
 
 std::vector<std::string> SpawnerNode::GetCameraNodeNames() const {
-  absl::MutexLock lock(&cameras_mutex_);
-
-  std::vector<std::string> node_names;
-  for (const auto& camera : discovered_camera_msgs_) {
-    node_names.push_back("zivid_" + camera.camera_id);
+    std::vector<std::string> names;
+  for (const auto& node : spawned_nodes_) {
+    if(node) {
+      names.push_back("zivid_" + node->get_serial());
+    }
   }
-
-  return node_names;
+  return names;
 }
 
-void SpawnerNode::RefreshCameraList() {
-  absl::MutexLock lock(&cameras_mutex_);
-
+void SpawnerNode::UpdateCameras() {
   RCLCPP_INFO(get_logger(), "Discovering physical cameras...");
   const auto& zivid_cameras = zivid_app_->cameras();
   RCLCPP_INFO(get_logger(), "Found %zu physical camera(s)",
               zivid_cameras.size());
 
   std::unordered_set<std::string> discovered_serials;
+  std::vector<std::string> current_serials;
+
   for (const auto& cam : zivid_cameras) {
-    discovered_serials.insert(cam.info().serialNumber().toString());
+    std::string serial = cam.info().serialNumber().toString();
+    discovered_serials.insert(serial);
+    current_serials.push_back(serial);
   }
 
   // 1. Shut down nodes for cameras that are no longer connected.
@@ -151,14 +99,7 @@ void SpawnerNode::RefreshCameraList() {
   }
 
   // 3. Update the list for the discovery service.
-  discovered_camera_msgs_.clear();
-  for (const auto& node : spawned_nodes_) {
-    if (!node) continue;
-    snapshot_interfaces::msg::DiscoveredCamera discovered_camera;
-    discovered_camera.driver_type = "zivid";
-    discovered_camera.camera_id = node->get_serial();
-    discovered_camera_msgs_.push_back(discovered_camera);
-  }
+  SetDiscoveredSerials(current_serials);
 }
 
 void SpawnerNode::ShutdownCameraNodes() {
