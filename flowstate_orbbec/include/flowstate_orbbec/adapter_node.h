@@ -29,9 +29,17 @@ class AdapterNode : public flowstate_common::CameraAdapterNode {
 
   void InitializeParameters();
   
+  rclcpp::node_interfaces::PreSetParametersCallbackHandle::SharedPtr
+      pre_set_parameters_callback_handle_;
   void PreSetParametersCallback(std::vector<rclcpp::Parameter>& parameters);
+
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr
+      on_set_parameters_callback_handle_;
   rcl_interfaces::msg::SetParametersResult SetParametersCallback(
       const std::vector<rclcpp::Parameter>& parameters);
+
+  rclcpp::node_interfaces::PostSetParametersCallbackHandle::SharedPtr
+      post_set_parameters_callback_handle_;
   void PostSetParametersCallback(const std::vector<rclcpp::Parameter>& parameters);
 
   template <typename ServiceType, typename ValueType>

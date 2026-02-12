@@ -372,7 +372,7 @@ bool AdapterNode::BuildSnapshotResponse(
   {
     absl::MutexLock lock(&camera_info_mutex_);
     if (!color_camera_info_ || !ir_camera_info_) {
-      response->error_message = "CameraInfo not yet received";
+      response.error_message = "CameraInfo not yet received";
       return false;
     }
     color_snapshot.camera_info = *color_camera_info_;
@@ -387,19 +387,19 @@ bool AdapterNode::BuildSnapshotResponse(
   // Lock and copy the most recent Image messages
   absl::MutexLock lock(&image_mutex_);
   if (!color_image_ || !ir_image_) {
-    response->error_message = "images not yet received from camera";
+    response.error_message = "images not yet received from camera";
     return false;
   }
 
   color_snapshot.image = *color_image_;
-  response->images.push_back(std::move(color_snapshot));
+  response.images.push_back(std::move(color_snapshot));
 
   ir_snapshot.image = *ir_image_;
-  response->images.push_back(std::move(ir_snapshot));
+  response.images.push_back(std::move(ir_snapshot));
 
 #if SEND_DEPTH
   if (!depth_image_) {
-    response->error_message = "depth image not yet received from camera";
+    response.error_message = "depth image not yet received from camera";
     return false;
   }
   // The Orbbec camera returns the depth image as 16-bit images in millimeters.
@@ -419,7 +419,7 @@ bool AdapterNode::BuildSnapshotResponse(
                       CV_32F, depth_snapshot.image.data.data());
   depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
 
-  response->images.push_back(std::move(depth_snapshot));
+  response.images.push_back(std::move(depth_snapshot));
 #endif
 
   return true;
