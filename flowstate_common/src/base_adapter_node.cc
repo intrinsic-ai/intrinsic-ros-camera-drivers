@@ -1,17 +1,17 @@
-#include "flowstate_common/camera_adapter_node.h"
+#include "flowstate_common/base_adapter_node.h"
 
 #include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_common {
 
-CameraAdapterNode::CameraAdapterNode(const std::string& serial,
+BaseAdapterNode::BaseAdapterNode(const std::string& serial,
                                      const std::string& ip_address,
                                      const std::string& node_name_prefix)
     : Node(node_name_prefix + "_" + serial),
       serial_(serial),
       ip_address_(ip_address) {}
 
-void CameraAdapterNode::CreateFlowstateServices() {
+void BaseAdapterNode::CreateFlowstateServices() {
   callback_group_ =
       this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
   describe_service_ = create_service<snapshot_interfaces::srv::Describe>(
@@ -39,7 +39,7 @@ void CameraAdapterNode::CreateFlowstateServices() {
       callback_group_);
 }
 
-void CameraAdapterNode::StartExecutorThread() {
+void BaseAdapterNode::StartExecutorThread() {
   thread_ = std::thread([this]() {
     const absl::Status status = this->Main();
     if (!status.ok()) {
@@ -49,7 +49,7 @@ void CameraAdapterNode::StartExecutorThread() {
   });
 }
 
-void CameraAdapterNode::DescribeCallback(
+void BaseAdapterNode::DescribeCallback(
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
@@ -67,7 +67,7 @@ void CameraAdapterNode::DescribeCallback(
   response->success = true;
 }
 
-void CameraAdapterNode::AppendSensorDescription(
+void BaseAdapterNode::AppendSensorDescription(
     snapshot_interfaces::srv::Describe::Response& response,
     const sensor_msgs::msg::CameraInfo& info,
     const std::string& sensor_name,
@@ -84,7 +84,7 @@ void CameraAdapterNode::AppendSensorDescription(
   response.sensors.push_back(std::move(sensor_info));
 }
 
-void CameraAdapterNode::SnapshotCallback(
+void BaseAdapterNode::SnapshotCallback(
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>

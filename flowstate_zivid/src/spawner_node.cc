@@ -17,7 +17,7 @@ absl::StatusOr<std::shared_ptr<SpawnerNode>> SpawnerNode::Create() {
 }
 
 SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
-    : flowstate_common::CameraSpawnerNode("zivid_spawner", "zivid", std::chrono::seconds(30), options),
+    : flowstate_common::BaseSpawnerNode("zivid_spawner", "zivid", std::chrono::seconds(30), options),
       zivid_app_(std::make_shared<Zivid::Application>()) {
   RCLCPP_INFO(get_logger(), "Starting Zivid SpawnerNode...");
   UpdateCameras();

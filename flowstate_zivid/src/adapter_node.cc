@@ -23,7 +23,7 @@ AdapterNode::AdapterNode(const std::string& serial,
                          const rclcpp::NodeOptions& options,
                          std::shared_ptr<Zivid::Application> zivid_app)
     // Zivid usually connects via USB/PCIe, so IP is empty.
-    : flowstate_common::CameraAdapterNode(serial, "", "zivid"),
+    : flowstate_common::BaseAdapterNode(serial, "", "zivid"),
       capture_params_(CaptureParameters::boot_defaults()) {
   InitializeParameters();
   const std::string zivid_node_name = std::string("camera_") + serial;

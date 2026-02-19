@@ -5,7 +5,7 @@
 #include <vector>
 #include <absl/status/statusor.h>
 
-#include "flowstate_common/camera_spawner_node.h"
+#include "flowstate_common/base_spawner_node.h"
 #include "flowstate_zivid/adapter_node.h"
 #include <Zivid/Application.h>
 
@@ -33,7 +33,7 @@ namespace flowstate_zivid {
  *     Flowstate that allows to query for a list of available cameras with their
  *     serial numbers.
  */
-class SpawnerNode : public flowstate_common::CameraSpawnerNode {
+class SpawnerNode : public flowstate_common::BaseSpawnerNode {
  public:
   SpawnerNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 

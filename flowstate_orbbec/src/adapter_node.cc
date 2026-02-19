@@ -17,7 +17,7 @@ namespace flowstate_orbbec {
 
 AdapterNode::AdapterNode(const std::string& serial,
                          const std::string& ip_address)
-    : flowstate_common::CameraAdapterNode(serial, ip_address, "orbbec") {
+    : flowstate_common::BaseAdapterNode(serial, ip_address, "orbbec") {
   const std::string orbbec_node_name = std::string("orbbec_camera_node");
   const std::string orbbec_ns = std::string("orbbec/camera_") + serial;
 

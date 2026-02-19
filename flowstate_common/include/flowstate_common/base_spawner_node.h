@@ -13,7 +13,7 @@
 namespace flowstate_common {
 
 /**
- * @class CameraSpawnerNode
+ * @class BaseSpawnerNode
  * @brief Abstract base class for managing the lifecycle and discovery of Flowstate camera adapters.
  *
  * This class serves as a "Factory" or "Manager" for camera adapter nodes. It provides
@@ -28,11 +28,11 @@ namespace flowstate_common {
  * - Run a periodic timer to trigger camera discovery and updates.
  *
  * To create a new camera spawner:
- * 1. Inherit from CameraSpawnerNode.
+ * 1. Inherit from BaseSpawnerNode.
  * 2. In the constructor, call the base constructor with your specific driver type (e.g., "luxonis").
  * 3. Implement the pure virtual method `UpdateCameras()`.
  */
-class CameraSpawnerNode : public rclcpp::Node {
+class BaseSpawnerNode : public rclcpp::Node {
  public:
   /**
    * @param node_name The name of the ROS node.
@@ -40,12 +40,12 @@ class CameraSpawnerNode : public rclcpp::Node {
    * @param update_period How often to run the discovery loop.
    * @param options Node options (defaults to empty).
    */
-  CameraSpawnerNode(const std::string& node_name,
+  BaseSpawnerNode(const std::string& node_name,
                   const std::string& driver_type,
                   std::chrono::duration<double> update_period,
                   const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
-  virtual ~CameraSpawnerNode();
+  virtual ~BaseSpawnerNode();
 
  protected:
   /**

@@ -9,7 +9,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
-#include "flowstate_common/camera_adapter_node.h"
+#include "flowstate_common/base_adapter_node.h"
 #include "image_transport/image_transport.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
@@ -53,7 +53,7 @@ namespace flowstate_zivid {
  *     - "~/describe": Provides a structured description of the camera's
  *       available sensors and their properties.
  */
-class AdapterNode : public flowstate_common::CameraAdapterNode {
+class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
   AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options,
               std::shared_ptr<Zivid::Application> zivid_app);

@@ -4,7 +4,7 @@
 namespace flowstate_luxonis {
 
 SpawnerNode::SpawnerNode()
-    : flowstate_common::CameraSpawnerNode("luxonis_spawner", "luxonis", std::chrono::seconds(10)) {
+    : flowstate_common::BaseSpawnerNode("luxonis_spawner", "luxonis", std::chrono::seconds(10)) {
   UpdateCameras();
 }
 

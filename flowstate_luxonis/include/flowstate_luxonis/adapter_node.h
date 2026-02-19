@@ -6,7 +6,7 @@
 
 #include "absl/status/status.h"
 #include "depthai_ros_driver/driver.hpp"
-#include "flowstate_common/camera_adapter_node.h"
+#include "flowstate_common/base_adapter_node.h"
 
 namespace flowstate_luxonis {
 
@@ -14,10 +14,10 @@ namespace flowstate_luxonis {
  * @class AdapterNode
  * @brief Flowstate adapter for Luxonis (OAK) cameras.
  *
- * Inherits from the common CameraAdapterNode base class and implements
+ * Inherits from the common BaseAdapterNode base class and implements
  * Luxonis-specific initialization and topic discovery.
  */
-class AdapterNode : public flowstate_common::CameraAdapterNode {
+class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
   /**
    * @brief Constructor initializes the Luxonis adapter.

@@ -1,11 +1,11 @@
-#include "flowstate_common/camera_spawner_node.h"
+#include "flowstate_common/base_spawner_node.h"
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
 
 namespace flowstate_common {
 
 using snapshot_interfaces::srv::Discover;
 
-CameraSpawnerNode::CameraSpawnerNode(const std::string& node_name,
+BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
                                  const std::string& driver_type,
                                  std::chrono::duration<double> update_period,
                                  const rclcpp::NodeOptions& options)
@@ -34,19 +34,19 @@ CameraSpawnerNode::CameraSpawnerNode(const std::string& node_name,
                              [this]() { this->UpdateCameras(); });
 }
 
-CameraSpawnerNode::~CameraSpawnerNode() {
+BaseSpawnerNode::~BaseSpawnerNode() {
   if (timer_) {
     timer_.reset();
   }
   RCLCPP_INFO(get_logger(), "Camera SpawnerNode shutdown complete");
 }
 
-void CameraSpawnerNode::SetDiscoveredSerials(const std::vector<std::string>& serials) {
+void BaseSpawnerNode::SetDiscoveredSerials(const std::vector<std::string>& serials) {
   absl::MutexLock lock(&discovery_mutex_);
   discovered_serials_ = serials;
 }
 
-bool CameraSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
+bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   for (const auto& node : spawned_nodes_) {
     // Uses the helper from CameraAdapterNode
     if (node && node->HasSerial(serial)) {
@@ -56,7 +56,7 @@ bool CameraSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   return false;
 }
 
-void CameraSpawnerNode::CleanupExitedNodes() {
+void BaseSpawnerNode::CleanupExitedNodes() {
   auto it = spawned_nodes_.begin();
   while (it != spawned_nodes_.end()) {
     // Uses the helper from CameraAdapterNode

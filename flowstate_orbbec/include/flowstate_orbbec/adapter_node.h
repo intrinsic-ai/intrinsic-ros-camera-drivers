@@ -5,14 +5,14 @@
 #include <string>
 #include <vector>
 
-#include "flowstate_common/camera_adapter_node.h"
+#include "flowstate_common/base_adapter_node.h"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "orbbec_camera_msgs/srv/set_int32.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 
 namespace flowstate_orbbec {
 
-class AdapterNode : public flowstate_common::CameraAdapterNode {
+class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
   AdapterNode(const std::string& serial, const std::string& ip_address);
 

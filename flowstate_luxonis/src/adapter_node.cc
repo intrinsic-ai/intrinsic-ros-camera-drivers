@@ -11,7 +11,7 @@ namespace flowstate_luxonis {
 
 AdapterNode::AdapterNode(const std::string& serial,
                          const std::string& ip_address)
-    : flowstate_common::CameraAdapterNode(serial, ip_address, "luxonis") {
+    : flowstate_common::BaseAdapterNode(serial, ip_address, "luxonis") {
   const std::string luxonis_node_name = std::string("luxonis_camera_node");
   const std::string luxonis_ns = std::string("/luxonis/camera_") + serial;
   rclcpp::NodeOptions luxonis_node_options =

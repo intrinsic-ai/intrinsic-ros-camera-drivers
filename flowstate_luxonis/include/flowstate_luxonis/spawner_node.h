@@ -5,13 +5,13 @@
 #include <string>
 #include <vector>
 
-#include "flowstate_common/camera_spawner_node.h"
+#include "flowstate_common/base_spawner_node.h"
 #include "flowstate_luxonis/adapter_node.h"
 #include <XLink/XLinkPublicDefines.h>
 
 namespace flowstate_luxonis {
 
-class SpawnerNode : public flowstate_common::CameraSpawnerNode {
+class SpawnerNode : public flowstate_common::BaseSpawnerNode {
  public:
   SpawnerNode();
 

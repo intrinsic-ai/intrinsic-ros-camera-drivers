@@ -17,7 +17,7 @@
 namespace flowstate_common {
 
 /**
- * @class CameraAdapterNode
+ * @class BaseAdapterNode
  * @brief Abstract base class for camera adapter nodes that implement the
  * Flowstate camera interface.
  *
@@ -32,13 +32,13 @@ namespace flowstate_common {
  * - Provide liveness checking for connection monitoring
  *
  * To create a new camera adapter:
- * 1. Inherit from CameraAdapterNode
+ * 1. Inherit from BaseAdapterNode
  * 2. Implement the pure virtual methods
  * 3. Subscribe to camera topics in the derived class constructor
  * 4. Override BuildDescribeResponse to build the describe response with sensor information for the describe service
  * 5. Override BuildSnapshotResponse to build the snapshot response with image data for the snapshot service
  */
-class CameraAdapterNode : public rclcpp::Node {
+class BaseAdapterNode : public rclcpp::Node {
  public:
   /**
    * @brief Constructor initializes the adapter node with serial and IP address.
@@ -46,7 +46,7 @@ class CameraAdapterNode : public rclcpp::Node {
    * @param ip_address Camera IP address (optional for USB devices)
    * @param node_name ROS node name prefix (will be prefixed with camera type)
    */
-  CameraAdapterNode(const std::string& serial, const std::string& ip_address,
+  BaseAdapterNode(const std::string& serial, const std::string& ip_address,
                     const std::string& node_name_prefix);
 
   /**

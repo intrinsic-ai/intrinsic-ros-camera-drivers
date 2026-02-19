@@ -5,12 +5,12 @@
 #include <string>
 #include <vector>
 
-#include "flowstate_common/camera_spawner_node.h"
+#include "flowstate_common/base_spawner_node.h"
 #include "flowstate_orbbec/adapter_node.h"
 
 namespace flowstate_orbbec {
 
-class SpawnerNode : public flowstate_common::CameraSpawnerNode {
+class SpawnerNode : public flowstate_common::BaseSpawnerNode {
  public:
   SpawnerNode();
 

@@ -4,7 +4,7 @@
 namespace flowstate_orbbec {
 
 SpawnerNode::SpawnerNode()
-    : flowstate_common::CameraSpawnerNode("orbbec_spawner", "orbbec", std::chrono::seconds(10)) {
+    : flowstate_common::BaseSpawnerNode("orbbec_spawner", "orbbec", std::chrono::seconds(10)) {
   UpdateCameras();
 }
 
