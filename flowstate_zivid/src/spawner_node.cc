@@ -50,7 +50,7 @@ void SpawnerNode::UpdateCameras() {
   }
 
   // 1. Shut down nodes for cameras that are no longer connected.
-std::vector<std::shared_ptr<flowstate_common::CameraAdapterNode>> still_active_nodes;
+std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> still_active_nodes;
   for (auto& node : spawned_nodes_) {
     if (node && discovered_serials.find(node->GetSerial()) ==
                     discovered_serials.end()) {

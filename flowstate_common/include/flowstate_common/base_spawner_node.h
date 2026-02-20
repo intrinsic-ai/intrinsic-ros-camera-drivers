@@ -8,7 +8,7 @@
 #include "absl/synchronization/mutex.h"
 #include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/srv/discover.hpp"
-#include "flowstate_common/camera_adapter_node.h"
+#include "flowstate_common/base_adapter_node.h"
 
 namespace flowstate_common {
 
@@ -23,7 +23,7 @@ namespace flowstate_common {
  * Key responsibilities:
  * - Provide a standard "/cameras/discover" service that lists all active cameras.
  * - Maintain a thread-safe list of active camera serial numbers.
- * - Manage a list of `CameraAdapterNode` instances (the workers).
+ * - Manage a list of `BaseAdapterNode` instances (the workers).
  * - Monitor adapter liveness and automatically clean up nodes that have crashed or exited.
  * - Run a periodic timer to trigger camera discovery and updates.
  *
@@ -72,7 +72,7 @@ class BaseSpawnerNode : public rclcpp::Node {
   void CleanupExitedNodes();
 
   // shared_ptr because Zivid (and potentially others) require shared ownership.
-  std::vector<std::shared_ptr<flowstate_common::CameraAdapterNode>> spawned_nodes_;
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> spawned_nodes_;
 
  private:
   const std::string driver_type_;

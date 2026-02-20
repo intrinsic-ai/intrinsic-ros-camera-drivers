@@ -48,7 +48,7 @@ void BaseSpawnerNode::SetDiscoveredSerials(const std::vector<std::string>& seria
 
 bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   for (const auto& node : spawned_nodes_) {
-    // Uses the helper from CameraAdapterNode
+    // Uses the helper from BaseAdapterNode
     if (node && node->HasSerial(serial)) {
       return true;
     }
@@ -59,7 +59,7 @@ bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
 void BaseSpawnerNode::CleanupExitedNodes() {
   auto it = spawned_nodes_.begin();
   while (it != spawned_nodes_.end()) {
-    // Uses the helper from CameraAdapterNode
+    // Uses the helper from BaseAdapterNode
     if ((*it)->HasExitedThread()) {
       RCLCPP_INFO(get_logger(), "Camera %s has exited. Removing it.",
                   (*it)->GetSerial().c_str());
