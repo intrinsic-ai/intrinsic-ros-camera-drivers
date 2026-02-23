@@ -1,10 +1,12 @@
 #include "flowstate_orbbec/spawner_node.h"
+
 #include "orbbec_camera/ob_camera_node_driver.h"
 
 namespace flowstate_orbbec {
 
 SpawnerNode::SpawnerNode()
-    : flowstate_common::BaseSpawnerNode("orbbec_spawner", "orbbec", std::chrono::seconds(10)) {
+    : flowstate_common::BaseSpawnerNode("orbbec_spawner", "orbbec",
+                                        std::chrono::seconds(10)) {
   UpdateCameras();
 }
 
@@ -12,7 +14,7 @@ void SpawnerNode::UpdateCameras() {
   // ob::Context::setLoggerSeverity(OBLogSeverity::OB_LOG_SEVERITY_OFF);
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();
-  
+
   std::vector<std::string> current_serials;
   for (size_t i = 0; i < list->deviceCount(); i++) {
     if (std::string(list->getConnectionType(i)) != std::string("Ethernet")) {

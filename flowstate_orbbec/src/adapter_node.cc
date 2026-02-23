@@ -77,8 +77,7 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   // Subscribe to color image
   color_image_sub_ = SubscribeToImage(
-      ColorImageTopic(),
-      [this](sensor_msgs::msg::Image::UniquePtr msg) {
+      ColorImageTopic(), [this](sensor_msgs::msg::Image::UniquePtr msg) {
         {
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();
@@ -89,16 +88,14 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   // Subscribe to IR image
   ir_image_sub_ = SubscribeToImage(
-      IrImageTopic(),
-      [this](sensor_msgs::msg::Image::UniquePtr msg) {
+      IrImageTopic(), [this](sensor_msgs::msg::Image::UniquePtr msg) {
         absl::MutexLock lock(&this->image_mutex_);
         this->ir_image_ = std::move(msg);
       });
 
 #if SEND_DEPTH
   depth_image_sub_ = SubscribeToImage(
-      DepthImageTopic(),
-      [this](sensor_msgs::msg::Image::UniquePtr msg) {
+      DepthImageTopic(), [this](sensor_msgs::msg::Image::UniquePtr msg) {
         absl::MutexLock lock(&this->image_mutex_);
         this->depth_image_ = std::move(msg);
       });
@@ -140,12 +137,11 @@ void AdapterNode::InitializeParameters() {
   pre_set_parameters_callback_handle_ =
       add_pre_set_parameters_callback(std::bind(
           &AdapterNode::PreSetParametersCallback, this, std::placeholders::_1));
-  on_set_parameters_callback_handle_ =
-      add_on_set_parameters_callback(std::bind(
-          &AdapterNode::SetParametersCallback, this, std::placeholders::_1));
-  post_set_parameters_callback_handle_ =
-      add_post_set_parameters_callback(std::bind(
-          &AdapterNode::PostSetParametersCallback, this, std::placeholders::_1));
+  on_set_parameters_callback_handle_ = add_on_set_parameters_callback(std::bind(
+      &AdapterNode::SetParametersCallback, this, std::placeholders::_1));
+  post_set_parameters_callback_handle_ = add_post_set_parameters_callback(
+      std::bind(&AdapterNode::PostSetParametersCallback, this,
+                std::placeholders::_1));
 
   rcl_interfaces::msg::ParameterDescriptor auto_exposure_descriptor;
   auto_exposure_descriptor.name = "auto_exposure";
@@ -206,11 +202,10 @@ void AdapterNode::PreSetParametersCallback(
                    [](const rclcpp::Parameter& param) {
                      return param.get_name() == "exposure";
                    }) != parameters.end();
-  const bool sets_gain =
-      std::find_if(parameters.begin(), parameters.end(),
-                   [](const rclcpp::Parameter& param) {
-                     return param.get_name() == "gain";
-                   }) != parameters.end();
+  const bool sets_gain = std::find_if(parameters.begin(), parameters.end(),
+                                      [](const rclcpp::Parameter& param) {
+                                        return param.get_name() == "gain";
+                                      }) != parameters.end();
   const bool sets_auto_exposure =
       std::find_if(parameters.begin(), parameters.end(),
                    [](const rclcpp::Parameter& param) {
@@ -335,19 +330,21 @@ absl::Status AdapterNode::Main() {
 
 bool AdapterNode::BuildDescribeResponse(
     snapshot_interfaces::srv::Describe::Response& response) {
-  
   absl::MutexLock lock(&camera_info_mutex_);
   if (!color_camera_info_ || !ir_camera_info_) {
     response.error_message = "CameraInfo not yet received (waiting for RGB+IR)";
     return false;
   }
 
-  AppendSensorDescription(response, *color_camera_info_, "rgb", ColorImageTopic());
-  AppendSensorDescription(response, *ir_camera_info_, "ir_left", IrImageTopic());
+  AppendSensorDescription(response, *color_camera_info_, "rgb",
+                          ColorImageTopic());
+  AppendSensorDescription(response, *ir_camera_info_, "ir_left",
+                          IrImageTopic());
 
 #if SEND_DEPTH
   if (depth_camera_info_) {
-    AppendSensorDescription(response, *depth_camera_info_, "depth", DepthImageTopic());
+    AppendSensorDescription(response, *depth_camera_info_, "depth",
+                            DepthImageTopic());
   }
 #endif
 

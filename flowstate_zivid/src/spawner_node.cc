@@ -1,5 +1,7 @@
 #include "flowstate_zivid/spawner_node.h"
+
 #include <absl/algorithm/container.h>
+
 #include "absl/strings/str_cat.h"
 
 namespace flowstate_zivid {
@@ -17,7 +19,8 @@ absl::StatusOr<std::shared_ptr<SpawnerNode>> SpawnerNode::Create() {
 }
 
 SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
-    : flowstate_common::BaseSpawnerNode("zivid_spawner", "zivid", std::chrono::seconds(30), options),
+    : flowstate_common::BaseSpawnerNode("zivid_spawner", "zivid",
+                                        std::chrono::seconds(30), options),
       zivid_app_(std::make_shared<Zivid::Application>()) {
   RCLCPP_INFO(get_logger(), "Starting Zivid SpawnerNode...");
   UpdateCameras();
@@ -25,9 +28,9 @@ SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
 }
 
 std::vector<std::string> SpawnerNode::GetCameraNodeNames() const {
-    std::vector<std::string> names;
+  std::vector<std::string> names;
   for (const auto& node : spawned_nodes_) {
-    if(node) {
+    if (node) {
       names.push_back("zivid_" + node->GetSerial());
     }
   }
@@ -50,7 +53,8 @@ void SpawnerNode::UpdateCameras() {
   }
 
   // 1. Shut down nodes for cameras that are no longer connected.
-std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> still_active_nodes;
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
+      still_active_nodes;
   for (auto& node : spawned_nodes_) {
     if (node && discovered_serials.find(node->GetSerial()) ==
                     discovered_serials.end()) {

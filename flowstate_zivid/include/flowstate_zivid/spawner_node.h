@@ -1,13 +1,14 @@
 #ifndef FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_SPAWNER_NODE_H_
 #define FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_SPAWNER_NODE_H_
 
+#include <Zivid/Application.h>
+#include <absl/status/statusor.h>
+
 #include <memory>
 #include <vector>
-#include <absl/status/statusor.h>
 
 #include "flowstate_common/base_spawner_node.h"
 #include "flowstate_zivid/adapter_node.h"
-#include <Zivid/Application.h>
 
 namespace flowstate_zivid {
 /**

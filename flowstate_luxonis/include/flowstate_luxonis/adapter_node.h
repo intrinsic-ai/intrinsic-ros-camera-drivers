@@ -30,9 +30,9 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   absl::Status Main() override;
   std::string ColorImageTopic() const override;
   bool BuildDescribeResponse(
-    snapshot_interfaces::srv::Describe::Response& response) override;
+      snapshot_interfaces::srv::Describe::Response& response) override;
   bool BuildSnapshotResponse(
-    snapshot_interfaces::srv::Snapshot::Response& response) override;
+      snapshot_interfaces::srv::Snapshot::Response& response) override;
 
   std::shared_ptr<depthai_ros_driver::Driver> luxonis_node_;
 };

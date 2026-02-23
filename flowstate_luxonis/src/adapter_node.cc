@@ -2,9 +2,9 @@
 
 #include <memory>
 
+#include "absl/strings/str_format.h"
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
-#include "absl/strings/str_format.h"
 #include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_luxonis {
@@ -34,7 +34,7 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(rclcpp::Parameter("rgb.i_height", 800))
           .append_parameter_override(
               rclcpp::Parameter("rgb.i_low_bandwidth", false));
-  
+
   luxonis_node_ =
       std::make_shared<depthai_ros_driver::Driver>(luxonis_node_options);
 
@@ -46,8 +46,7 @@ AdapterNode::AdapterNode(const std::string& serial,
       });
 
   color_image_sub_ = SubscribeToImage(
-      ColorImageTopic(),
-      [this](sensor_msgs::msg::Image::UniquePtr msg) {
+      ColorImageTopic(), [this](sensor_msgs::msg::Image::UniquePtr msg) {
         {
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();
@@ -71,7 +70,7 @@ absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main()");
   t_last_color_image_ = get_clock()->now();
   rclcpp::executors::SingleThreadedExecutor executor;
-  
+
   liveness_timer_ =
       create_wall_timer(std::chrono::seconds(1), [this, &executor]() {
         absl::MutexLock timeout_lock(&timeout_mutex_);
@@ -82,8 +81,8 @@ absl::Status AdapterNode::Main() {
       });
 
   executor.add_node(this->get_node_base_interface());
-  executor.add_node(luxonis_node_); //->get_node_base_interface());
-  executor.spin(); 
+  executor.add_node(luxonis_node_);  //->get_node_base_interface());
+  executor.spin();
   return absl::OkStatus();
 }
 
@@ -96,14 +95,14 @@ bool AdapterNode::BuildDescribeResponse(
     return false;
   }
 
-  AppendSensorDescription(response, *color_camera_info_, "color", ColorImageTopic());
-  
+  AppendSensorDescription(response, *color_camera_info_, "color",
+                          ColorImageTopic());
+
   return true;
 }
 
 bool AdapterNode::BuildSnapshotResponse(
     snapshot_interfaces::srv::Snapshot::Response& response) {
-  
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
 
   color_snapshot.topic_name = ColorImageTopic();
@@ -121,9 +120,9 @@ bool AdapterNode::BuildSnapshotResponse(
   // Lock and copy the most recent Image messages
   absl::MutexLock lock(&image_mutex_);
   if (!color_image_) {
-      response.error_message = "images not yet received from camera";
-      RCLCPP_ERROR(get_logger(), response.error_message.c_str());
-      return false;
+    response.error_message = "images not yet received from camera";
+    RCLCPP_ERROR(get_logger(), response.error_message.c_str());
+    return false;
   }
 
   // The rgb.i_color_order parameter didn't seem to change the data, so we

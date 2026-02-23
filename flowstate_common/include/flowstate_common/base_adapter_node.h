@@ -35,8 +35,10 @@ namespace flowstate_common {
  * 1. Inherit from BaseAdapterNode
  * 2. Implement the pure virtual methods
  * 3. Subscribe to camera topics in the derived class constructor
- * 4. Override BuildDescribeResponse to build the describe response with sensor information for the describe service
- * 5. Override BuildSnapshotResponse to build the snapshot response with image data for the snapshot service
+ * 4. Override BuildDescribeResponse to build the describe response with sensor
+ * information for the describe service
+ * 5. Override BuildSnapshotResponse to build the snapshot response with image
+ * data for the snapshot service
  */
 class BaseAdapterNode : public rclcpp::Node {
  public:
@@ -47,7 +49,7 @@ class BaseAdapterNode : public rclcpp::Node {
    * @param node_name ROS node name prefix (will be prefixed with camera type)
    */
   BaseAdapterNode(const std::string& serial, const std::string& ip_address,
-                    const std::string& node_name_prefix);
+                  const std::string& node_name_prefix);
 
   /**
    * @brief Check if the background thread has exited.
@@ -85,7 +87,8 @@ class BaseAdapterNode : public rclcpp::Node {
 
   /**
    * @brief Build the response for the describe service.
-   * Derived classes should override to provide camera-specific sensor information.
+   * Derived classes should override to provide camera-specific sensor
+   * information.
    * @param response Describe service response to populate
    * @return true on success, false on error (caller will set error_message)
    */
@@ -94,7 +97,8 @@ class BaseAdapterNode : public rclcpp::Node {
 
   /**
    * @brief Build the response for the snapshot service.
-   * Derived classes should override to handle multiple image types (IR, depth, etc).
+   * Derived classes should override to handle multiple image types (IR, depth,
+   * etc).
    * @param response Snapshot service response to populate
    * @return true on success, false on error (caller will set error_message)
    */
@@ -131,7 +135,7 @@ class BaseAdapterNode : public rclcpp::Node {
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
   SubscribeToCameraInfo(const std::string& topic, Func callback) {
     return create_subscription<sensor_msgs::msg::CameraInfo>(topic, 2,
-                                                            callback);
+                                                             callback);
   }
 
   /**
@@ -158,16 +162,16 @@ class BaseAdapterNode : public rclcpp::Node {
 
   /**
    * @brief Helper to pack CameraInfo into the Response.
-   * Call this from BuildDescribeResponse() in derived classes to add a sensor description for the color camera.
-    * @param response Describe service response to populate
-    * @param info CameraInfo message to extract sensor parameters from
-    * @param sensor_name Logical name for the sensor (e.g., "rgb")
-    * @param topic_name ROS topic name for the sensor's image stream
+   * Call this from BuildDescribeResponse() in derived classes to add a sensor
+   * description for the color camera.
+   * @param response Describe service response to populate
+   * @param info CameraInfo message to extract sensor parameters from
+   * @param sensor_name Logical name for the sensor (e.g., "rgb")
+   * @param topic_name ROS topic name for the sensor's image stream
    */
   void AppendSensorDescription(
       snapshot_interfaces::srv::Describe::Response& response,
-      const sensor_msgs::msg::CameraInfo& info,
-      const std::string& sensor_name,
+      const sensor_msgs::msg::CameraInfo& info, const std::string& sensor_name,
       const std::string& topic_name);
 
   // Thread management

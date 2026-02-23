@@ -1,4 +1,5 @@
 #include "flowstate_common/base_spawner_node.h"
+
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
 
 namespace flowstate_common {
@@ -10,15 +11,15 @@ BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
                                  std::chrono::duration<double> update_period,
                                  const rclcpp::NodeOptions& options)
     : Node(node_name, options), driver_type_(driver_type) {
-  
   // Initialize Discover Service
   discover_service_ = create_service<Discover>(
       "/cameras/discover",
       [this](const std::shared_ptr<rmw_request_id_t>,
              const std::shared_ptr<Discover::Request>,
              const std::shared_ptr<Discover::Response> response) {
-        RCLCPP_INFO_ONCE(get_logger(), "Discover service called (logging once)");
-        
+        RCLCPP_INFO_ONCE(get_logger(),
+                         "Discover service called (logging once)");
+
         absl::MutexLock lock(&this->discovery_mutex_);
         for (const std::string& serial : discovered_serials_) {
           snapshot_interfaces::msg::DiscoveredCamera camera;
@@ -30,8 +31,8 @@ BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
       });
 
   // Initialize Timer
-  timer_ = create_wall_timer(update_period,
-                             [this]() { this->UpdateCameras(); });
+  timer_ =
+      create_wall_timer(update_period, [this]() { this->UpdateCameras(); });
 }
 
 BaseSpawnerNode::~BaseSpawnerNode() {
@@ -41,7 +42,8 @@ BaseSpawnerNode::~BaseSpawnerNode() {
   RCLCPP_INFO(get_logger(), "Camera SpawnerNode shutdown complete");
 }
 
-void BaseSpawnerNode::SetDiscoveredSerials(const std::vector<std::string>& serials) {
+void BaseSpawnerNode::SetDiscoveredSerials(
+    const std::vector<std::string>& serials) {
   absl::MutexLock lock(&discovery_mutex_);
   discovered_serials_ = serials;
 }

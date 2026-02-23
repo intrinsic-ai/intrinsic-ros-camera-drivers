@@ -28,7 +28,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   InitializeParameters();
   const std::string zivid_node_name = std::string("camera_") + serial;
   const std::string zivid_ns = "zivid/" + zivid_node_name;
-  
+
   rclcpp::NodeOptions zivid_node_options = options;
   zivid_node_options.append_parameter_override("serial_number", serial)
       .append_parameter_override(
@@ -86,7 +86,7 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   callback_group_ =
       this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  
+
   CreateFlowstateServices();
   RCLCPP_INFO(this->get_logger(), "zivid_node_ = %s",
               zivid_node_->get_fully_qualified_name());
@@ -98,19 +98,24 @@ AdapterNode::AdapterNode(const std::string& serial,
 
 void AdapterNode::InitializeParameters() {
   declare_parameter<double>("exposure_time", capture_params_.exposure_time);
-  declare_parameter<double>("ExposureTime", capture_params_.exposure_time); // Alias
+  declare_parameter<double>("ExposureTime",
+                            capture_params_.exposure_time);  // Alias
   declare_parameter<double>("gain", capture_params_.gain);
-  declare_parameter<double>("Gain", capture_params_.gain); // Alias
+  declare_parameter<double>("Gain", capture_params_.gain);  // Alias
   declare_parameter<double>("gamma", capture_params_.gamma);
-  declare_parameter<double>("Gamma", capture_params_.gamma); // Alias
-  declare_parameter<double>("projector_brightness", capture_params_.projector_brightness);
+  declare_parameter<double>("Gamma", capture_params_.gamma);  // Alias
+  declare_parameter<double>("projector_brightness",
+                            capture_params_.projector_brightness);
   declare_parameter<double>("brightness", capture_params_.projector_brightness);
-  declare_parameter<double>("Brightness", capture_params_.projector_brightness); // Alias
+  declare_parameter<double>("Brightness",
+                            capture_params_.projector_brightness);  // Alias
   declare_parameter<double>("aperture", capture_params_.aperture);
-  declare_parameter<double>("Aperture", capture_params_.aperture); // Alias
+  declare_parameter<double>("Aperture", capture_params_.aperture);  // Alias
 
-  declare_parameter<bool>("outlier_removal_enabled", capture_params_.outlier_removal_enabled);
-  declare_parameter<double>("outlier_removal_threshold", capture_params_.outlier_removal_threshold);
+  declare_parameter<bool>("outlier_removal_enabled",
+                          capture_params_.outlier_removal_enabled);
+  declare_parameter<double>("outlier_removal_threshold",
+                            capture_params_.outlier_removal_threshold);
 
   declare_parameter<std::string>("settings_yaml", "");  // For zivid_camera node
   declare_parameter<std::string>("settings_2d_yaml", "");
@@ -296,12 +301,10 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
           absl::Condition(&data_, &CaptureData::AllAvailable), timeout)) {
     RCLCPP_INFO(get_logger(), "Capture succeeded.");
     // Move all data out and cache only camera_info for future describe() calls
-    CaptureData result{
-        .color_image = std::move(data_.color_image), 
-        .depth_image = std::move(data_.depth_image), 
-        .normal_pc = std::move(data_.normal_pc), 
-        .camera_info = data_.camera_info
-    };
+    CaptureData result{.color_image = std::move(data_.color_image),
+                       .depth_image = std::move(data_.depth_image),
+                       .normal_pc = std::move(data_.normal_pc),
+                       .camera_info = data_.camera_info};
     return result;
   }
 
@@ -320,13 +323,14 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
 
 bool AdapterNode::BuildDescribeResponse(
     snapshot_interfaces::srv::Describe::Response& response) {
-  const auto requires_capture = [this](){
+  const auto requires_capture = [this]() {
     absl::MutexLock lock(&data_mutex_);
     return data_.camera_info == nullptr;
   };
 
   if (requires_capture()) {
-    RCLCPP_INFO(get_logger(), "No cached camera_info available, triggering capture");
+    RCLCPP_INFO(get_logger(),
+                "No cached camera_info available, triggering capture");
     auto capture_data = Capture();
     if (!capture_data.ok()) {
       response.error_message = std::string(capture_data.status().message());
@@ -335,10 +339,13 @@ bool AdapterNode::BuildDescribeResponse(
   }
 
   // Color sensor info
-  AppendSensorDescription(response, *data_.camera_info, "rgb", ColorImageTopic());
+  AppendSensorDescription(response, *data_.camera_info, "rgb",
+                          ColorImageTopic());
   // Depth sensor info
-  AppendSensorDescription(response, *data_.camera_info, "depth", DepthImageTopic());
-  AppendSensorDescription(response, *data_.camera_info, "normal", NormalTopic());
+  AppendSensorDescription(response, *data_.camera_info, "depth",
+                          DepthImageTopic());
+  AppendSensorDescription(response, *data_.camera_info, "normal",
+                          NormalTopic());
 
   return true;
 }

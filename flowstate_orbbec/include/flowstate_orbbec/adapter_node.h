@@ -28,7 +28,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   std::string DepthImageTopic() const;
 
   void InitializeParameters();
-  
+
   rclcpp::node_interfaces::PreSetParametersCallbackHandle::SharedPtr
       pre_set_parameters_callback_handle_;
   void PreSetParametersCallback(std::vector<rclcpp::Parameter>& parameters);
@@ -40,7 +40,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   rclcpp::node_interfaces::PostSetParametersCallbackHandle::SharedPtr
       post_set_parameters_callback_handle_;
-  void PostSetParametersCallback(const std::vector<rclcpp::Parameter>& parameters);
+  void PostSetParametersCallback(
+      const std::vector<rclcpp::Parameter>& parameters);
 
   template <typename ServiceType, typename ValueType>
   void CallAsyncSet(std::shared_ptr<rclcpp::Client<ServiceType>> client,
@@ -76,7 +77,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
-    
+
   // IR Data
   std::unique_ptr<sensor_msgs::msg::CameraInfo> ir_camera_info_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr ir_info_sub_;
@@ -89,7 +90,6 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   std::unique_ptr<sensor_msgs::msg::Image> depth_image_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
 
-
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr set_auto_exposure_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_exposure_client_;
@@ -97,8 +97,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
       set_auto_white_balance_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_white_balance_client_;
-  rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr 
-      set_gain_client_;
+  rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr set_gain_client_;
 };
 
 }  // namespace flowstate_orbbec
