@@ -10,20 +10,8 @@
 
 namespace flowstate_luxonis {
 
-/**
- * @class AdapterNode
- * @brief Flowstate adapter for Luxonis (OAK) cameras.
- *
- * Inherits from the common BaseAdapterNode base class and implements
- * Luxonis-specific initialization and topic discovery.
- */
 class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
-  /**
-   * @brief Constructor initializes the Luxonis adapter.
-   * @param serial Camera serial number/MXID
-   * @param ip_address Camera IP address (for network cameras)
-   */
   AdapterNode(const std::string& serial, const std::string& ip_address);
 
  private:
