@@ -367,6 +367,10 @@ bool AdapterNode::BuildSnapshotResponse(
   depth_snapshot.topic_name = DepthImageTopic();
 #endif
 
+  sensor_msgs::msg::Image color_copy, ir_copy;
+#if SEND_DEPTH
+  sensor_msgs::msg::Image depth_copy;
+#endif
   // Lock and copy the most recent CameraInfo messages
   {
     absl::MutexLock lock(&camera_info_mutex_);
@@ -383,17 +387,33 @@ bool AdapterNode::BuildSnapshotResponse(
 #endif
   }
 
+  sensor_msgs::msg::Image color_copy, ir_copy;
+#if SEND_DEPTH
+  sensor_msgs::msg::Image depth_copy;
+#endif
   // Lock and copy the most recent Image messages
-  absl::MutexLock lock(&image_mutex_);
-  if (!color_image_ || !ir_image_) {
-    response.error_message = "images not yet received from camera";
-    return false;
+  {
+    absl::MutexLock lock(&image_mutex_);
+    if (!color_image_ || !ir_image_) {
+      response.error_message = "images not yet received from camera";
+      return false;
+    }
+    color_copy = *color_image_;
+    ir_copy = *ir_image_;
+
+#if SEND_DEPTH
+    if (!depth_image_) {
+      response.error_message = "depth image not yet received from camera";
+      return false;
+    }
+    depth_copy = *depth_image_;
+#endif
   }
 
-  color_snapshot.image = *color_image_;
+  color_snapshot.image = color_copy;
   response.images.push_back(std::move(color_snapshot));
 
-  ir_snapshot.image = *ir_image_;
+  ir_snapshot.image = ir_copy;
   response.images.push_back(std::move(ir_snapshot));
 
 #if SEND_DEPTH
@@ -403,17 +423,17 @@ bool AdapterNode::BuildSnapshotResponse(
   }
   // The Orbbec camera returns the depth image as 16-bit images in millimeters.
   // We want to convert that to 32-bit float (meters) for Flowstate.
-  depth_snapshot.image.header = depth_image_->header;
-  depth_snapshot.image.height = depth_image_->height;
-  depth_snapshot.image.width = depth_image_->width;
+  depth_snapshot.image.header = depth_copy.header;
+  depth_snapshot.image.height = depth_copy.height;
+  depth_snapshot.image.width = depth_copy.width;
   depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
   depth_snapshot.image.is_bigendian = false;
   depth_snapshot.image.step = 4 * depth_snapshot.image.width;
   depth_snapshot.image.data.resize(depth_snapshot.image.step *
                                    depth_snapshot.image.height);
   // Use OpenCV's amazingly optimized implementation to do the conversion
-  const cv::Mat depth_unsigned(depth_image_->height, depth_image_->width,
-                               CV_16U, depth_image_->data.data());
+  const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width,
+                               CV_16U, depth_copy.data.data());
   cv::Mat depth_float(depth_snapshot.image.height, depth_snapshot.image.width,
                       CV_32F, depth_snapshot.image.data.data());
   depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
