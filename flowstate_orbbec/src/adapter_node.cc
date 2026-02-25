@@ -265,6 +265,8 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
   return result;
 }
 
+// PostSetParametersCallback() is where we use the validated parameters
+// in this case by forwarding them to the Orbbec Driver node.
 void AdapterNode::PostSetParametersCallback(
     const std::vector<rclcpp::Parameter>& parameters) {
   for (const rclcpp::Parameter& parameter : parameters) {
@@ -285,7 +287,7 @@ void AdapterNode::PostSetParametersCallback(
                 parameter.get_name().c_str(), value_str.c_str());
 
     // Set the parameter by using the relevant service client to
-    // send an async request
+    // send an async request.
     if (parameter.get_name() == "exposure") {
       CallAsyncSet(set_exposure_client_,
                    static_cast<int>(10000.0 * parameter.as_double()));

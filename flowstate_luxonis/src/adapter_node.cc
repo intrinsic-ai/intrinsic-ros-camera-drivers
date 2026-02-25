@@ -104,7 +104,9 @@ bool AdapterNode::BuildDescribeResponse(
 bool AdapterNode::BuildSnapshotResponse(
     snapshot_interfaces::srv::Snapshot::Response& response) {
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
-
+  // Note that we'll need something smarter in order to be able to implement
+  // WAIT_FOR_NEXT; a single-threaded executor will never be able to block
+  // here while waiting for the image message callbacks to be invoked.
   color_snapshot.topic_name = ColorImageTopic();
 
   // Lock and copy the most recent CameraInfo messages
@@ -124,7 +126,6 @@ bool AdapterNode::BuildSnapshotResponse(
     RCLCPP_ERROR(get_logger(), response.error_message.c_str());
     return false;
   }
-
   // The rgb.i_color_order parameter didn't seem to change the data, so we
   // need to convert BGR->RGB here, as the Flowstate ROS Image Source can
   // only handle rgb8, not bgr8.
