@@ -367,10 +367,6 @@ bool AdapterNode::BuildSnapshotResponse(
   depth_snapshot.topic_name = DepthImageTopic();
 #endif
 
-  sensor_msgs::msg::Image color_copy, ir_copy;
-#if SEND_DEPTH
-  sensor_msgs::msg::Image depth_copy;
-#endif
   // Lock and copy the most recent CameraInfo messages
   {
     absl::MutexLock lock(&camera_info_mutex_);
