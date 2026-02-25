@@ -37,6 +37,12 @@ void BaseAdapterNode::CreateFlowstateServices() {
       rclcpp::ServicesQoS(), callback_group_);
 }
 
+BaseAdapterNode::~BaseAdapterNode() {
+  if (thread_.joinable()) {
+    thread_.join();
+  }
+}
+
 void BaseAdapterNode::StartExecutorThread() {
   thread_ = std::thread([this]() {
     const absl::Status status = this->Main();

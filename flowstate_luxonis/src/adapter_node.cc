@@ -109,19 +109,15 @@ bool AdapterNode::BuildSnapshotResponse(
   // here while waiting for the image message callbacks to be invoked.
   color_snapshot.topic_name = ColorImageTopic();
 
-  // Lock and copy the most recent CameraInfo messages
-  {
-    absl::MutexLock lock(&camera_info_mutex_);
-    if (!color_camera_info_) {
-      response.error_message = "CameraInfo not yet received from camera";
-      return false;
-    }
-    color_snapshot.camera_info = *color_camera_info_;
+  auto info_copy = GetColorCameraInfo();
+  if (!info_copy) {
+    response.error_message = "CameraInfo not yet received from camera";
+    return false;
   }
+  color_snapshot.camera_info = *info_copy;
 
-  // Lock and copy the most recent Image messages
-  absl::MutexLock lock(&image_mutex_);
-  if (!color_image_) {
+  auto img_copy = GetColorImage();
+  if (!img_copy) {
     response.error_message = "images not yet received from camera";
     RCLCPP_ERROR(get_logger(), response.error_message.c_str());
     return false;
@@ -129,19 +125,20 @@ bool AdapterNode::BuildSnapshotResponse(
   // The rgb.i_color_order parameter didn't seem to change the data, so we
   // need to convert BGR->RGB here, as the Flowstate ROS Image Source can
   // only handle rgb8, not bgr8.
-  color_snapshot.image.header = color_image_->header;
-  color_snapshot.image.height = color_image_->height;
-  color_snapshot.image.width = color_image_->width;
+  color_snapshot.image.header = img_copy->header;
+  color_snapshot.image.height = img_copy->height;
+  color_snapshot.image.width = img_copy->width;
   color_snapshot.image.encoding = "rgb8";
   color_snapshot.image.is_bigendian = false;
-  color_snapshot.image.step = color_image_->step;
+  color_snapshot.image.step = img_copy->step;
   color_snapshot.image.data.resize(color_snapshot.image.width *
                                    color_snapshot.image.step);
 
-  const cv::Mat bgr_image(color_image_->height, color_image_->width, CV_8UC3,
-                          color_image_->data.data(), color_image_->step);
-  cv::Mat rgb_image(color_image_->height, color_image_->width, CV_8UC3,
-                    color_snapshot.image.data.data(), color_image_->step);
+  const cv::Mat bgr_image(img_copy->height, img_copy->width, CV_8UC3,
+                          img_copy->data.data(), img_copy->step);
+  cv::Mat rgb_image(color_snapshot.image.height, color_snapshot.image.width,
+                    CV_8UC3, color_snapshot.image.data.data(), img_copy->step);
+
   cv::cvtColor(bgr_image, rgb_image, cv::COLOR_BGR2RGB);
 
   response.images.push_back(std::move(color_snapshot));

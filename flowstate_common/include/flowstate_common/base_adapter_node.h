@@ -51,6 +51,8 @@ class BaseAdapterNode : public rclcpp::Node {
   BaseAdapterNode(const std::string& serial, const std::string& ip_address,
                   const std::string& node_name_prefix);
 
+  virtual ~BaseAdapterNode();
+
   /**
    * @brief Check if the background thread has exited.
    * @return true if thread has exited, false otherwise

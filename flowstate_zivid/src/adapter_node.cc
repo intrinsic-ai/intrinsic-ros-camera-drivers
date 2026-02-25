@@ -84,9 +84,6 @@ AdapterNode::AdapterNode(const std::string& serial,
         this->data_.normal_pc = std::move(msg);
       });
 
-  callback_group_ =
-      this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-
   CreateFlowstateServices();
   RCLCPP_INFO(this->get_logger(), "zivid_node_ = %s",
               zivid_node_->get_fully_qualified_name());
@@ -323,12 +320,14 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
 
 bool AdapterNode::BuildDescribeResponse(
     snapshot_interfaces::srv::Describe::Response& response) {
-  const auto requires_capture = [this]() {
-    absl::MutexLock lock(&data_mutex_);
-    return data_.camera_info == nullptr;
-  };
+  sensor_msgs::msg::CameraInfo::ConstSharedPtr info_copy;
 
-  if (requires_capture()) {
+  {
+    absl::MutexLock lock(&data_mutex_);
+    info_copy = data_.camera_info;
+  }
+
+  if (info_copy == nullptr) {
     RCLCPP_INFO(get_logger(),
                 "No cached camera_info available, triggering capture");
     auto capture_data = Capture();
@@ -336,15 +335,16 @@ bool AdapterNode::BuildDescribeResponse(
       response.error_message = std::string(capture_data.status().message());
       return false;
     }
+    info_copy = capture_data->camera_info;
   }
 
   // Color sensor info
-  AppendSensorDescription(response, *data_.camera_info, "rgb",
+  AppendSensorDescription(response, *info_copy, "rgb",
                           ColorImageTopic());
   // Depth sensor info
-  AppendSensorDescription(response, *data_.camera_info, "depth",
+  AppendSensorDescription(response, *info_copy, "depth",
                           DepthImageTopic());
-  AppendSensorDescription(response, *data_.camera_info, "normal",
+  AppendSensorDescription(response, *info_copy, "normal",
                           NormalTopic());
 
   return true;
