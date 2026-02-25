@@ -8,8 +8,6 @@ add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 
 find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
-find_package(depthai REQUIRED VERBOSE)
-find_package(depthai_ros_driver REQUIRED VERBOSE)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
@@ -31,8 +29,6 @@ target_link_libraries(flowstate_common
   ${snapshot_interfaces_TARGETS}
 )
 ament_target_dependencies(flowstate_common
-  depthai
-  depthai_ros_driver
 )
 install(TARGETS flowstate_common
         DESTINATION lib)
