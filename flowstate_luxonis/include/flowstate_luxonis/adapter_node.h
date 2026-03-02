@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "depthai_ros_driver/driver.hpp"
 #include "flowstate_common/base_adapter_node.h"
 #include "snapshot_interfaces/srv/describe.hpp"
@@ -21,9 +22,11 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
  private:
   absl::Status Main() override;
   std::string ColorImageTopic() const override;
-  bool BuildDescribeResponse(
+  absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+  BuildDescribeResponse(
       snapshot_interfaces::srv::Describe::Response& response) override;
-  bool BuildSnapshotResponse(
+  absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+  BuildSnapshotResponse(
       snapshot_interfaces::srv::Snapshot::Response& response) override;
 
   std::shared_ptr<depthai_ros_driver::Driver> luxonis_node_;

@@ -60,9 +60,11 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
  private:
   absl::Status Main() override;
   std::string ColorImageTopic() const override;
-  bool BuildDescribeResponse(
+  absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+  BuildDescribeResponse(
       snapshot_interfaces::srv::Describe::Response& response) override;
-  bool BuildSnapshotResponse(
+  absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+  BuildSnapshotResponse(
       snapshot_interfaces::srv::Snapshot::Response& response) override;
 
   // --- Zivid Specific Implementations ---

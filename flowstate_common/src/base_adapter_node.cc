@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/msg/sensor_info.hpp"
 #include "snapshot_interfaces/srv/describe.hpp"
