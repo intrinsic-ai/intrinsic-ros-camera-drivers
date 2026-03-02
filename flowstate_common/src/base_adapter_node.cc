@@ -1,6 +1,9 @@
 #include "flowstate_common/base_adapter_node.h"
 
+#include <utility>
+
 #include "rclcpp/rclcpp.hpp"
+#include "snapshot_interfaces/msg/sensor_info.hpp"
 
 namespace flowstate_common {
 

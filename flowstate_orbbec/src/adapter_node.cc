@@ -10,6 +10,9 @@
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/image_encodings.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
+#include "sensor_msgs/msg/image.hpp"
+#include "snapshot_interfaces/msg/image_snapshot.hpp"
 
 #define SEND_DEPTH 0
 
@@ -51,24 +54,24 @@ AdapterNode::AdapterNode(const std::string& serial,
       orbbec_node_name, orbbec_ns, orbbec_node_options);
 
   // Subscribe to color camera info
-  color_info_sub_ = SubscribeToCameraInfo(
-      absl::StrFormat("orbbec/camera_%s/color/camera_info", serial_),
+  color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
+      absl::StrFormat("orbbec/camera_%s/color/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->color_camera_info_ = std::move(msg);
       });
 
   // Subscribe to IR camera info
-  ir_info_sub_ = SubscribeToCameraInfo(
-      absl::StrFormat("orbbec/camera_%s/left_ir/camera_info", serial_),
+  ir_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
+      absl::StrFormat("orbbec/camera_%s/left_ir/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->ir_camera_info_ = std::move(msg);
       });
 
 #if SEND_DEPTH
-  depth_info_sub_ = SubscribeToCameraInfo(
-      absl::StrFormat("orbbec/camera_%s/depth/camera_info", serial_),
+  depth_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
+      absl::StrFormat("orbbec/camera_%s/depth/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->depth_camera_info_ = std::move(msg);
@@ -76,8 +79,8 @@ AdapterNode::AdapterNode(const std::string& serial,
 #endif
 
   // Subscribe to color image
-  color_image_sub_ = SubscribeToImage(
-      ColorImageTopic(), [this](sensor_msgs::msg::Image::UniquePtr msg) {
+  color_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      ColorImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
         {
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();
@@ -87,15 +90,15 @@ AdapterNode::AdapterNode(const std::string& serial,
       });
 
   // Subscribe to IR image
-  ir_image_sub_ = SubscribeToImage(
-      IrImageTopic(), [this](sensor_msgs::msg::Image::UniquePtr msg) {
+  ir_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      IrImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
         absl::MutexLock lock(&this->image_mutex_);
         this->ir_image_ = std::move(msg);
       });
 
 #if SEND_DEPTH
-  depth_image_sub_ = SubscribeToImage(
-      DepthImageTopic(), [this](sensor_msgs::msg::Image::UniquePtr msg) {
+  depth_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      DepthImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
         absl::MutexLock lock(&this->image_mutex_);
         this->depth_image_ = std::move(msg);
       });
@@ -428,8 +431,8 @@ bool AdapterNode::BuildSnapshotResponse(
   depth_snapshot.image.data.resize(depth_snapshot.image.step *
                                    depth_snapshot.image.height);
   // Use OpenCV's amazingly optimized implementation to do the conversion
-  const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width,
-                               CV_16U, depth_copy.data.data());
+  const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width, CV_16U,
+                               depth_copy.data.data());
   cv::Mat depth_float(depth_snapshot.image.height, depth_snapshot.image.width,
                       CV_32F, depth_snapshot.image.data.data());
   depth_unsigned.convertTo(depth_float, CV_32F, 0.001);

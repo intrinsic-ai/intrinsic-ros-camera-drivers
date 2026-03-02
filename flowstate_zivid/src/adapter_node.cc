@@ -11,6 +11,9 @@
 #include "absl/strings/str_join.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/image_encodings.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
+#include "sensor_msgs/msg/image.hpp"
+#include "snapshot_interfaces/msg/image_snapshot.hpp"
 #include "yaml-cpp/yaml.h"
 #include "zivid_camera/zivid_camera.hpp"
 
@@ -22,7 +25,6 @@ using snapshot_interfaces::srv::Snapshot;
 AdapterNode::AdapterNode(const std::string& serial,
                          const rclcpp::NodeOptions& options,
                          std::shared_ptr<Zivid::Application> zivid_app)
-    // Zivid usually connects via USB/PCIe, so IP is empty.
     : flowstate_common::BaseAdapterNode(serial, "", "zivid"),
       capture_params_(CaptureParameters::boot_defaults()) {
   InitializeParameters();
@@ -339,13 +341,10 @@ bool AdapterNode::BuildDescribeResponse(
   }
 
   // Color sensor info
-  AppendSensorDescription(response, *info_copy, "rgb",
-                          ColorImageTopic());
+  AppendSensorDescription(response, *info_copy, "rgb", ColorImageTopic());
   // Depth sensor info
-  AppendSensorDescription(response, *info_copy, "depth",
-                          DepthImageTopic());
-  AppendSensorDescription(response, *info_copy, "normal",
-                          NormalTopic());
+  AppendSensorDescription(response, *info_copy, "depth", DepthImageTopic());
+  AppendSensorDescription(response, *info_copy, "normal", NormalTopic());
 
   return true;
 }

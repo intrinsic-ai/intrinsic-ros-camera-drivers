@@ -7,6 +7,8 @@
 #include "absl/status/status.h"
 #include "depthai_ros_driver/driver.hpp"
 #include "flowstate_common/base_adapter_node.h"
+#include "snapshot_interfaces/srv/describe.hpp"
+#include "snapshot_interfaces/srv/snapshot.hpp"
 
 namespace flowstate_luxonis {
 

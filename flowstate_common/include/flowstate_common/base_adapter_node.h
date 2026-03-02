@@ -10,7 +10,7 @@
 #include "absl/synchronization/mutex.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
-#include "snapshot_interfaces/msg/image_snapshot.hpp"
+#include "sensor_msgs/msg/image.hpp"
 #include "snapshot_interfaces/srv/describe.hpp"
 #include "snapshot_interfaces/srv/snapshot.hpp"
 
@@ -127,27 +127,6 @@ class BaseAdapterNode : public rclcpp::Node {
     absl::MutexLock lock(&image_mutex_);
     if (!color_image_) return nullptr;
     return std::make_unique<sensor_msgs::msg::Image>(*color_image_);
-  }
-
-  /**
-   * @brief Subscribe to camera info topic.
-   * Helper for derived classes to subscribe to camera info.
-   */
-  template <typename Func>
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
-  SubscribeToCameraInfo(const std::string& topic, Func callback) {
-    return create_subscription<sensor_msgs::msg::CameraInfo>(topic, 2,
-                                                             callback);
-  }
-
-  /**
-   * @brief Subscribe to image topic.
-   * Helper for derived classes to subscribe to images.
-   */
-  template <typename Func>
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr SubscribeToImage(
-      const std::string& topic, Func callback) {
-    return create_subscription<sensor_msgs::msg::Image>(topic, 2, callback);
   }
 
   /**

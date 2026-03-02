@@ -6,6 +6,8 @@
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
+#include "snapshot_interfaces/msg/image_snapshot.hpp"
 
 namespace flowstate_luxonis {
 
@@ -38,15 +40,16 @@ AdapterNode::AdapterNode(const std::string& serial,
   luxonis_node_ =
       std::make_shared<depthai_ros_driver::Driver>(luxonis_node_options);
 
-  color_info_sub_ = SubscribeToCameraInfo(
-      absl::StrFormat("luxonis/camera_%s/driver/rgb/camera_info", serial_),
+  color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
+      absl::StrFormat("luxonis/camera_%s/driver/rgb/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->color_camera_info_ = std::move(msg);
       });
 
-  color_image_sub_ = SubscribeToImage(
-      ColorImageTopic(), [this](sensor_msgs::msg::Image::UniquePtr msg) {
+  color_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      ColorImageTopic(), 2,
+      [this](sensor_msgs::msg::Image::UniquePtr msg) {
         {
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();
