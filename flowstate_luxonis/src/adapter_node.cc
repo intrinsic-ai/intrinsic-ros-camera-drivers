@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
@@ -92,8 +93,7 @@ absl::Status AdapterNode::Main() {
 }
 
 absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
-AdapterNode::BuildDescribeResponse(
-    snapshot_interfaces::srv::Describe::Response& response) {
+AdapterNode::BuildDescribeResponse() {
   snapshot_interfaces::srv::Describe::Response response;
   auto color_camera_info_ = GetColorCameraInfo();
   if (!color_camera_info_) {
@@ -106,8 +106,7 @@ AdapterNode::BuildDescribeResponse(
 }
 
 absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
-AdapterNode::BuildSnapshotResponse(
-    snapshot_interfaces::srv::Snapshot::Response& response) {
+AdapterNode::BuildSnapshotResponse() {
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   // Note that we'll need something smarter in order to be able to implement
   // WAIT_FOR_NEXT; a single-threaded executor will never be able to block

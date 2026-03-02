@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "flowstate_common/base_adapter_node.h"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "orbbec_camera_msgs/srv/set_int32.hpp"
@@ -28,11 +29,9 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   absl::Status Main() override;
   std::string ColorImageTopic() const override;
   absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
-  BuildDescribeResponse(
-      snapshot_interfaces::srv::Describe::Response& response) override;
+  BuildDescribeResponse() override;
   absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
-  BuildSnapshotResponse(
-      snapshot_interfaces::srv::Snapshot::Response& response) override;
+  BuildSnapshotResponse() override;
 
   std::string IrImageTopic() const;
   std::string DepthImageTopic() const;

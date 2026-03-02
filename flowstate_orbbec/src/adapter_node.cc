@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
@@ -334,8 +335,7 @@ absl::Status AdapterNode::Main() {
 }
 
 absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
-AdapterNode::BuildDescribeResponse(
-    snapshot_interfaces::srv::Describe::Response& response) {
+AdapterNode::BuildDescribeResponse() {
   absl::MutexLock lock(&camera_info_mutex_);
   if (!color_camera_info_ || !ir_camera_info_) {
     return absl::UnavailableError(
@@ -358,8 +358,7 @@ AdapterNode::BuildDescribeResponse(
 }
 
 absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
-AdapterNode::BuildSnapshotResponse(
-    snapshot_interfaces::srv::Snapshot::Response& response) {
+AdapterNode::BuildSnapshotResponse() {
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   snapshot_interfaces::msg::ImageSnapshot ir_snapshot;
 #if SEND_DEPTH
