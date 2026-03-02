@@ -6,11 +6,13 @@
 #include <thread>
 #include <vector>
 
+#include "absl/base/thread_annotations.h"
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include "snapshot_interfaces/msg/sensor_info.hpp"
 #include "snapshot_interfaces/srv/describe.hpp"
 #include "snapshot_interfaces/srv/snapshot.hpp"
 
@@ -45,7 +47,8 @@ class BaseAdapterNode : public rclcpp::Node {
   /**
    * @brief Constructor initializes the adapter node with serial and locators.
    * @param serial Camera serial number
-   * @param locators Camera locators (IP addresses should come first after that, USB paths)
+   * @param locators Camera locators (IP addresses should come first after that,
+   * USB paths)
    * @param node_name ROS node name prefix (will be prefixed with camera type)
    */
   BaseAdapterNode(const std::string& serial,
@@ -92,26 +95,24 @@ class BaseAdapterNode : public rclcpp::Node {
    * @brief Build the response for the describe service.
    * Derived classes should override to provide camera-specific sensor
    * information.
-   * @param response Describe service response to populate
-   * @return true on success, false on error (caller will set error_message)
+   * @return The populated response, or an error status on failure.
    */
-  virtual bool BuildDescribeResponse(
-      snapshot_interfaces::srv::Describe::Response& response) = 0;
+  virtual absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+  BuildDescribeResponse() = 0;
 
   /**
    * @brief Build the response for the snapshot service.
    * Derived classes should override to handle multiple image types (IR, depth,
    * etc).
-   * @param response Snapshot service response to populate
-   * @return true on success, false on error (caller will set error_message)
+   * @return The populated response, or an error status on failure.
    */
-  virtual bool BuildSnapshotResponse(
-      snapshot_interfaces::srv::Snapshot::Response& response) = 0;
+  virtual absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+  BuildSnapshotResponse() = 0;
 
   /**
    * @brief Get color camera info.
    * Thread-safe access to cached color camera info.
-   * @return shared_ptr to camera info (nullptr if not yet received)
+   * @return unique_ptr to camera info (nullptr if not yet received)
    */
   std::unique_ptr<sensor_msgs::msg::CameraInfo> GetColorCameraInfo() const {
     absl::MutexLock lock(&camera_info_mutex_);
@@ -122,7 +123,7 @@ class BaseAdapterNode : public rclcpp::Node {
   /**
    * @brief Get color image.
    * Thread-safe access to cached color image.
-   * @return shared_ptr to image (nullptr if not yet received)
+   * @return unique_ptr to image (nullptr if not yet received)
    */
   std::unique_ptr<sensor_msgs::msg::Image> GetColorImage() const {
     absl::MutexLock lock(&image_mutex_);
@@ -146,15 +147,14 @@ class BaseAdapterNode : public rclcpp::Node {
    * @brief Helper to pack CameraInfo into the Response.
    * Call this from BuildDescribeResponse() in derived classes to add a sensor
    * description for the color camera.
-   * @param response Describe service response to populate
-   * @param info CameraInfo message to extract sensor parameters from
+   * @param camera_info CameraInfo message to extract sensor parameters from
    * @param sensor_name Logical name for the sensor (e.g., "rgb")
    * @param topic_name ROS topic name for the sensor's image stream
+   * @return SensorInfo message populated with the provided info and parameters
    */
-  void AppendSensorDescription(
-      snapshot_interfaces::srv::Describe::Response& response,
-      const sensor_msgs::msg::CameraInfo& info, const std::string& sensor_name,
-      const std::string& topic_name);
+  snapshot_interfaces::msg::SensorInfo SensorInformation(
+      const sensor_msgs::msg::CameraInfo& camera_info,
+      const std::string& sensor_name, const std::string& topic_name);
 
   // Thread management
   std::thread thread_;
@@ -166,16 +166,18 @@ class BaseAdapterNode : public rclcpp::Node {
 
   // Subscriptions and cached data
   mutable absl::Mutex camera_info_mutex_;
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> color_camera_info_;
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> color_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr color_info_sub_;
 
   mutable absl::Mutex image_mutex_;
-  std::unique_ptr<sensor_msgs::msg::Image> color_image_;
+  std::unique_ptr<sensor_msgs::msg::Image> color_image_
+      ABSL_GUARDED_BY(image_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_image_sub_;
 
   // Timeout monitoring
   mutable absl::Mutex timeout_mutex_;
-  rclcpp::Time t_last_color_image_;
+  rclcpp::Time t_last_color_image_ ABSL_GUARDED_BY(timeout_mutex_);
   rclcpp::TimerBase::SharedPtr liveness_timer_;
 
   // Flowstate services

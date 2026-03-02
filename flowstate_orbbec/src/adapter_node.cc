@@ -337,23 +337,23 @@ bool AdapterNode::BuildDescribeResponse(
     snapshot_interfaces::srv::Describe::Response& response) {
   absl::MutexLock lock(&camera_info_mutex_);
   if (!color_camera_info_ || !ir_camera_info_) {
-    response.error_message = "CameraInfo not yet received (waiting for RGB+IR)";
-    return false;
+    return absl::UnavailableError(
+        "CameraInfo not yet received (waiting for RGB+IR)");
   }
 
-  AppendSensorDescription(response, *color_camera_info_, "rgb",
-                          ColorImageTopic());
-  AppendSensorDescription(response, *ir_camera_info_, "ir_left",
-                          IrImageTopic());
+  response.sensors.push_back(
+      SensorInformation(*color_camera_info_, "rgb", ColorImageTopic()));
+  response.sensors.push_back(
+      SensorInformation(*ir_camera_info_, "ir_left", IrImageTopic()));
 
 #if SEND_DEPTH
   if (depth_camera_info_) {
-    AppendSensorDescription(response, *depth_camera_info_, "depth",
-                            DepthImageTopic());
+    response.sensors.push_back(
+        SensorInformation(*depth_camera_info_, "depth", DepthImageTopic()));
   }
 #endif
 
-  return true;
+  return response;
 }
 
 bool AdapterNode::BuildSnapshotResponse(
@@ -374,8 +374,7 @@ bool AdapterNode::BuildSnapshotResponse(
   {
     absl::MutexLock lock(&camera_info_mutex_);
     if (!color_camera_info_ || !ir_camera_info_) {
-      response.error_message = "CameraInfo not yet received";
-      return false;
+      return absl::UnavailableError("CameraInfo not yet received");
     }
     color_snapshot.camera_info = *color_camera_info_;
     ir_snapshot.camera_info = *ir_camera_info_;
@@ -394,16 +393,14 @@ bool AdapterNode::BuildSnapshotResponse(
   {
     absl::MutexLock lock(&image_mutex_);
     if (!color_image_ || !ir_image_) {
-      response.error_message = "images not yet received from camera";
-      return false;
+      return absl::UnavailableError("Images not yet received from camera");
     }
     color_copy = *color_image_;
     ir_copy = *ir_image_;
 
 #if SEND_DEPTH
     if (!depth_image_) {
-      response.error_message = "depth image not yet received from camera";
-      return false;
+      return absl::UnavailableError("Depth image not yet received from camera");
     }
     depth_copy = *depth_image_;
 #endif
@@ -440,7 +437,7 @@ bool AdapterNode::BuildSnapshotResponse(
   response.images.push_back(std::move(depth_snapshot));
 #endif
 
-  return true;
+  return response;
 }
 
 }  // namespace flowstate_orbbec

@@ -68,23 +68,24 @@ void BaseAdapterNode::DescribeCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {
   RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
-  if (!BuildDescribeResponse(*response)) {
-    if (response->error_message.empty()) {
-      response->error_message =
-          "Failed to build describe response (data not ready)";
-    }
+
+  absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+      describe_response = BuildDescribeResponse();
+
+  if (!describe_response.ok()) {
     response->success = false;
+    response->error_message = std::string(describe_response.status().message());
     RCLCPP_ERROR(get_logger(), response->error_message.c_str());
     return;
   }
 
+  *response = std::move(describe_response).value();
   response->success = true;
 }
 
-void BaseAdapterNode::AppendSensorDescription(
-    snapshot_interfaces::srv::Describe::Response& response,
-    const sensor_msgs::msg::CameraInfo& info, const std::string& sensor_name,
-    const std::string& topic_name) {
+snapshot_interfaces::msg::SensorInfo BaseAdapterNode::SensorInformation(
+    const sensor_msgs::msg::CameraInfo& camera_info,
+    const std::string& sensor_name, const std::string& topic_name) {
   snapshot_interfaces::msg::SensorInfo sensor_info;
   sensor_info.sensor_name = sensor_name;
   sensor_info.topic_name = topic_name;
@@ -93,8 +94,8 @@ void BaseAdapterNode::AppendSensorDescription(
   sensor_info.camera_t_sensor.transform.rotation.w =
       1.0;  // todo: get static transform
 
-  sensor_info.info.push_back(info);
-  response.sensors.push_back(std::move(sensor_info));
+  sensor_info.info.push_back(camera_info);
+  return sensor_info;
 }
 
 void BaseAdapterNode::SnapshotCallback(
@@ -103,15 +104,18 @@ void BaseAdapterNode::SnapshotCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
         response) {
   RCLCPP_INFO(get_logger(), "=== SNAPSHOT SERVICE ===");
-  if (!BuildSnapshotResponse(*response)) {
-    if (response->error_message.empty()) {
-      response->error_message = "Failed to capture snapshot (data not ready)";
-    }
+
+  absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+      snapshot_response = BuildSnapshotResponse();
+
+  if (!snapshot_response.ok()) {
     response->success = false;
+    response->error_message = std::string(snapshot_response.status().message());
     RCLCPP_ERROR(get_logger(), response->error_message.c_str());
     return;
   }
 
+  *response = std::move(snapshot_response).value();
   response->success = true;
 }
 

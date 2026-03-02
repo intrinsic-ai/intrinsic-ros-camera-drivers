@@ -25,7 +25,7 @@ using snapshot_interfaces::srv::Snapshot;
 AdapterNode::AdapterNode(const std::string& serial,
                          const rclcpp::NodeOptions& options,
                          std::shared_ptr<Zivid::Application> zivid_app)
-    : flowstate_common::BaseAdapterNode(serial, {} , "zivid"),
+    : flowstate_common::BaseAdapterNode(serial, {}, "zivid"),
       capture_params_(CaptureParameters::boot_defaults()) {
   InitializeParameters();
   const std::string zivid_node_name = std::string("camera_") + serial;
@@ -334,19 +334,21 @@ bool AdapterNode::BuildDescribeResponse(
                 "No cached camera_info available, triggering capture");
     auto capture_data = Capture();
     if (!capture_data.ok()) {
-      response.error_message = std::string(capture_data.status().message());
-      return false;
+      return capture_data.status();
     }
     info_copy = capture_data->camera_info;
   }
 
   // Color sensor info
-  AppendSensorDescription(response, *info_copy, "rgb", ColorImageTopic());
+  response.sensors.push_back(
+      SensorInformation(*info_copy, "rgb", ColorImageTopic()));
   // Depth sensor info
-  AppendSensorDescription(response, *info_copy, "depth", DepthImageTopic());
-  AppendSensorDescription(response, *info_copy, "normal", NormalTopic());
+  response.sensors.push_back(
+      SensorInformation(*info_copy, "depth", DepthImageTopic()));
+  response.sensors.push_back(
+      SensorInformation(*info_copy, "normal", NormalTopic()));
 
-  return true;
+  return response;
 }
 
 bool AdapterNode::BuildSnapshotResponse(
@@ -354,8 +356,7 @@ bool AdapterNode::BuildSnapshotResponse(
   // Trigger a capture
   auto capture_data = Capture();
   if (!capture_data.ok()) {
-    response.error_message = std::string(capture_data.status().message());
-    return false;
+    return capture_data.status();
   }
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
@@ -376,6 +377,6 @@ bool AdapterNode::BuildSnapshotResponse(
   response.images.push_back(std::move(depth_snapshot));
   response.point_clouds.push_back(std::move(normal_snapshot));
 
-  return true;
+  return response;
 }
 }  // namespace flowstate_zivid

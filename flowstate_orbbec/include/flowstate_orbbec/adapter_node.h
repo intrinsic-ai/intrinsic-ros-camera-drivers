@@ -21,7 +21,8 @@ namespace flowstate_orbbec {
 
 class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
-  AdapterNode(const std::string& serial, const std::vector<std::string>& locators);
+  AdapterNode(const std::string& serial,
+              const std::vector<std::string>& locators);
 
  private:
   absl::Status Main() override;
@@ -86,15 +87,19 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
   // IR Data
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> ir_camera_info_;
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> ir_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr ir_info_sub_;
-  std::unique_ptr<sensor_msgs::msg::Image> ir_image_;
+  std::unique_ptr<sensor_msgs::msg::Image> ir_image_
+      ABSL_GUARDED_BY(image_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr ir_image_sub_;
 
   // Depth Data
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_;
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_sub_;
-  std::unique_ptr<sensor_msgs::msg::Image> depth_image_;
+  std::unique_ptr<sensor_msgs::msg::Image> depth_image_
+      ABSL_GUARDED_BY(image_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
 
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr set_auto_exposure_client_;

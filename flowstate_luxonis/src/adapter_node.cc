@@ -14,8 +14,7 @@ namespace flowstate_luxonis {
 AdapterNode::AdapterNode(const std::string& serial,
                          const std::vector<std::string>& locators)
     : flowstate_common::BaseAdapterNode(serial, locators, "luxonis") {
-  
-  // ip address should be the first locator if it exists  
+  // ip address should be the first locator if it exists
   std::string ip_address = locators.empty() ? "" : locators[0];
 
   const std::string luxonis_node_name = std::string("luxonis_camera_node");
@@ -94,17 +93,15 @@ absl::Status AdapterNode::Main() {
 
 bool AdapterNode::BuildDescribeResponse(
     snapshot_interfaces::srv::Describe::Response& response) {
-  // Lock and check camera info
-  absl::MutexLock lock(&camera_info_mutex_);
+  snapshot_interfaces::srv::Describe::Response response;
+  auto color_camera_info_ = GetColorCameraInfo();
   if (!color_camera_info_) {
-    response.error_message = "CameraInfo not yet received from camera";
-    return false;
+    return absl::UnavailableError("CameraInfo not yet received from camera");
   }
 
-  AppendSensorDescription(response, *color_camera_info_, "color",
-                          ColorImageTopic());
-
-  return true;
+  response.sensors.push_back(
+      SensorInformation(*color_camera_info_, "color", ColorImageTopic()));
+  return response;
 }
 
 bool AdapterNode::BuildSnapshotResponse(
@@ -117,16 +114,13 @@ bool AdapterNode::BuildSnapshotResponse(
 
   auto info_copy = GetColorCameraInfo();
   if (!info_copy) {
-    response.error_message = "CameraInfo not yet received from camera";
-    return false;
+    return absl::UnavailableError("CameraInfo not yet received from camera");
   }
   color_snapshot.camera_info = *info_copy;
 
   auto img_copy = GetColorImage();
   if (!img_copy) {
-    response.error_message = "images not yet received from camera";
-    RCLCPP_ERROR(get_logger(), response.error_message.c_str());
-    return false;
+    return absl::UnavailableError("images not yet received from camera");
   }
   // The rgb.i_color_order parameter didn't seem to change the data, so we
   // need to convert BGR->RGB here, as the Flowstate ROS Image Source can
@@ -148,8 +142,7 @@ bool AdapterNode::BuildSnapshotResponse(
   cv::cvtColor(bgr_image, rgb_image, cv::COLOR_BGR2RGB);
 
   response.images.push_back(std::move(color_snapshot));
-
-  return true;
+  return response;
 }
 
 }  // namespace flowstate_luxonis
