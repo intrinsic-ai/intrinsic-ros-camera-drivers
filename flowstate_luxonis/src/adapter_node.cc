@@ -107,6 +107,7 @@ AdapterNode::BuildDescribeResponse() {
 
 absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
 AdapterNode::BuildSnapshotResponse() {
+  snapshot_interfaces::srv::Snapshot::Response response;
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   // Note that we'll need something smarter in order to be able to implement
   // WAIT_FOR_NEXT; a single-threaded executor will never be able to block

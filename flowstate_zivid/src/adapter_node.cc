@@ -323,6 +323,8 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
 
 absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
 AdapterNode::BuildDescribeResponse() {
+
+  snapshot_interfaces::srv::Describe::Response response;
   sensor_msgs::msg::CameraInfo::ConstSharedPtr info_copy;
 
   {
@@ -354,6 +356,7 @@ AdapterNode::BuildDescribeResponse() {
 
 absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
 AdapterNode::BuildSnapshotResponse() {
+  snapshot_interfaces::srv::Snapshot::Response response;
   // Trigger a capture
   auto capture_data = Capture();
   if (!capture_data.ok()) {
