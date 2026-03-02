@@ -5,7 +5,7 @@
   <version>0.0.1</version>
   <description>Flowstate Luxonis driver adapter</description>
   <maintainer email="morganquigley@intrinsic.ai">morganquigley</maintainer>
-  <license>TODO</license>
+  <license>Apache-2.0</license>
 
   <depend>abseil_cpp_vendor</depend>
   <depend>camera_info_manager</depend>
