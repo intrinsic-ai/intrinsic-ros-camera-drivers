@@ -27,6 +27,7 @@ add_library(flowstate_luxonis
 target_link_libraries(flowstate_luxonis
   ${flowstate_camera_common_LIBRARIES}
   absl::status
+  absl::statusor
   absl::synchronization
   rclcpp::rclcpp
   depthai::core

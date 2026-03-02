@@ -36,6 +36,7 @@ target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_orbbec
   ${flowstate_camera_common_LIBRARIES}
   absl::status
+  absl::statusor
   absl::synchronization
   rclcpp::rclcpp
   ob::OrbbecSDK
