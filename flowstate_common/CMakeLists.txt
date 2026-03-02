@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(flowstate_common)
+project(flowstate_camera_common)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,11 +16,11 @@ find_package(intrinsic_sdk_ros QUIET)
 
 include_directories(include)
 
-add_library(flowstate_common SHARED
+add_library(flowstate_camera_common SHARED
   src/base_adapter_node.cc
   src/base_spawner_node.cc
 )
-target_link_libraries(flowstate_common
+target_link_libraries(flowstate_camera_common
   absl::status
   absl::synchronization
   rclcpp::rclcpp
@@ -28,9 +28,9 @@ target_link_libraries(flowstate_common
   ${sensor_msgs_TARGETS}
   ${snapshot_interfaces_TARGETS}
 )
-ament_target_dependencies(flowstate_common
+ament_target_dependencies(flowstate_camera_common
 )
-install(TARGETS flowstate_common
+install(TARGETS flowstate_camera_common
         DESTINATION lib)
 
 install(
