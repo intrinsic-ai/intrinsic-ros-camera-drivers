@@ -94,7 +94,7 @@ void SpawnerNode::UpdateCameras() {
       node_options.parameter_overrides(parameters);
 
       auto camera_node = std::make_shared<flowstate_zivid::AdapterNode>(
-          serial, std::vector<std::string>{}, node_options, zivid_app_);
+          serial, node_options, zivid_app_);
       spawned_nodes_.push_back(camera_node);
       RCLCPP_INFO(get_logger(), "Created AdapterNode for zivid camera %s",
                   serial.c_str());
