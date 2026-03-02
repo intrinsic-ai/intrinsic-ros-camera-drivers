@@ -320,7 +320,8 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
   return absl::DeadlineExceededError(error_msg);
 }
 
-bool AdapterNode::BuildDescribeResponse(
+absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+AdapterNode::BuildDescribeResponse(
     snapshot_interfaces::srv::Describe::Response& response) {
   sensor_msgs::msg::CameraInfo::ConstSharedPtr info_copy;
 
@@ -351,7 +352,8 @@ bool AdapterNode::BuildDescribeResponse(
   return response;
 }
 
-bool AdapterNode::BuildSnapshotResponse(
+absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+AdapterNode::BuildSnapshotResponse(
     snapshot_interfaces::srv::Snapshot::Response& response) {
   // Trigger a capture
   auto capture_data = Capture();

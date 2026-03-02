@@ -91,7 +91,8 @@ absl::Status AdapterNode::Main() {
   return absl::OkStatus();
 }
 
-bool AdapterNode::BuildDescribeResponse(
+absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+AdapterNode::BuildDescribeResponse(
     snapshot_interfaces::srv::Describe::Response& response) {
   snapshot_interfaces::srv::Describe::Response response;
   auto color_camera_info_ = GetColorCameraInfo();
@@ -104,7 +105,8 @@ bool AdapterNode::BuildDescribeResponse(
   return response;
 }
 
-bool AdapterNode::BuildSnapshotResponse(
+absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+AdapterNode::BuildSnapshotResponse(
     snapshot_interfaces::srv::Snapshot::Response& response) {
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   // Note that we'll need something smarter in order to be able to implement
