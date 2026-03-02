@@ -1,6 +1,14 @@
 #include "flowstate_orbbec/spawner_node.h"
 
+#include <chrono>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "flowstate_orbbec/adapter_node.h"
 #include "orbbec_camera/ob_camera_node_driver.h"
+#include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_orbbec {
 
@@ -28,7 +36,8 @@ void SpawnerNode::UpdateCameras() {
     if (IsAlreadySpawned(serial)) continue;
     RCLCPP_INFO(get_logger(), "Spawning it...");
 
-    spawned_nodes_.push_back(std::make_shared<AdapterNode>(serial, ip_address));
+    spawned_nodes_.push_back(std::make_shared<AdapterNode>(
+        serial, std::vector<std::string>{ip_address}));
   }
 
   // See if any camera nodes have crashed. If so, close them so we can respawn

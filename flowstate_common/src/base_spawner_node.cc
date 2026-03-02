@@ -1,5 +1,12 @@
 #include "flowstate_common/base_spawner_node.h"
 
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "absl/synchronization/mutex.h"
+#include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/msg/discovered_camera.hpp"
 
 namespace flowstate_common {

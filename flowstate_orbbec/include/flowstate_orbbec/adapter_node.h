@@ -21,7 +21,7 @@ namespace flowstate_orbbec {
 
 class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
-  AdapterNode(const std::string& serial, const std::string& ip_address);
+  AdapterNode(const std::string& serial, const std::vector<std::string>& locators);
 
  private:
   absl::Status Main() override;

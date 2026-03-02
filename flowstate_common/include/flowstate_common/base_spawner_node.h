@@ -2,9 +2,11 @@
 #define FLOWSTATE_COMMON_CAMERA_SPAWNER_NODE_H_
 
 #include <chrono>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "flowstate_common/base_adapter_node.h"
 #include "rclcpp/rclcpp.hpp"

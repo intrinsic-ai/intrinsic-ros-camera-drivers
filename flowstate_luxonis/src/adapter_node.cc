@@ -12,8 +12,12 @@
 namespace flowstate_luxonis {
 
 AdapterNode::AdapterNode(const std::string& serial,
-                         const std::string& ip_address)
-    : flowstate_common::BaseAdapterNode(serial, ip_address, "luxonis") {
+                         const std::vector<std::string>& locators)
+    : flowstate_common::BaseAdapterNode(serial, locators, "luxonis") {
+  
+  // ip address should be the first locator if it exists  
+  std::string ip_address = locators.empty() ? "" : locators[0];
+
   const std::string luxonis_node_name = std::string("luxonis_camera_node");
   const std::string luxonis_ns = std::string("/luxonis/camera_") + serial;
   rclcpp::NodeOptions luxonis_node_options =
@@ -48,8 +52,7 @@ AdapterNode::AdapterNode(const std::string& serial,
       });
 
   color_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-      ColorImageTopic(), 2,
-      [this](sensor_msgs::msg::Image::UniquePtr msg) {
+      ColorImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
         {
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();

@@ -25,7 +25,7 @@ using snapshot_interfaces::srv::Snapshot;
 AdapterNode::AdapterNode(const std::string& serial,
                          const rclcpp::NodeOptions& options,
                          std::shared_ptr<Zivid::Application> zivid_app)
-    : flowstate_common::BaseAdapterNode(serial, "", "zivid"),
+    : flowstate_common::BaseAdapterNode(serial, {} , "zivid"),
       capture_params_(CaptureParameters::boot_defaults()) {
   InitializeParameters();
   const std::string zivid_node_name = std::string("camera_") + serial;

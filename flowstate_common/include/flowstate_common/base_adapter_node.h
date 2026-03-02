@@ -43,12 +43,13 @@ namespace flowstate_common {
 class BaseAdapterNode : public rclcpp::Node {
  public:
   /**
-   * @brief Constructor initializes the adapter node with serial and IP address.
+   * @brief Constructor initializes the adapter node with serial and locators.
    * @param serial Camera serial number
-   * @param ip_address Camera IP address (optional for USB devices)
+   * @param locators Camera locators (IP addresses should come first after that, USB paths)
    * @param node_name ROS node name prefix (will be prefixed with camera type)
    */
-  BaseAdapterNode(const std::string& serial, const std::string& ip_address,
+  BaseAdapterNode(const std::string& serial,
+                  const std::vector<std::string>& locators,
                   const std::string& node_name_prefix);
 
   virtual ~BaseAdapterNode();
@@ -161,7 +162,7 @@ class BaseAdapterNode : public rclcpp::Node {
 
   // Camera identification
   std::string serial_;
-  std::string ip_address_;
+  std::vector<std::string> locators_;
 
   // Subscriptions and cached data
   mutable absl::Mutex camera_info_mutex_;

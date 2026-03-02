@@ -1,6 +1,15 @@
 #include "flowstate_luxonis/spawner_node.h"
 
+#include <XLink/XLinkPublicDefines.h>
+
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "depthai/device/Device.hpp"
+#include "flowstate_luxonis/adapter_node.h"
+#include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_luxonis {
 
@@ -44,7 +53,8 @@ void SpawnerNode::UpdateCameras() {
     current_serials.push_back(serial);
     if (IsAlreadySpawned(serial)) continue;
     RCLCPP_INFO(get_logger(), "Spawning it...");
-    spawned_nodes_.push_back(std::make_shared<AdapterNode>(serial, ip_str));
+    spawned_nodes_.push_back(std::make_shared<AdapterNode>(
+        serial, std::vector<std::string>{ip_str}));
   }
 
   // See if any camera nodes have crashed. If so, close them so we can respawn

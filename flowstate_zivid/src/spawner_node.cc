@@ -2,7 +2,17 @@
 
 #include <absl/algorithm/container.h>
 
+#include <chrono>
+#include <exception>
+#include <memory>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
+#include "absl/algorithm/container.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
+#include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_zivid {
 
@@ -84,7 +94,7 @@ void SpawnerNode::UpdateCameras() {
       node_options.parameter_overrides(parameters);
 
       auto camera_node = std::make_shared<flowstate_zivid::AdapterNode>(
-          serial, node_options, zivid_app_);
+          serial, std::vector<std::string>{}, node_options, zivid_app_);
       spawned_nodes_.push_back(camera_node);
       RCLCPP_INFO(get_logger(), "Created AdapterNode for zivid camera %s",
                   serial.c_str());

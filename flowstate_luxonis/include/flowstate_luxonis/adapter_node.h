@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "depthai_ros_driver/driver.hpp"
@@ -14,7 +15,8 @@ namespace flowstate_luxonis {
 
 class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
-  AdapterNode(const std::string& serial, const std::string& ip_address);
+  AdapterNode(const std::string& serial,
+              const std::vector<std::string>& locators);
 
  private:
   absl::Status Main() override;

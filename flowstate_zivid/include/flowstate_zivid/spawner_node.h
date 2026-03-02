@@ -5,10 +5,13 @@
 #include <absl/status/statusor.h>
 
 #include <memory>
+#include <string>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "flowstate_common/base_spawner_node.h"
 #include "flowstate_zivid/adapter_node.h"
+#include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_zivid {
 /**

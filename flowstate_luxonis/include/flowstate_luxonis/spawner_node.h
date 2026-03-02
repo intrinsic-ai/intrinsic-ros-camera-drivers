@@ -3,9 +3,7 @@
 
 #include <XLink/XLinkPublicDefines.h>
 
-#include <memory>
 #include <string>
-#include <vector>
 
 #include "flowstate_common/base_spawner_node.h"
 #include "flowstate_luxonis/adapter_node.h"

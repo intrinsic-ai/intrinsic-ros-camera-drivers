@@ -1,18 +1,24 @@
 #include "flowstate_common/base_adapter_node.h"
 
-#include <utility>
+#include <memory>
+#include <string>
+#include <thread>
+#include <vector>
 
+#include "absl/status/status.h"
 #include "rclcpp/rclcpp.hpp"
 #include "snapshot_interfaces/msg/sensor_info.hpp"
+#include "snapshot_interfaces/srv/describe.hpp"
+#include "snapshot_interfaces/srv/snapshot.hpp"
 
 namespace flowstate_common {
 
 BaseAdapterNode::BaseAdapterNode(const std::string& serial,
-                                 const std::string& ip_address,
+                                 const std::vector<std::string>& locators,
                                  const std::string& node_name_prefix)
     : Node(node_name_prefix + "_" + serial),
       serial_(serial),
-      ip_address_(ip_address) {}
+      locators_(locators) {}
 
 void BaseAdapterNode::CreateFlowstateServices() {
   callback_group_ =
