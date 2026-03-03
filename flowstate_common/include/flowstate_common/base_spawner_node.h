@@ -65,7 +65,8 @@ class BaseSpawnerNode : public rclcpp::Node {
    * @brief Derived classes must call this at the end of UpdateCameras()
    * to update the list available to the Discover service.
    */
-  void SetDiscoveredSerials(const std::vector<std::string>& serials);
+  void SetDiscoveredSerials(const std::vector<std::string>& serials)
+      ABSL_LOCKS_EXCLUDED(discovery_mutex_);
 
   /**
    * @brief Checks if a node with this serial already exists in spawned_nodes_.

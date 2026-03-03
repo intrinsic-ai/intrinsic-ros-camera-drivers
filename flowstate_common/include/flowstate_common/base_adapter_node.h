@@ -65,13 +65,6 @@ class BaseAdapterNode : public rclcpp::Node {
   bool HasExitedThread() const { return exited_thread_; }
 
   /**
-   * @brief Check if this adapter is managing the specified camera serial.
-   * @param serial Camera serial number to check
-   * @return true if serials match, false otherwise
-   */
-  bool HasSerial(const std::string& serial) const { return serial_ == serial; }
-
-  /**
    * @brief Get the camera serial number.
    * @return Camera serial number
    */
@@ -115,7 +108,8 @@ class BaseAdapterNode : public rclcpp::Node {
    * Thread-safe access to cached color camera info.
    * @return unique_ptr to camera info (nullptr if not yet received)
    */
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> GetColorCameraInfo() const {
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> GetColorCameraInfo() const
+      ABSL_LOCKS_EXCLUDED(camera_info_mutex_) {
     absl::MutexLock lock(&camera_info_mutex_);
     if (!color_camera_info_) return nullptr;
     return std::make_unique<sensor_msgs::msg::CameraInfo>(*color_camera_info_);
@@ -126,7 +120,8 @@ class BaseAdapterNode : public rclcpp::Node {
    * Thread-safe access to cached color image.
    * @return unique_ptr to image (nullptr if not yet received)
    */
-  std::unique_ptr<sensor_msgs::msg::Image> GetColorImage() const {
+  std::unique_ptr<sensor_msgs::msg::Image> GetColorImage() const
+      ABSL_LOCKS_EXCLUDED(image_mutex_) {
     absl::MutexLock lock(&image_mutex_);
     if (!color_image_) return nullptr;
     return std::make_unique<sensor_msgs::msg::Image>(*color_image_);

@@ -61,9 +61,9 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   absl::Status Main() override;
   std::string ColorImageTopic() const override;
   absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
-      BuildDescribeResponse() override;
+  BuildDescribeResponse() override ABSL_LOCKS_EXCLUDED(data_mutex_);
   absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
-      BuildSnapshotResponse() override;
+  BuildSnapshotResponse() override;
 
   // --- Zivid Specific Implementations ---
   std::string DepthImageTopic() const;
@@ -71,7 +71,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   void InitializeParameters();
   rcl_interfaces::msg::SetParametersResult SetParametersCallback(
-      const std::vector<rclcpp::Parameter>& parameters);
+      const std::vector<rclcpp::Parameter>& parameters)
+      ABSL_LOCKS_EXCLUDED(capture_params_mutex_);
   /**
    * @brief Generates a Zivid settings string in YAML format.
    * @return A string containing the Zivid settings in YAML format.
@@ -116,7 +117,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
    * @brief Triggers a capture and returns the captured data.
    * @return CaptureData on success, or error status on failure.
    */
-  absl::StatusOr<CaptureData> Capture();
+  absl::StatusOr<CaptureData> Capture() ABSL_LOCKS_EXCLUDED(data_mutex_);
 
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
 

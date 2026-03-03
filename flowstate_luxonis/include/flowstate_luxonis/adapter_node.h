@@ -20,7 +20,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
               const std::vector<std::string>& locators);
 
  private:
-  absl::Status Main() override;
+  absl::Status Main() override ABSL_LOCKS_EXCLUDED(timeout_mutex_);
   std::string ColorImageTopic() const override;
   absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
     BuildDescribeResponse() override;

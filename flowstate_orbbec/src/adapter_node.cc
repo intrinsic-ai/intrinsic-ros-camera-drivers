@@ -317,7 +317,10 @@ void AdapterNode::PostSetParametersCallback(
 
 absl::Status AdapterNode::Main() {
   RCLCPP_INFO(get_logger(), "AdapterNode::Main()");
-  t_last_color_image_ = get_clock()->now();
+  {
+    absl::MutexLock timeout_lock(&timeout_mutex_);
+    t_last_color_image_ = get_clock()->now();
+  }
   rclcpp::executors::SingleThreadedExecutor executor;
   liveness_timer_ =
       create_wall_timer(std::chrono::seconds(1), [this, &executor]() {

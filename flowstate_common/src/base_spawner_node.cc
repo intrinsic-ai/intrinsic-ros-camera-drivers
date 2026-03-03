@@ -58,7 +58,7 @@ void BaseSpawnerNode::SetDiscoveredSerials(
 bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   for (const auto& node : spawned_nodes_) {
     // Uses the helper from BaseAdapterNode
-    if (node && node->HasSerial(serial)) {
+    if (node && serial == node->GetSerial()) {
       return true;
     }
   }
