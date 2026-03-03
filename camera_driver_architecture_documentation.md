@@ -8,6 +8,8 @@ To integrate a new ROS 2 camera, you need to implement two key modules and build
 1. A vendor-provided C++ API/SDK.
 2. A vendor-provided ROS 2 Camera Driver that publishes information on ROS topics and responds to ROS service requests.
 
+-----
+
 ## Architecture Overview
 
 The integration consists of two main components:
@@ -16,6 +18,8 @@ The integration consists of two main components:
 2. **Hardware Device Service Container**: Contains the camera CAD model and hardware device protos for the camera.
 
 > **Network Configuration**: Camera networks should be configured to use **link-local** addressing for automatic discovery and communication without manual IP configuration.
+
+-----
 
 ## Camera Service Container
 
