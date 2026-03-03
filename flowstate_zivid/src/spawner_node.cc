@@ -37,13 +37,7 @@ SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
   RCLCPP_INFO(get_logger(), "Zivid SpawnerNode is ready!");
 }
 
-SpawnerNode::~SpawnerNode() {
-  ShutdownCameraNodes();
-  if (timer_) {
-    timer_->reset();
-  }
-  RCLCPP_INFO(get_logger(), "Zivid SpawnerNode shutdown complete");
-}
+SpawnerNode::~SpawnerNode() { ShutdownCameraNodes(); }
 
 std::vector<std::string> SpawnerNode::GetSerials() {
   std::vector<std::string> serials;
