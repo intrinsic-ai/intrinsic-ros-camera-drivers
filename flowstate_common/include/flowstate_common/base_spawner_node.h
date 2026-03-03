@@ -10,7 +10,8 @@
 #include "absl/synchronization/mutex.h"
 #include "flowstate_common/base_adapter_node.h"
 #include "rclcpp/rclcpp.hpp"
-#include "snapshot_interfaces/srv/discover.hpp"
+#include "snapshot_interfaces/msg/discovery_request.hpp"
+#include "snapshot_interfaces/msg/discovery_response.hpp"
 
 namespace flowstate_common {
 
@@ -71,7 +72,7 @@ class BaseSpawnerNode : public rclcpp::Node {
    * @return A vector of newly created BaseAdapterNode shared pointers.
    */
   virtual std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
-    SpawnNodes(const std::vector<std::string>& serials) = 0;
+  SpawnNodes(const std::vector<std::string>& serials) = 0;
 
   // Protected mutex and vector so derived classes (like Zivid) can safely
   // access and manually shut down nodes if required by their SDK.
@@ -85,8 +86,10 @@ class BaseSpawnerNode : public rclcpp::Node {
   void CleanupExitedNodes() ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
 
   const std::string driver_type_;
-  rclcpp::Service<snapshot_interfaces::srv::Discover>::SharedPtr
-      discover_service_;
+  rclcpp::Subscription<snapshot_interfaces::msg::DiscoveryRequest>::SharedPtr
+      discovery_sub_;
+  rclcpp::Publisher<snapshot_interfaces::msg::DiscoveryResponse>::SharedPtr
+      discovery_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 

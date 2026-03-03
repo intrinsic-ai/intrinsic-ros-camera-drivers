@@ -18,24 +18,31 @@ BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
                                  std::chrono::duration<double> update_period,
                                  const rclcpp::NodeOptions& options)
     : Node(node_name, options), driver_type_(driver_type) {
-  // Initialize Discover Service
-  discover_service_ = create_service<Discover>(
-      "/cameras/discover",
-      [this](const std::shared_ptr<rmw_request_id_t>,
-             const std::shared_ptr<Discover::Request>,
-             const std::shared_ptr<Discover::Response> response) {
-        RCLCPP_INFO_ONCE(get_logger(),
-                         "Discover service called (logging once)");
+  discovery_pub_ =
+      create_publisher<snapshot_interfaces::msg::DiscoveryResponse>(
+          "/cameras/discovery/response", 10);
 
-        absl::MutexLock lock(&this->nodes_mutex_);
-        for (const auto& node : spawned_nodes_) {
-          snapshot_interfaces::msg::DiscoveredCamera camera;
-          camera.driver_type = this->driver_type_;
-          camera.camera_id = node->GetSerial();
-          response->cameras.push_back(camera);
-        }
-        response->success = true;
-      });
+  discovery_sub_ =
+      create_subscription<snapshot_interfaces::msg::DiscoveryRequest>(
+          "/cameras/discovery/request", 10,
+          [this](const snapshot_interfaces::msg::DiscoveryRequest::
+                     ConstSharedPtr /*msg*/) {
+            snapshot_interfaces::msg::DiscoveryResponse response;
+
+            {
+              absl::MutexLock lock(&this->nodes_mutex_);
+              for (const auto& node : spawned_nodes_) {
+                if (node) {
+                  snapshot_interfaces::msg::DiscoveredCamera camera;
+                  camera.driver_type = this->driver_type_;
+                  camera.camera_id = node->GetSerial();
+                  response.cameras.push_back(camera);
+                }
+              }
+            }
+
+            discovery_pub_->publish(response);
+          });
 
   // Initialize Timer
   timer_ =
