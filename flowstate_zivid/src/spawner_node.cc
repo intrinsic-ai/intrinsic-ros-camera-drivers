@@ -37,55 +37,28 @@ SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
   RCLCPP_INFO(get_logger(), "Zivid SpawnerNode is ready!");
 }
 
-std::vector<std::string> SpawnerNode::GetCameraNodeNames() const {
-  std::vector<std::string> names;
-  for (const auto& node : spawned_nodes_) {
-    if (node) {
-      names.push_back("zivid_" + node->GetSerial());
-    }
+SpawnerNode::~SpawnerNode() {
+  ShutdownCameraNodes();
+  if (timer_) {
+    timer_->reset();
   }
-  return names;
+  RCLCPP_INFO(get_logger(), "Zivid SpawnerNode shutdown complete");
 }
 
-void SpawnerNode::UpdateCameras() {
-  RCLCPP_INFO(get_logger(), "Discovering physical cameras...");
-  const auto& zivid_cameras = zivid_app_->cameras();
-  RCLCPP_INFO(get_logger(), "Found %zu physical camera(s)",
-              zivid_cameras.size());
-
-  std::unordered_set<std::string> discovered_serials;
-  std::vector<std::string> current_serials;
-
-  for (const auto& cam : zivid_cameras) {
-    std::string serial = cam.info().serialNumber().toString();
-    discovered_serials.insert(serial);
-    current_serials.push_back(serial);
+std::vector<std::string> SpawnerNode::GetSerials() {
+  std::vector<std::string> serials;
+  for (const auto& cam : zivid_app_->cameras()) {
+    serials.push_back(cam.info().serialNumber().toString());
   }
+  return serials;
+}
 
-  // 1. Shut down nodes for cameras that are no longer connected.
-  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
-      still_active_nodes;
-  for (auto& node : spawned_nodes_) {
-    if (node && discovered_serials.find(node->GetSerial()) ==
-                    discovered_serials.end()) {
-      RCLCPP_INFO(get_logger(), "Camera %s disconnected. Shutting down node.",
-                  node->GetSerial().c_str());
-      rclcpp::shutdown(node->get_node_base_interface()->get_context());
-    } else {
-      still_active_nodes.push_back(node);
-    }
-  }
-  spawned_nodes_ = still_active_nodes;
+std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
+SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> new_nodes;
 
-  // 2. Spawn nodes for newly discovered cameras.
-  for (const std::string& serial : discovered_serials) {
-    if (absl::c_any_of(spawned_nodes_, [&serial](const auto& node) {
-          return node && node->GetSerial() == serial;
-        })) {
-      continue;
-    }
-    RCLCPP_INFO(get_logger(), "New camera found: %s. Spawning node.",
-                serial.c_str());
+  for (const auto& serial : serials) {
+    RCLCPP_INFO(get_logger(), "Spawning Zivid node: %s", serial.c_str());
     try {
       std::vector<rclcpp::Parameter> parameters;
       parameters.emplace_back("serial_number", serial);
@@ -93,20 +66,14 @@ void SpawnerNode::UpdateCameras() {
       rclcpp::NodeOptions node_options;
       node_options.parameter_overrides(parameters);
 
-      auto camera_node = std::make_shared<flowstate_zivid::AdapterNode>(
-          serial, node_options, zivid_app_);
-      spawned_nodes_.push_back(camera_node);
-      RCLCPP_INFO(get_logger(), "Created AdapterNode for zivid camera %s",
-                  serial.c_str());
+      new_nodes.push_back(std::make_shared<flowstate_zivid::AdapterNode>(
+          serial, node_options, zivid_app_));
     } catch (const std::exception& e) {
-      RCLCPP_ERROR_STREAM(get_logger(),
-                          "Failed to create AdapterNode for zivid camera "
-                              << serial << ": " << e.what());
+      RCLCPP_ERROR_STREAM(
+          get_logger(), "Failed to create AdapterNode for zivid: " << e.what());
     }
   }
-
-  // 3. Update the list for the discovery service.
-  SetDiscoveredSerials(current_serials);
+  return new_nodes;
 }
 
 void SpawnerNode::ShutdownCameraNodes() {

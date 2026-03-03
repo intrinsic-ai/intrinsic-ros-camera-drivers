@@ -41,13 +41,14 @@ class SpawnerNode : public flowstate_common::BaseSpawnerNode {
  public:
   SpawnerNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
+  ~SpawnerNode() override;
+
   static absl::StatusOr<std::shared_ptr<SpawnerNode>> Create();
 
-  // Get the generated camera node names
-  std::vector<std::string> GetCameraNodeNames() const;
-
  protected:
-  void UpdateCameras() override;
+  std::vector<std::string> GetSerials() override;
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> SpawnNodes(
+      const std::vector<std::string>& serials) override;
 
  private:
   void ShutdownCameraNodes();

@@ -17,27 +17,24 @@ namespace flowstate_common {
 /**
  * @class BaseSpawnerNode
  * @brief Abstract base class for managing the lifecycle and discovery of
- * Flowstate camera adapters.
+ * Flowstate camera adapters
  *
  * This class serves as a "Factory" or "Manager" for camera adapter nodes. It
- * provides standard functionality for reporting available devices to the system
- * and automatically managing the lifecycle (creation, monitoring, and cleanup)
- * of adapter nodes.
+ * completely owns the logic for tracking active hardware, reporting available
+ * devices to the system via the "/cameras/discover" service, and automatically
+ * managing the lifecycle (creation, monitoring, and cleanup) of adapter nodes.
  *
- * Key responsibilities:
- * - Provide a standard "/cameras/discover" service that lists all active
- * cameras.
- * - Maintain a thread-safe list of active camera serial numbers.
- * - Manage a list of `BaseAdapterNode` instances (the workers).
- * - Monitor adapter liveness and automatically clean up nodes that have crashed
- * or exited.
- * - Run a periodic timer to trigger camera discovery and updates.
+ * Derived classes only need to act as "informants" by querying their specific
+ * manufacturer SDKs and returning lists of hardware or instantiating nodes when
+ * asked by this base class.
  *
  * To create a new camera spawner:
  * 1. Inherit from BaseSpawnerNode.
- * 2. In the constructor, call the base constructor with your specific driver
- * type (e.g., "luxonis").
- * 3. Implement the pure virtual method `UpdateCameras()`.
+ * 2. Implement `GetSerials()` to query the SDK and return all connected
+ * serials.
+ * 3. Implement `SpawnNodes()` to instantiate AdapterNodes for a requested list.
+ * 4. Call `UpdateCameras()` at the very end of your derived class constructor
+ *    to trigger the initial hardware scan.
  */
 class BaseSpawnerNode : public rclcpp::Node {
  public:
@@ -56,43 +53,41 @@ class BaseSpawnerNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Pure virtual function. Derived classes must implement specific SDK
-   * logic to find devices and manage the `spawned_nodes_` vector.
+   * @brief The main execution loop. It queries GetSerials(), cleans up crashed
+   * or disconnected nodes, and calls SpawnNodes() for newly discovered
+   * hardware. Should be called at the end of the derived class constructor.
    */
-  virtual void UpdateCameras() = 0;
+  void UpdateCameras() ABSL_LOCKS_EXCLUDED(nodes_mutex_);
 
   /**
-   * @brief Derived classes must call this at the end of UpdateCameras()
-   * to update the list available to the Discover service.
+   * @brief Queries the manufacturer SDK for all currently connected hardware.
+   * @return A vector of serial numbers for physically connected cameras.
    */
-  void SetDiscoveredSerials(const std::vector<std::string>& serials)
-      ABSL_LOCKS_EXCLUDED(discovery_mutex_);
+  virtual std::vector<std::string> GetSerials() = 0;
 
   /**
-   * @brief Checks if a node with this serial already exists in spawned_nodes_.
+   * @brief Instantiates adapter nodes for the requested serial numbers.
+   * @param serials A list of new serial numbers that need adapter nodes.
+   * @return A vector of newly created BaseAdapterNode shared pointers.
    */
-  bool IsAlreadySpawned(const std::string& serial) const;
+  virtual std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
+    SpawnNodes(const std::vector<std::string>& serials) = 0;
 
-  /**
-   * @brief Iterates through spawned_nodes_ and removes any that have exited.
-   * Should be used in UpdateCameras() after checking for new devices to also
-   * clean up any dead nodes.
-   */
-  void CleanupExitedNodes();
-
-  // shared_ptr because Zivid (and potentially others) require shared ownership.
-  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
-      spawned_nodes_;
+  // Protected mutex and vector so derived classes (like Zivid) can safely
+  // access and manually shut down nodes if required by their SDK.
+  mutable absl::Mutex nodes_mutex_;
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> spawned_nodes_
+      ABSL_GUARDED_BY(nodes_mutex_);
 
  private:
+  bool IsAlreadySpawned(const std::string& serial) const
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
+  void CleanupExitedNodes() ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
+
   const std::string driver_type_;
   rclcpp::Service<snapshot_interfaces::srv::Discover>::SharedPtr
       discover_service_;
   rclcpp::TimerBase::SharedPtr timer_;
-
-  mutable absl::Mutex discovery_mutex_;
-  std::vector<std::string> discovered_serials_
-      ABSL_GUARDED_BY(discovery_mutex_);
 };
 
 }  // namespace flowstate_common

@@ -15,7 +15,9 @@ class SpawnerNode : public flowstate_common::BaseSpawnerNode {
   SpawnerNode();
 
  protected:
-  void UpdateCameras() override;
+  std::vector<std::string> GetSerials() override;
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> SpawnNodes(
+      const std::vector<std::string>& serials) override;
 };
 
 }  // namespace flowstate_orbbec

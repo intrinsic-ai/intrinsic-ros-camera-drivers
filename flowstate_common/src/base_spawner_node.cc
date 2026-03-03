@@ -27,11 +27,11 @@ BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
         RCLCPP_INFO_ONCE(get_logger(),
                          "Discover service called (logging once)");
 
-        absl::MutexLock lock(&this->discovery_mutex_);
-        for (const std::string& serial : discovered_serials_) {
+        absl::MutexLock lock(&this->nodes_mutex_);
+        for (const auto& node : spawned_nodes_) {
           snapshot_interfaces::msg::DiscoveredCamera camera;
           camera.driver_type = this->driver_type_;
-          camera.camera_id = serial;
+          camera.camera_id = node->GetSerial();
           response->cameras.push_back(camera);
         }
         response->success = true;
@@ -47,12 +47,6 @@ BaseSpawnerNode::~BaseSpawnerNode() {
     timer_.reset();
   }
   RCLCPP_INFO(get_logger(), "Camera SpawnerNode shutdown complete");
-}
-
-void BaseSpawnerNode::SetDiscoveredSerials(
-    const std::vector<std::string>& serials) {
-  absl::MutexLock lock(&discovery_mutex_);
-  discovered_serials_ = serials;
 }
 
 bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
@@ -75,6 +69,29 @@ void BaseSpawnerNode::CleanupExitedNodes() {
       it = spawned_nodes_.erase(it);
     } else {
       ++it;
+    }
+  }
+}
+
+void BaseSpawnerNode::UpdateCameras() {
+  std::vector<std::string> current_serials = GetSerials();
+
+  absl::MutexLock lock(&nodes_mutex_);
+
+  CleanupExitedNodes();
+
+  std::vector<std::string> serials_to_spawn;
+  for (const auto& serial : current_serials) {
+    if (IsAlreadySpawned(serial)) continue;
+    serials_to_spawn.push_back(serial);
+  }
+
+  if (!serials_to_spawn.empty()) {
+    auto new_nodes = SpawnNodes(serials_to_spawn);
+    for (auto& new_node : new_nodes) {
+      if (new_node) {
+        spawned_nodes_.push_back(std::move(new_node));
+      }
     }
   }
 }

@@ -18,32 +18,39 @@ SpawnerNode::SpawnerNode()
   UpdateCameras();
 }
 
-void SpawnerNode::UpdateCameras() {
-  // ob::Context::setLoggerSeverity(OBLogSeverity::OB_LOG_SEVERITY_OFF);
+std::vector<std::string> SpawnerNode::GetSerials() {
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();
-
-  std::vector<std::string> current_serials;
+  std::vector<std::string> serials;
+  
   for (size_t i = 0; i < list->deviceCount(); i++) {
-    if (std::string(list->getConnectionType(i)) != std::string("Ethernet")) {
-      continue;
+    if (std::string(list->getConnectionType(i)) == "Ethernet") {
+      serials.push_back(list->serialNumber(i));
     }
-    std::string serial = list->serialNumber(i);
-    std::string ip_address = list->getIpAddress(i);
-    RCLCPP_INFO(get_logger(), "Found Orbbec device: %s at %s", serial.c_str(),
-                ip_address.c_str());
-    current_serials.push_back(serial);
-    if (IsAlreadySpawned(serial)) continue;
-    RCLCPP_INFO(get_logger(), "Spawning it...");
-
-    spawned_nodes_.push_back(std::make_shared<AdapterNode>(
-        serial, std::vector<std::string>{ip_address}));
   }
+  return serials;
+}
 
-  // See if any camera nodes have crashed. If so, close them so we can respawn
-  CleanupExitedNodes();
-
-  // Update the Base Class with the list of active serials
-  SetDiscoveredSerials(current_serials);
+std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> 
+SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> new_nodes;
+  auto context = std::make_unique<ob::Context>();
+  auto list = context->queryDeviceList();
+  
+  std::unordered_set<std::string> serials_to_spawn(serials.begin(), serials.end());
+  
+  for (size_t i = 0; i < list->deviceCount(); i++) {
+    std::string current_serial = list->serialNumber(i);
+    
+    if (serials_to_spawn.count(current_serial)) {
+      std::string ip_address = list->getIpAddress(i);
+      RCLCPP_INFO(get_logger(), "Spawning Orbbec node: %s at %s", 
+                  current_serial.c_str(), ip_address.c_str());
+                  
+      new_nodes.push_back(std::make_shared<AdapterNode>(
+          current_serial, std::vector<std::string>{ip_address}));
+    }
+  }
+  return new_nodes;
 }
 }  // namespace flowstate_orbbec

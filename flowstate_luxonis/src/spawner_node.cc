@@ -36,32 +36,33 @@ std::string SpawnerNode::DeviceStateToString(XLinkDeviceState_t state) {
   }
 }
 
-void SpawnerNode::UpdateCameras() {
+std::vector<std::string> SpawnerNode::GetSerials() {
+  std::vector<std::string> serials;
   std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
-  if (!devices.empty()) {
-    RCLCPP_INFO(get_logger(), "Found %lu devices", devices.size());
-  }
-
-  std::vector<std::string> current_serials;
   for (const auto& device_info : devices) {
-    const std::string ip_str(device_info.name);
-    const std::string serial(device_info.deviceId);
-    const std::string state_str(DeviceStateToString(device_info.state));
-
-    RCLCPP_INFO(get_logger(), "  ip: %s state: %s mxid: %s", ip_str.c_str(),
-                state_str.c_str(), serial.c_str());
-    current_serials.push_back(serial);
-    if (IsAlreadySpawned(serial)) continue;
-    RCLCPP_INFO(get_logger(), "Spawning it...");
-    spawned_nodes_.push_back(std::make_shared<AdapterNode>(
-        serial, std::vector<std::string>{ip_str}));
+    serials.push_back(device_info.deviceId);
   }
+  return serials;
+}
 
-  // See if any camera nodes have crashed. If so, close them so we can respawn
-  CleanupExitedNodes();
+std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
+SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> new_nodes;
+  std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
 
-  // Update the Base Class with the list of active serials
-  SetDiscoveredSerials(current_serials);
+  std::unordered_set<std::string> serials_to_spawn(serials.begin(), serials.end());
+
+  for (const auto& device_info : devices) {
+    if (serials_to_spawn.count(device_info.deviceId)) {
+      std::string ip_str = device_info.name;
+      RCLCPP_INFO(get_logger(), "Spawning Luxonis node: %s at %s", 
+                  device_info.deviceId.c_str(), ip_str.c_str());
+                  
+      new_nodes.push_back(std::make_shared<AdapterNode>(
+          device_info.deviceId, std::vector<std::string>{ip_str}));
+    }
+  }
+  return new_nodes;
 }
 
 }  // namespace flowstate_luxonis
