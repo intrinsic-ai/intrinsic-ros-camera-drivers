@@ -29,7 +29,7 @@ To ensure standardization and prevent code duplication, all camera integrations 
 ### Required Flowstate ROS Services
 Flowstate relies on standardized ROS services from [`snapshot_interfaces`](https://github.com/intrinsic-ai/sdk-ros/tree/80c542681486908e31d89a90e78395d26e5e48c9/snapshot_interfaces). These are largely managed for you by the base classes:
 
-*   **/cameras/discovery/request & /response** (Pub/Sub - Managed by `BaseSpawnerNode`): The spawner listens to the request topic. Upon receiving a trigger, it aggregates all connected physical cameras and publishes the list to the response topic.
+*   **/cameras/discover** (Managed by `BaseSpawnerNode`): Returns a list of all physically connected cameras.
 *   **~/\<camera_id>/describe** (Implemented via `BaseAdapterNode`): Returns metadata about a specific camera's available sensors.
 *   **~/\<camera_id>/snapshot** (Implemented via `BaseAdapterNode`): Triggers a capture and returns synchronized multi-modal sensor data.
 
@@ -92,9 +92,11 @@ Defines the service metadata and deployment configuration.
 
 ### Dockerfile (`flowstate/Dockerfile.service`)
 
-*   **Multi-stage Build**: Separates build and runtime dependencies to minimize final image size.
-*   **Hardware Access**: Account for vendor-specific needs like GPU support (NVIDIA CUDA base), USB access rules, or special permissions.
-*   **RMW Zenoh**: Required for communication with the Flowstate platform.
+*   **Multi-stage Build**: Minimizes final image size by separating build and runtime dependencies
+*   **Hardware Access**: May need GPU support (NVIDIA CUDA base), USB access, or special permissions
+*   **Vendor SDK**: Must be installed in both underlay (build) and result (runtime) stages
+*   **RMW Zenoh**: Required for communication with Flowstate platform
+*   **Vendored Libraries**: Copy critical libraries (protobuf, abseil) before cleaning build artifacts
 
 -----
 
