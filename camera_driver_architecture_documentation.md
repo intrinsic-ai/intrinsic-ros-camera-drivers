@@ -27,11 +27,32 @@ The integration consists of two main components:
 To ensure standardization and prevent code duplication, all camera integrations must utilize the base classes provided in the `flowstate_common` package. These base classes automatically handle ROS service hosting, thread safety, and lifecycle management.
 
 ### Required Flowstate ROS Services
-Flowstate relies on standardized ROS services from [`snapshot_interfaces`](https://github.com/intrinsic-ai/sdk-ros/tree/80c542681486908e31d89a90e78395d26e5e48c9/snapshot_interfaces). These are largely managed for you by the base classes:
+Flowstate relies on standardized ROS services from [`snapshot_interfaces`](https://github.com/intrinsic-ai/sdk-ros/tree/80c542681486908e31d89a90e78395d26e5e48c9/snapshot_interfaces). These are largely managed for you by the base classes, but you must implement the hardware logic to populate their specific message types:
 
-*   **/cameras/discover** (Managed by `BaseSpawnerNode`): Returns a list of all physically connected cameras.
-*   **~/\<camera_id>/describe** (Implemented via `BaseAdapterNode`): Returns metadata about a specific camera's available sensors.
-*   **~/\<camera_id>/snapshot** (Implemented via `BaseAdapterNode`): Triggers a capture and returns synchronized multi-modal sensor data.
+#### 1. `/cameras/discover` (Managed by `BaseSpawnerNode`)
+*   **Type**: `snapshot_interfaces::srv::Discover`
+*   **Purpose**: Returns a list of all physically connected cameras.
+*   **Returns**: An array of `DiscoveredCamera` messages containing:
+    *   `driver_type`: String identifier (e.g., "zivid", "luxonis")
+    *   `camera_id`: Unique string identifier (typically the hardware serial number)
+
+#### 2. `~/<camera_id>/describe` (Implemented via `BaseAdapterNode`)
+*   **Type**: `snapshot_interfaces::srv::Describe`
+*   **Purpose**: Returns metadata about a specific camera's available sensors.
+*   **Returns**: An array of `SensorInfo` messages containing:
+    *   `sensor_name`: Identifying name (e.g., "color", "depth", "normal")
+    *   `topic_name`: The ROS topic where this sensor's data is actively published
+    *   `sensor_type`: Enumeration (IMAGE, DEPTH, POINT_CLOUD, IMU, etc.)
+    *   `camera_t_sensor`: The static transform from the camera's base frame to the sensor frame
+    *   `info`: Standard `sensor_msgs/CameraInfo`
+
+#### 3. `~/<camera_id>/snapshot` (Implemented via `BaseAdapterNode`)
+*   **Type**: `snapshot_interfaces::srv::Snapshot`
+*   **Purpose**: Triggers a hardware capture and returns synchronized multi-modal sensor data.
+*   **Returns**: Aggregated arrays of synchronized data structures:
+    *   `images`: Array of `ImageSnapshot` messages (image + camera_info pairs)
+    *   `point_clouds`: Array of `PointCloud2Snapshot` messages
+    *   `imus`: Array of `ImuSnapshot` messages
 
 ### Folder Structure
 A new camera service package should follow this standardized structure:
