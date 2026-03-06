@@ -83,8 +83,7 @@ class BaseSpawnerNode : public rclcpp::Node {
 
   bool IsAlreadySpawned(const std::string& serial) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
-  void BaseSpawnerNode::CleanupDeadNodes(
-      const std::vector<std::string>& current_serials)
+  void CleanupDeadNodes(const std::vector<std::string>& current_serials)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
 
   const std::string driver_type_;
