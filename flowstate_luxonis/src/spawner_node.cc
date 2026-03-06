@@ -15,9 +15,7 @@ namespace flowstate_luxonis {
 
 SpawnerNode::SpawnerNode()
     : flowstate_common::BaseSpawnerNode("luxonis_spawner", "luxonis",
-                                        std::chrono::seconds(10)) {
-  UpdateCameras();
-}
+                                        std::chrono::seconds(10)) {}
 
 std::string SpawnerNode::DeviceStateToString(XLinkDeviceState_t state) {
   switch (state) {
@@ -50,14 +48,15 @@ SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
   std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> new_nodes;
   std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
 
-  std::unordered_set<std::string> serials_to_spawn(serials.begin(), serials.end());
+  std::unordered_set<std::string> serials_to_spawn(serials.begin(),
+                                                   serials.end());
 
   for (const auto& device_info : devices) {
     if (serials_to_spawn.count(device_info.deviceId)) {
       std::string ip_str = device_info.name;
-      RCLCPP_INFO(get_logger(), "Spawning Luxonis node: %s at %s", 
+      RCLCPP_INFO(get_logger(), "Spawning Luxonis node: %s at %s",
                   device_info.deviceId.c_str(), ip_str.c_str());
-                  
+
       new_nodes.push_back(std::make_shared<AdapterNode>(
           device_info.deviceId, std::vector<std::string>{ip_str}));
     }

@@ -31,9 +31,9 @@ namespace flowstate_common {
  * To create a new camera spawner:
  * 1. Inherit from BaseSpawnerNode.
  * 2. Implement `GetSerials()` to query the SDK and return all connected
- * serials.
+ *    serials.
  * 3. Implement `SpawnNodes()` to instantiate AdapterNodes for a requested list.
- * 4. Call `UpdateCameras()` at the very end of your derived class constructor
+ * 4. Call `UpdateCameras()` from your `main()` function after instantiation
  *    to trigger the initial hardware scan.
  */
 class BaseSpawnerNode : public rclcpp::Node {
@@ -51,14 +51,15 @@ class BaseSpawnerNode : public rclcpp::Node {
 
   virtual ~BaseSpawnerNode();
 
- protected:
   /**
    * @brief The main execution loop. It queries GetSerials(), cleans up crashed
    * or disconnected nodes, and calls SpawnNodes() for newly discovered
-   * hardware. Should be called at the end of the derived class constructor.
+   * hardware. Must be called manually from main() after the object is fully
+   * constructed.
    */
   void UpdateCameras() ABSL_LOCKS_EXCLUDED(nodes_mutex_);
 
+ protected:
   /**
    * @brief Queries the manufacturer SDK for all currently connected hardware.
    * @return A vector of serial numbers for physically connected cameras.
