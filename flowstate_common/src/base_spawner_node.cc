@@ -59,13 +59,27 @@ bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   return false;
 }
 
-void BaseSpawnerNode::CleanupExitedNodes() {
+void BaseSpawnerNode::CleanupDeadNodes(
+    const std::vector<std::string>& current_serials) {
   auto it = spawned_nodes_.begin();
   while (it != spawned_nodes_.end()) {
-    // Uses the helper from BaseAdapterNode
-    if ((*it)->HasExitedThread()) {
-      RCLCPP_INFO(get_logger(), "Camera %s has exited. Removing it.",
-                  (*it)->GetSerial().c_str());
+    const std::string& node_serial = (*it)->GetSerial();
+
+    bool has_exited = (*it)->HasExitedThread();
+    bool is_unplugged =
+        std::find(current_serials.begin(), current_serials.end(),
+                  node_serial) == current_serials.end();
+
+    if (has_exited || is_unplugged) {
+      if (has_exited) {
+        RCLCPP_INFO(get_logger(), "Camera %s thread exited. Removing node.",
+                    node_serial.c_str());
+      } else {
+        RCLCPP_WARN(get_logger(),
+                    "Camera %s physically disconnected. Removing node.",
+                    node_serial.c_str());
+      }
+
       it = spawned_nodes_.erase(it);
     } else {
       ++it;
@@ -78,7 +92,7 @@ void BaseSpawnerNode::UpdateCameras() {
 
   absl::MutexLock lock(&nodes_mutex_);
 
-  CleanupExitedNodes();
+  CleanupDeadNodes(current_serials);
 
   std::vector<std::string> serials_to_spawn;
   for (const auto& serial : current_serials) {

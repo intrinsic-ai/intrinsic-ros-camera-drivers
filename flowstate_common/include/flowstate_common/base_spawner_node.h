@@ -72,18 +72,20 @@ class BaseSpawnerNode : public rclcpp::Node {
    * @return A vector of newly created BaseAdapterNode shared pointers.
    */
   virtual std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
-    SpawnNodes(const std::vector<std::string>& serials) = 0;
+  SpawnNodes(const std::vector<std::string>& serials) = 0;
 
+ private:
   // Protected mutex and vector so derived classes (like Zivid) can safely
   // access and manually shut down nodes if required by their SDK.
   mutable absl::Mutex nodes_mutex_;
   std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> spawned_nodes_
       ABSL_GUARDED_BY(nodes_mutex_);
 
- private:
   bool IsAlreadySpawned(const std::string& serial) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
-  void CleanupExitedNodes() ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
+  void BaseSpawnerNode::CleanupDeadNodes(
+      const std::vector<std::string>& current_serials)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
 
   const std::string driver_type_;
   rclcpp::Service<snapshot_interfaces::srv::Discover>::SharedPtr
