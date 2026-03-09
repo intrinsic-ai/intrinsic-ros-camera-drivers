@@ -33,7 +33,10 @@ SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
                                         std::chrono::seconds(30), options),
       zivid_app_(std::make_shared<Zivid::Application>()) {}
 
-SpawnerNode::~SpawnerNode() { ShutdownCameraNodes(); }
+SpawnerNode::~SpawnerNode() {
+  RCLCPP_INFO(get_logger(), "Shutting down all Zivid camera node(s)...");
+  ClearSpawnedNodes();
+}
 
 std::vector<std::string> SpawnerNode::GetSerials() {
   std::vector<std::string> serials;
@@ -66,22 +69,4 @@ SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
   return new_nodes;
 }
 
-void SpawnerNode::ShutdownCameraNodes() {
-  if (spawned_nodes_.empty()) {
-    return;
-  }
-  RCLCPP_INFO(get_logger(), "Shutting down %zu camera node(s)...",
-              spawned_nodes_.size());
-
-  // Request nodes to shut down.
-  for (auto& node : spawned_nodes_) {
-    // The node might be null if creation failed but was still added to the
-    // list.
-    if (node) {
-      rclcpp::shutdown(node->get_node_base_interface()->get_context());
-    }
-  }
-
-  spawned_nodes_.clear();
-}
 }  // namespace flowstate_zivid

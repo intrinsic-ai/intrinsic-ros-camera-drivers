@@ -74,6 +74,16 @@ class BaseSpawnerNode : public rclcpp::Node {
   virtual std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
   SpawnNodes(const std::vector<std::string>& serials) = 0;
 
+  void ClearSpawnedNodes() {
+    std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
+        nodes_to_delete;
+    {
+      absl::MutexLock lock(&nodes_mutex_);
+      nodes_to_delete = std::move(spawned_nodes_);
+    }
+    nodes_to_delete.clear();
+  }
+
  private:
   // Protected mutex and vector so derived classes (like Zivid) can safely
   // access and manually shut down nodes if required by their SDK.

@@ -51,7 +51,6 @@ class SpawnerNode : public flowstate_common::BaseSpawnerNode {
       const std::vector<std::string>& serials) override;
 
  private:
-  void ShutdownCameraNodes();
   std::shared_ptr<Zivid::Application> zivid_app_;
 };
 }  // namespace flowstate_zivid
