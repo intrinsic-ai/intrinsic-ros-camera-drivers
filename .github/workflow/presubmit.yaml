@@ -1,0 +1,54 @@
+name: Camera Drivers Presubmit
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-bundle:
+    name: Build ${{ matrix.camera }}
+    runs-on: ubuntu-24.04
+    
+    strategy:
+      fail-fast: false # Don't cancel the other cameras if one fails
+      matrix:
+        camera: [orbbec, luxonis, zivid]
+
+    steps:
+      - name: Create Workspace Directory
+        run: mkdir -p workspace/src
+
+      - name: Checkout Camera Drivers (This Repo)
+        uses: actions/checkout@v4
+        with:
+          path: workspace/src/flowstate-ros-camera-drivers
+
+      - name: Checkout sdk-ros
+        uses: actions/checkout@v4
+        with:
+          repository: intrinsic-ai/sdk-ros
+          path: workspace/src/sdk-ros
+
+      - name: Clone Vendor Dependencies
+        working-directory: workspace/src
+        run: |
+          if [ "${{ matrix.camera }}" == "orbbec" ]; then
+            git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
+            git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
+            
+          elif [ "${{ matrix.camera }}" == "luxonis" ]; then
+            git clone https://github.com/codebot/depthai-core --branch kilted
+            cd depthai-core && git submodule update --init --recursive && cd ..
+            git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
+            
+          elif [ "${{ matrix.camera }}" == "zivid" ]; then
+            git clone https://github.com/zivid/zivid-ros.git
+          fi
+
+      - name: Build Service Bundle
+        working-directory: workspace
+        run: |
+          # Make the script executable
+          chmod +x src/flowstate-ros-camera-drivers/flowstate_${{ matrix.camera }}/flowstate/build_service_bundle.sh
+          
+          ./src/flowstate-ros-camera-drivers/flowstate_${{ matrix.camera }}/flowstate/build_service_bundle.sh
