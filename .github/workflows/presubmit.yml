@@ -3,16 +3,44 @@ name: Camera Drivers Presubmit
 on:
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      orbbec: ${{ steps.filter.outputs.orbbec }}
+      luxonis: ${{ steps.filter.outputs.luxonis }}
+      zivid: ${{ steps.filter.outputs.zivid }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            orbbec:
+              - 'flowstate_orbbec/**'
+              - 'flowstate_common/**'
+            luxonis:
+              - 'flowstate_luxonis/**'
+              - 'flowstate_common/**'
+            zivid:
+              - 'flowstate_zivid/**'
+              - 'flowstate_common/**'
+
   build-bundle:
-    name: Build ${{ matrix.camera }}
+    needs: detect-changes
+    name: Build ${{ matrix.camera }} Driver
     runs-on: ubuntu-24.04
     
     strategy:
-      fail-fast: false # Don't cancel the other cameras if one fails
+      fail-fast: false
       matrix:
         camera: [orbbec, luxonis, zivid]
+
+    if: needs.detect-changes.outputs[matrix.camera] == 'true'
 
     steps:
       - name: Create Workspace Directory
@@ -23,7 +51,7 @@ jobs:
         with:
           path: workspace/src/flowstate-ros-camera-drivers
 
-      - name: Checkout sdk-ros
+      - name: Checkout sdk-ros (Public)
         uses: actions/checkout@v4
         with:
           repository: intrinsic-ai/sdk-ros
@@ -48,7 +76,5 @@ jobs:
       - name: Build Service Bundle
         working-directory: workspace
         run: |
-          # Make the script executable
           chmod +x src/flowstate-ros-camera-drivers/flowstate_${{ matrix.camera }}/flowstate/build_service_bundle.sh
-          
           ./src/flowstate-ros-camera-drivers/flowstate_${{ matrix.camera }}/flowstate/build_service_bundle.sh
