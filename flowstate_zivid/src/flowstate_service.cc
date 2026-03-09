@@ -11,7 +11,7 @@ int main(int argc, char** argv) {
                         "Failed to create SpawnerNode: " << node.status());
     return EXIT_FAILURE;
   }
-  node->value()->UpdateCameras();
+  node->UpdateCameras();
   rclcpp::spin(*node);
   rclcpp::shutdown();
 }
