@@ -419,10 +419,6 @@ AdapterNode::BuildSnapshotResponse() {
   response.images.push_back(std::move(ir_snapshot));
 
 #if SEND_DEPTH
-  if (!depth_image_) {
-    response.error_message = "depth image not yet received from camera";
-    return false;
-  }
   // The Orbbec camera returns the depth image as 16-bit images in millimeters.
   // We want to convert that to 32-bit float (meters) for Flowstate.
   depth_snapshot.image.header = depth_copy.header;
