@@ -43,7 +43,7 @@ Flowstate relies on standardized ROS services from [`snapshot_interfaces`](https
     *   `sensor_name`: Identifying name (e.g., "color", "depth", "normal")
     *   `topic_name`: The ROS topic where this sensor's data is actively published
     *   `sensor_type`: Enumeration (IMAGE, DEPTH, POINT_CLOUD, IMU, etc.)
-    *   `camera_t_sensor`: The static transform from the camera's base frame to the sensor frame
+    *   `camera_t_sensor`: The static transform from the sensor frame to the camera base frame
     *   `info`: Standard `sensor_msgs/CameraInfo`
 
 #### 3. `~/<camera_id>/snapshot` (Implemented via `BaseAdapterNode`)
@@ -166,7 +166,7 @@ export INTRINSIC_ORGANIZATION=<your_org_name>
 export INTRINSIC_CONTEXT=<cluster_id>
 
 # Install service
-inctl service install \
+inctl asset install \
   --org $INTRINSIC_ORGANIZATION \
   --cluster $INTRINSIC_CONTEXT \
   $SERVICE_BUNDLE
