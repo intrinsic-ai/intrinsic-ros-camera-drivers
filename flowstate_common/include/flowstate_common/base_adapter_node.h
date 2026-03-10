@@ -42,6 +42,13 @@ namespace flowstate_common {
  * information for the describe service
  * 5. Override BuildSnapshotResponse to build the snapshot response with image
  * data for the snapshot service
+ *
+ * Driver Initialization Note:
+ * Derived classes have full control over their setup. Driver authors may introduce
+ * custom helpers (e.g., `InitializeParameters()`) to handle ROS 2 parameters,
+ * compile pipelines, or wrap SDK connections as needed. This heavy lifting
+ * should generally be executed within the `Main()` background thread to avoid
+ * blocking the SpawnerNode.
  */
 class BaseAdapterNode : public rclcpp::Node {
  public:
