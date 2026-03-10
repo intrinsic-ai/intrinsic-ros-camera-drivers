@@ -50,7 +50,8 @@ class BaseAdapterNode : public rclcpp::Node {
    * @param serial Camera serial number
    * @param locators Camera locators (IP addresses should come first after that,
    * USB paths)
-   * @param node_name ROS node name prefix (will be prefixed with camera type)
+   * @param node_name_prefix ROS node name prefix (will be prefixed with camera
+   * type)
    */
   BaseAdapterNode(const std::string& serial,
                   const std::vector<std::string>& locators,
@@ -62,7 +63,7 @@ class BaseAdapterNode : public rclcpp::Node {
    * @brief Check if the background thread has exited.
    * @return true if thread has exited, false otherwise
    */
-  bool HasExitedThread() const { return exited_thread_; }
+  bool HasExitedThread() const { return exited_thread_.load(); }
 
   /**
    * @brief Get the camera serial number.
@@ -148,13 +149,13 @@ class BaseAdapterNode : public rclcpp::Node {
    * @param topic_name ROS topic name for the sensor's image stream
    * @return SensorInfo message populated with the provided info and parameters
    */
-  snapshot_interfaces::msg::SensorInfo SensorInformation(
+  snapshot_interfaces::msg::SensorInfo BuildSensorInformation(
       const sensor_msgs::msg::CameraInfo& camera_info,
       const std::string& sensor_name, const std::string& topic_name);
 
   // Thread management
   std::thread thread_;
-  bool exited_thread_ = false;
+  std::atomic<bool> exited_thread_{false};
 
   // Camera identification
   std::string serial_;

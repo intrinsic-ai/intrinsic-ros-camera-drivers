@@ -84,7 +84,7 @@ void BaseAdapterNode::DescribeCallback(
   response->success = true;
 }
 
-snapshot_interfaces::msg::SensorInfo BaseAdapterNode::SensorInformation(
+snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
     const sensor_msgs::msg::CameraInfo& camera_info,
     const std::string& sensor_name, const std::string& topic_name) {
   snapshot_interfaces::msg::SensorInfo sensor_info;

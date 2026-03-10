@@ -347,14 +347,14 @@ AdapterNode::BuildDescribeResponse() {
   }
 
   response.sensors.push_back(
-      SensorInformation(*color_camera_info_, "rgb", ColorImageTopic()));
+      BuildSensorInformation(*color_camera_info_, "rgb", ColorImageTopic()));
   response.sensors.push_back(
-      SensorInformation(*ir_camera_info_, "ir_left", IrImageTopic()));
+      BuildSensorInformation(*ir_camera_info_, "ir_left", IrImageTopic()));
 
 #if SEND_DEPTH
   if (depth_camera_info_) {
     response.sensors.push_back(
-        SensorInformation(*depth_camera_info_, "depth", DepthImageTopic()));
+        BuildSensorInformation(*depth_camera_info_, "depth", DepthImageTopic()));
   }
 #endif
 
