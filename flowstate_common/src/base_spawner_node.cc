@@ -7,7 +7,8 @@
 
 #include "absl/synchronization/mutex.h"
 #include "rclcpp/rclcpp.hpp"
-#include "snapshot_interfaces/msg/discovered_camera.hpp"
+#include "snapshot_interfaces/msg/discovery_request.hpp"
+#include "snapshot_interfaces/msg/discovery_response.hpp"
 
 namespace flowstate_common {
 
@@ -20,15 +21,17 @@ BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
     : Node(node_name, options), driver_type_(driver_type) {
   discovery_pub_ =
       create_publisher<snapshot_interfaces::msg::DiscoveryResponse>(
-          "/cameras/discovery/response", 10);
+          "/cameras/discovery_responses", 10);
 
   discovery_sub_ =
       create_subscription<snapshot_interfaces::msg::DiscoveryRequest>(
-          "/cameras/discovery/request", 10,
+          "/cameras/discovery_request", 10,
           [this](const snapshot_interfaces::msg::DiscoveryRequest::
                      ConstSharedPtr /*msg*/) {
             snapshot_interfaces::msg::DiscoveryResponse response;
 
+            response.success = true;
+            response.error_message = "";
             {
               absl::MutexLock lock(&this->nodes_mutex_);
               for (const auto& node : spawned_nodes_) {
