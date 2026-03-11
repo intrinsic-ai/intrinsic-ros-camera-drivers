@@ -10,9 +10,7 @@ jobs:
   detect-changes:
     runs-on: ubuntu-24.04
     outputs:
-      orbbec: ${{ steps.filter.outputs.orbbec }}
-      luxonis: ${{ steps.filter.outputs.luxonis }}
-      zivid: ${{ steps.filter.outputs.zivid }}
+      cameras: ${{ steps.filter.outputs.changes }}
     steps:
       - uses: actions/checkout@v4
       
@@ -32,15 +30,14 @@ jobs:
 
   build-bundle:
     needs: detect-changes
+    if: needs.detect-changes.outputs.cameras != '[]'
     name: Build ${{ matrix.camera }} Driver
     runs-on: ubuntu-24.04
     
     strategy:
       fail-fast: false
       matrix:
-        camera: [orbbec, luxonis, zivid]
-
-    if: needs.detect-changes.outputs[matrix.camera] == 'true'
+        camera: ${{ fromJSON(needs.detect-changes.outputs.cameras) }}
 
     steps:
       - name: Create Workspace Directory
