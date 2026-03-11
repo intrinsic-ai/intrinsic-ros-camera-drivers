@@ -18,7 +18,7 @@
 #include "snapshot_interfaces/srv/snapshot.hpp"
 
 namespace flowstate_common {
-
+// Add small comment
 /**
  * @class BaseAdapterNode
  * @brief Abstract base class for camera adapter nodes that implement the
