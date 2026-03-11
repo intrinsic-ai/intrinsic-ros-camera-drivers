@@ -45,6 +45,18 @@ jobs:
     steps:
       - name: Create Workspace Directory
         run: mkdir -p workspace/src
+      
+      # Need to free space otherwise we run out of it during build
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: false
 
       - name: Checkout Camera Drivers (This Repo)
         uses: actions/checkout@v4
