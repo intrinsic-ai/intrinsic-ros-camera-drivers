@@ -7,12 +7,11 @@
 
 #include "absl/synchronization/mutex.h"
 #include "rclcpp/rclcpp.hpp"
+#include "snapshot_interfaces/msg/discovered_camera.hpp"
 #include "snapshot_interfaces/msg/discovery_request.hpp"
 #include "snapshot_interfaces/msg/discovery_response.hpp"
 
 namespace flowstate_common {
-
-using snapshot_interfaces::srv::Discover;
 
 BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
                                  const std::string& driver_type,
