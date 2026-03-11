@@ -9,6 +9,9 @@ on:
 jobs:
   detect-changes:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       cameras: ${{ steps.filter.outputs.changes }}
     steps:
