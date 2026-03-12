@@ -36,14 +36,12 @@ RUN . /opt/ros/jazzy/setup.sh \
 
 RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
-        --event-handlers=console_direct+ \
         --merge-install \
         --packages-up-to intrinsic_sdk_ros snapshot_interfaces \
         --cmake-args -DBUILD_SHARED_LIBS=ON
 
 RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
-        --event-handlers=console_direct+ \
         --merge-install \
         --packages-up-to=rmw_zenoh_cpp \
         --cmake-args -DBUILD_SHARED_LIBS=ON

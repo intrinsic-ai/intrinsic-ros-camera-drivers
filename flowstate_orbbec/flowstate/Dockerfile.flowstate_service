@@ -36,13 +36,11 @@ RUN . /opt/ros/jazzy/setup.sh \
 
 RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
-        --event-handlers=console_direct+ \
         --merge-install \
         --packages-up-to intrinsic_sdk_ros snapshot_interfaces
 
 RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
-        --event-handlers=console_direct+ \
         --merge-install \
         --packages-up-to=rmw_zenoh_cpp
 
@@ -65,7 +63,6 @@ RUN . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/overlay \
     && colcon build \
-      --event-handlers=console_direct+ \
       --merge-install \
       --executor sequential \
       --packages-up-to=${SERVICE_PACKAGE} \

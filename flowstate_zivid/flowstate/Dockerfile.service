@@ -50,7 +50,6 @@ RUN . /opt/ros/jazzy/setup.sh && \
     rosdep install --from-paths /opt/ros/underlay/src --ignore-src --rosdistro jazzy -y --skip-keys "snapshot_interfaces OrbbecSDK" && \
     colcon build \
         --continue-on-error \
-        --event-handlers=console_direct+ \
         --merge-install \
         --packages-up-to intrinsic_sdk \
     && rm -rf /var/lib/apt/lists/* \
@@ -90,7 +89,6 @@ RUN . /opt/ros/jazzy/setup.sh \
 
 RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
-        --event-handlers=console_direct+ \
         --merge-install \
         --packages-up-to=rmw_zenoh_cpp
 
@@ -123,7 +121,6 @@ RUN . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/overlay \
     && colcon build \
-      --event-handlers=console_direct+ \
       --merge-install \
       --packages-above-and-dependencies=${SERVICE_PACKAGE} \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log
