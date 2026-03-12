@@ -46,17 +46,17 @@ jobs:
       - name: Create Workspace Directory
         run: mkdir -p workspace/src
       
-      # Need to free space otherwise we run out of it during build
-      - name: Free Disk Space
-        uses: jlumbroso/free-disk-space@main
+      # Need to free space otherwise the build will fail due to lack of space
+      - name: Maximize Build Space
+        uses: easimon/maximize-build-space@master
         with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: false
-          docker-images: true
-          swap-storage: false
+          root-reserve-mb: 512
+          swap-size-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
 
       - name: Checkout Camera Drivers (This Repo)
         uses: actions/checkout@v4
