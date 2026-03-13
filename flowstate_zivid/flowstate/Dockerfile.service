@@ -52,8 +52,12 @@ RUN . /opt/ros/jazzy/setup.sh && \
         --continue-on-error \
         --merge-install \
         --packages-up-to intrinsic_sdk \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /root/.ros/rosdep 
+        && \
+    echo "Searching for and copying vendored libprotobuf..." && \
+    find /opt/ros/underlay/build -name "libprotobuf.so.29.0.0" -exec cp {} /opt/ros/underlay/install/lib/ \; && \
+    echo "Searching for and copying vendored absl libraries..." && \
+    find /opt/ros/underlay/build/abseil_cpp_vendor -name "libabsl*.so*" -exec cp -d {} /opt/ros/underlay/install/lib/ \; && \
+    rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /var/lib/apt/lists/* /root/.ros/rosdep
 
 # Configure OpenCL for NVIDIA GPU
 RUN mkdir -p /etc/OpenCL/vendors && \
@@ -79,29 +83,13 @@ ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
 # install rmw_zenoh
 RUN cd /opt/ros/underlay/src/ \
-    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ../..
-
-RUN . /opt/ros/jazzy/setup.sh \
+    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ../.. \
+    && . /opt/ros/jazzy/setup.sh \
     && apt-get update \
     && rosdep update \
     && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build \
-        --merge-install \
-        --packages-up-to=rmw_zenoh_cpp
-
-# Copy vendored libraries to install before cleaning up build directory
-RUN echo "Searching for and copying vendored libprotobuf..." && \
-    find /opt/ros/underlay/build -name "libprotobuf.so.29.0.0" -exec cp {} /opt/ros/underlay/install/lib/ \;
-
-RUN echo "Searching for and copying vendored absl libraries..." && \
-    find /opt/ros/underlay/build/abseil_cpp_vendor -name "libabsl*.so*" -exec cp -d {} /opt/ros/underlay/install/lib/ \;
-
-# Now clean up build artifacts
-RUN rm -rf /opt/ros/underlay/build /opt/ros/underlay/log
-
+    && colcon build --merge-install --packages-up-to=rmw_zenoh_cpp \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /var/lib/apt/lists/*
 
 # overlay stage: underlay + service code built
 FROM underlay AS overlay
@@ -123,14 +111,9 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
       --merge-install \
       --packages-above-and-dependencies=${SERVICE_PACKAGE} \
-    && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log
-
-# Clean up source code and caches (vendored libs already copied in underlay stage)
-RUN rm -rf /opt/ros/underlay/src \
+    && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /opt/ros/underlay/src \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /tmp/* \
-    && rm -rf /root/.cache
+    && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
 
 RUN ls -l /opt/ros/overlay/install/lib/${SERVICE_PACKAGE}
 RUN ls -R /opt/ros/overlay/install
