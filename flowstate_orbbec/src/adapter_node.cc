@@ -15,7 +15,7 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "snapshot_interfaces/msg/image_snapshot.hpp"
 
-#define SEND_DEPTH 0
+#define SEND_DEPTH 1
 
 namespace flowstate_orbbec {
 
@@ -31,24 +31,28 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true))
           .append_parameter_override(rclcpp::Parameter("enable_depth", false))
-          .append_parameter_override(rclcpp::Parameter("color_fps", 10))
+          .append_parameter_override(rclcpp::Parameter("color_fps", 5))
           .append_parameter_override(rclcpp::Parameter("color_format", "RGB"))
           .append_parameter_override(rclcpp::Parameter("color_width", 1280))
           .append_parameter_override(rclcpp::Parameter("color_height", 800))
           .append_parameter_override(rclcpp::Parameter("color_sharpness", 75))
           .append_parameter_override(rclcpp::Parameter("enable_color", true))
 #if SEND_DEPTH
-          .append_parameter_override(rclcpp::Parameter("depth_fps", 10))
-          .append_parameter_override(rclcpp::Parameter("right_ir_fps", 10))
+          .append_parameter_override(rclcpp::Parameter("depth_fps", 5))
           .append_parameter_override(rclcpp::Parameter("enable_depth", true))
 #else
           .append_parameter_override(rclcpp::Parameter("enable_depth", false))
 #endif
-          .append_parameter_override(rclcpp::Parameter("left_ir_fps", 10))
+          .append_parameter_override(rclcpp::Parameter("left_ir_fps", 5))
           .append_parameter_override(rclcpp::Parameter("left_ir_format", "Y8"))
           .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
           .append_parameter_override(rclcpp::Parameter("left_ir_height", 800))
-          .append_parameter_override(rclcpp::Parameter("enable_left_ir", true));
+          .append_parameter_override(rclcpp::Parameter("enable_left_ir", true))
+          .append_parameter_override(rclcpp::Parameter("right_ir_fps", 5))
+          .append_parameter_override(rclcpp::Parameter("right_ir_format", "Y8"))
+          .append_parameter_override(rclcpp::Parameter("right_ir_width", 1280))
+          .append_parameter_override(rclcpp::Parameter("right_ir_height", 800))
+          .append_parameter_override(rclcpp::Parameter("enable_right_ir", true));
   InitializeParameters();
 
   orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
@@ -62,12 +66,19 @@ AdapterNode::AdapterNode(const std::string& serial,
         this->color_camera_info_ = std::move(msg);
       });
 
-  // Subscribe to IR camera info
-  ir_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
+  // Subscribe to IR camera infos
+  left_ir_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       absl::StrFormat("orbbec/camera_%s/left_ir/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
-        this->ir_camera_info_ = std::move(msg);
+        this->left_ir_camera_info_ = std::move(msg);
+      });
+
+  right_ir_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
+      absl::StrFormat("orbbec/camera_%s/right_ir/camera_info", serial_), 2,
+      [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
+        absl::MutexLock lock(&this->camera_info_mutex_);
+        this->right_ir_camera_info_ = std::move(msg);
       });
 
 #if SEND_DEPTH
@@ -90,11 +101,17 @@ AdapterNode::AdapterNode(const std::string& serial,
         this->color_image_ = std::move(msg);
       });
 
-  // Subscribe to IR image
-  ir_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-      IrImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
+  // Subscribe to IR images
+  left_ir_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      LeftIrImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
         absl::MutexLock lock(&this->image_mutex_);
-        this->ir_image_ = std::move(msg);
+        this->left_ir_image_ = std::move(msg);
+      });
+
+  right_ir_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      RightIrImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
+        absl::MutexLock lock(&this->image_mutex_);
+        this->right_ir_image_ = std::move(msg);
       });
 
 #if SEND_DEPTH
@@ -116,8 +133,12 @@ std::string AdapterNode::ColorImageTopic() const {
   return absl::StrFormat("/orbbec/camera_%s/color/image_raw", serial_);
 }
 
-std::string AdapterNode::IrImageTopic() const {
+std::string AdapterNode::LeftIrImageTopic() const {
   return absl::StrFormat("/orbbec/camera_%s/left_ir/image_raw", serial_);
+}
+
+std::string AdapterNode::RightIrImageTopic() const {
+  return absl::StrFormat("/orbbec/camera_%s/right_ir/image_raw", serial_);
 }
 
 std::string AdapterNode::DepthImageTopic() const {
@@ -341,20 +362,22 @@ absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
 AdapterNode::BuildDescribeResponse() {
   snapshot_interfaces::srv::Describe::Response response;
   absl::MutexLock lock(&camera_info_mutex_);
-  if (!color_camera_info_ || !ir_camera_info_) {
+  if (!color_camera_info_ || !left_ir_camera_info_ || !right_ir_camera_info_) {
     return absl::UnavailableError(
         "CameraInfo not yet received (waiting for RGB+IR)");
   }
 
   response.sensors.push_back(
       BuildSensorInformation(*color_camera_info_, "rgb", ColorImageTopic()));
-  response.sensors.push_back(
-      BuildSensorInformation(*ir_camera_info_, "ir_left", IrImageTopic()));
+  response.sensors.push_back(BuildSensorInformation(
+      *left_ir_camera_info_, "ir_left", LeftIrImageTopic()));
+  response.sensors.push_back(BuildSensorInformation(
+      *right_ir_camera_info_, "ir_right", RightIrImageTopic()));
 
 #if SEND_DEPTH
   if (depth_camera_info_) {
-    response.sensors.push_back(
-        BuildSensorInformation(*depth_camera_info_, "depth", DepthImageTopic()));
+    response.sensors.push_back(BuildSensorInformation(
+        *depth_camera_info_, "depth", DepthImageTopic()));
   }
 #endif
 
@@ -365,13 +388,15 @@ absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
 AdapterNode::BuildSnapshotResponse() {
   snapshot_interfaces::srv::Snapshot::Response response;
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
-  snapshot_interfaces::msg::ImageSnapshot ir_snapshot;
+  snapshot_interfaces::msg::ImageSnapshot left_ir_snapshot;
+  snapshot_interfaces::msg::ImageSnapshot right_ir_snapshot;
 #if SEND_DEPTH
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
 #endif
 
   color_snapshot.topic_name = ColorImageTopic();
-  ir_snapshot.topic_name = IrImageTopic();
+  left_ir_snapshot.topic_name = LeftIrImageTopic();
+  right_ir_snapshot.topic_name = RightIrImageTopic();
 #if SEND_DEPTH
   depth_snapshot.topic_name = DepthImageTopic();
 #endif
@@ -379,11 +404,13 @@ AdapterNode::BuildSnapshotResponse() {
   // Lock and copy the most recent CameraInfo messages
   {
     absl::MutexLock lock(&camera_info_mutex_);
-    if (!color_camera_info_ || !ir_camera_info_) {
+    if (!color_camera_info_ || !left_ir_camera_info_ ||
+        !right_ir_camera_info_) {
       return absl::UnavailableError("CameraInfo not yet received");
     }
     color_snapshot.camera_info = *color_camera_info_;
-    ir_snapshot.camera_info = *ir_camera_info_;
+    left_ir_snapshot.camera_info = *left_ir_camera_info_;
+    right_ir_snapshot.camera_info = *right_ir_camera_info_;
 #if SEND_DEPTH
     if (depth_camera_info_) {
       depth_snapshot.camera_info = *depth_camera_info_;
@@ -391,18 +418,19 @@ AdapterNode::BuildSnapshotResponse() {
 #endif
   }
 
-  sensor_msgs::msg::Image color_copy, ir_copy;
+  sensor_msgs::msg::Image color_copy, left_ir_copy, right_ir_copy;
 #if SEND_DEPTH
   sensor_msgs::msg::Image depth_copy;
 #endif
   // Lock and copy the most recent Image messages
   {
     absl::MutexLock lock(&image_mutex_);
-    if (!color_image_ || !ir_image_) {
+    if (!color_image_ || !left_ir_image_ || !right_ir_image_) {
       return absl::UnavailableError("Images not yet received from camera");
     }
     color_copy = *color_image_;
-    ir_copy = *ir_image_;
+    left_ir_copy = *left_ir_image_;
+    right_ir_copy = *right_ir_image_;
 
 #if SEND_DEPTH
     if (!depth_image_) {
@@ -415,8 +443,11 @@ AdapterNode::BuildSnapshotResponse() {
   color_snapshot.image = color_copy;
   response.images.push_back(std::move(color_snapshot));
 
-  ir_snapshot.image = ir_copy;
-  response.images.push_back(std::move(ir_snapshot));
+  left_ir_snapshot.image = left_ir_copy;
+  response.images.push_back(std::move(left_ir_snapshot));
+
+  right_ir_snapshot.image = right_ir_copy;
+  response.images.push_back(std::move(right_ir_snapshot));
 
 #if SEND_DEPTH
   // The Orbbec camera returns the depth image as 16-bit images in millimeters.

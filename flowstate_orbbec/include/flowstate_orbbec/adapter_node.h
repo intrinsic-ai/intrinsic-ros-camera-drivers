@@ -33,7 +33,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
   BuildSnapshotResponse() override;
 
-  std::string IrImageTopic() const;
+  std::string LeftIrImageTopic() const;
+  std::string RightIrImageTopic() const;
   std::string DepthImageTopic() const;
 
   void InitializeParameters();
@@ -88,12 +89,21 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
   // IR Data
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> ir_camera_info_
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> left_ir_camera_info_
       ABSL_GUARDED_BY(camera_info_mutex_);
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr ir_info_sub_;
-  std::unique_ptr<sensor_msgs::msg::Image> ir_image_
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      left_ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> left_ir_image_
       ABSL_GUARDED_BY(image_mutex_);
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr ir_image_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr left_ir_image_sub_;
+
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> right_ir_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      right_ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> right_ir_image_
+      ABSL_GUARDED_BY(image_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr right_ir_image_sub_;
 
   // Depth Data
   std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_
