@@ -59,14 +59,14 @@ install(TARGETS spawner_node
 if (intrinsic_sdk_ros_FOUND)
   message("intrinsic_sdk_ros found")
   intrinsic_sdk_generate_service_manifest(
-    SERVICE_NAME orbbec_driver
-    MANIFEST flowstate/orbbec_driver.manifest.textproto
-    DEFAULT_CONFIGURATION flowstate/orbbec_driver_default_config.textproto
-    PARAMETER_DESCRIPTOR flowstate/orbbec_driver_config.proto
-    PROTOS_TARGET orbbec_driver_protos
+    SERVICE_NAME orbbec_gemini_driver
+    MANIFEST flowstate/orbbec_gemini_driver.manifest.textproto
+    DEFAULT_CONFIGURATION flowstate/orbbec_gemini_driver_default_config.textproto
+    PARAMETER_DESCRIPTOR flowstate/orbbec_gemini_driver_config.proto
+    PROTOS_TARGET orbbec_gemini_driver_protos
   )
   install(FILES
-          ${CMAKE_CURRENT_BINARY_DIR}/orbbec_driver_protos.desc
+          ${CMAKE_CURRENT_BINARY_DIR}/orbbec_gemini_driver_protos.desc
           ${CMAKE_CURRENT_BINARY_DIR}/service_manifest.binarypb
           ${CMAKE_CURRENT_BINARY_DIR}/default_config.binarypb
           DESTINATION "share/${PROJECT_NAME}"
@@ -75,12 +75,12 @@ if (intrinsic_sdk_ros_FOUND)
   target_link_libraries(flowstate_service
     flowstate_orbbec
     intrinsic_sdk_cmake::intrinsic_sdk_cmake
-    orbbec_driver_protos
+    orbbec_gemini_driver_protos
     rclcpp::rclcpp
   )
   add_dependencies(flowstate_service
-    orbbec_driver_manifest
-    orbbec_driver_default_config
+    orbbec_gemini_driver_manifest
+    orbbec_gemini_driver_default_config
   )
   install(TARGETS flowstate_service
           DESTINATION lib/${PROJECT_NAME})
