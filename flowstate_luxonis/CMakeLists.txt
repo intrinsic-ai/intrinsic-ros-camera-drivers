@@ -8,9 +8,9 @@ add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 
 find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
-find_package(cv_bridge REQUIRED)
 find_package(depthai REQUIRED VERBOSE)
 find_package(depthai_ros_driver REQUIRED VERBOSE)
+find_package(flowstate_camera_common REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -25,7 +25,9 @@ add_library(flowstate_luxonis
   src/spawner_node.cc
 )
 target_link_libraries(flowstate_luxonis
+  ${flowstate_camera_common_LIBRARIES}
   absl::status
+  absl::statusor
   absl::synchronization
   rclcpp::rclcpp
   depthai::core
@@ -33,9 +35,9 @@ target_link_libraries(flowstate_luxonis
   ${snapshot_interfaces_TARGETS}
 )
 ament_target_dependencies(flowstate_luxonis
-  cv_bridge
   depthai
   depthai_ros_driver
+  flowstate_camera_common
   OpenCV
 )
 install(TARGETS flowstate_luxonis

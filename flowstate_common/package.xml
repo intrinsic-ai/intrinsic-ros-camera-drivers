@@ -1,23 +1,16 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>flowstate_orbbec</name>
+  <name>flowstate_camera_common</name>
   <version>0.0.1</version>
-  <description>Flowstate Orbbec driver adapter</description>
+  <description>Flowstate camera common utilities</description>
   <maintainer email="morganquigley@intrinsic.ai">morganquigley</maintainer>
   <license>Apache-2.0</license>
 
   <depend>abseil_cpp_vendor</depend>
-  <depend>cv_bridge</depend>
-  <depend>intrinsic_sdk_ros</depend>
-  <depend>orbbec_camera</depend>
-  <depend>orbbec_camera_msgs</depend>
-  <depend>libopencv-dev</depend>
-  <depend>OrbbecSDK</depend>
+  <depend>camera_info_manager</depend>
   <depend>sensor_msgs</depend>
   <depend>snapshot_interfaces</depend>
-  <depend>std_srvs</depend>
-  <depend>flowstate_camera_common</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

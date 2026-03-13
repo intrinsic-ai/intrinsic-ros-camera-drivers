@@ -3,13 +3,12 @@
 
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/synchronization/notification.h"
+#include "flowstate_common/base_adapter_node.h"
 #include "image_transport/image_transport.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
@@ -53,14 +52,33 @@ namespace flowstate_zivid {
  *     - "~/describe": Provides a structured description of the camera's
  *       available sensors and their properties.
  */
-class AdapterNode : public rclcpp::Node {
+class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
   AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options,
               std::shared_ptr<Zivid::Application> zivid_app);
 
-  std::string get_serial() const { return serial_; }
-
  private:
+  absl::Status Main() override;
+  std::string ColorImageTopic() const override;
+  absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+  BuildDescribeResponse() override ABSL_LOCKS_EXCLUDED(data_mutex_);
+  absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+  BuildSnapshotResponse() override;
+
+  // --- Zivid Specific Implementations ---
+  std::string DepthImageTopic() const;
+  std::string NormalTopic() const;
+
+  void InitializeParameters();
+  rcl_interfaces::msg::SetParametersResult SetParametersCallback(
+      const std::vector<rclcpp::Parameter>& parameters)
+      ABSL_LOCKS_EXCLUDED(capture_params_mutex_);
+  /**
+   * @brief Generates a Zivid settings string in YAML format.
+   * @return A string containing the Zivid settings in YAML format.
+   */
+  std::string GenerateZividSettings() const;
+
   struct CaptureParameters {
     double exposure_time;
     double gain;
@@ -95,54 +113,17 @@ class AdapterNode : public rclcpp::Node {
     }
   };
 
-  rcl_interfaces::msg::SetParametersResult setParametersCallback(
-      const std::vector<rclcpp::Parameter>& parameters);
-  /**
-   * @brief Generates a Zivid settings string in YAML format.
-   * @return A string containing the Zivid settings in YAML format.
-   */
-  std::string GenerateZividSettings() const;
-
-  void DescribeCallback(
-      const std::shared_ptr<rmw_request_id_t> request_header,
-      const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>
-          request,
-      const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
-          response);
-
-  void SnapshotCallback(
-      const std::shared_ptr<rmw_request_id_t> request_header,
-      const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>
-          request,
-      const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
-          response);
-
   /**
    * @brief Triggers a capture and returns the captured data.
    * @return CaptureData on success, or error status on failure.
    */
-  absl::StatusOr<CaptureData> Capture();
-
-  absl::Status Main();
-
-  std::string ColorImageTopic() const;
-
-  std::string DepthImageTopic() const;
-
-  std::string NormalTopic() const;
-
-  std::string serial_;
-
-  // ROS Services
-  rclcpp::CallbackGroup::SharedPtr callback_group_;
-  rclcpp::Service<snapshot_interfaces::srv::Describe>::SharedPtr
-      describe_service_;
-  rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr
-      snapshot_service_;
-
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
+  absl::StatusOr<CaptureData> Capture() ABSL_LOCKS_EXCLUDED(data_mutex_);
 
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
+
+  // Internal client to trigger the Zivid driver
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
+  rclcpp::CallbackGroup::SharedPtr client_cb_group_;
 
   mutable absl::Mutex data_mutex_;
   CaptureData data_ ABSL_GUARDED_BY(data_mutex_);
@@ -156,8 +137,6 @@ class AdapterNode : public rclcpp::Node {
   mutable absl::Mutex capture_params_mutex_;
   CaptureParameters capture_params_ ABSL_GUARDED_BY(capture_params_mutex_);
   std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_;
-
-  std::thread thread_;
 };
 
 }  // namespace flowstate_zivid
