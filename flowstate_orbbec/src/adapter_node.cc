@@ -30,7 +30,6 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(rclcpp::Parameter("serial_number", serial))
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true))
-          .append_parameter_override(rclcpp::Parameter("enable_depth", false))
           .append_parameter_override(rclcpp::Parameter("color_fps", 5))
           .append_parameter_override(rclcpp::Parameter("color_format", "RGB"))
           .append_parameter_override(rclcpp::Parameter("color_width", 1280))
