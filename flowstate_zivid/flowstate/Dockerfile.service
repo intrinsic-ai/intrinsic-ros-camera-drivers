@@ -44,7 +44,7 @@ RUN . /opt/ros/jazzy/setup.sh && \
     python3-rosdep \
     python3-colcon-common-extensions \
     ros-jazzy-ament-cmake-vendor-package \
-    valgrind \
+    valgrind ninja-build\
     && rosdep init && \
     rosdep update && \
     rosdep install --from-paths /opt/ros/underlay/src --ignore-src --rosdistro jazzy -y --skip-keys "snapshot_interfaces OrbbecSDK" && \
@@ -52,6 +52,8 @@ RUN . /opt/ros/jazzy/setup.sh && \
         --continue-on-error \
         --merge-install \
         --packages-up-to intrinsic_sdk \
+        --parallel-workers 2 \
+        --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
         && \
     echo "Searching for and copying vendored libprotobuf..." && \
     find /opt/ros/underlay/build -name "libprotobuf.so.29.0.0" -exec cp {} /opt/ros/underlay/install/lib/ \; && \
@@ -88,7 +90,11 @@ RUN cd /opt/ros/underlay/src/ \
     && apt-get update \
     && rosdep update \
     && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
-    && colcon build --merge-install --packages-up-to=rmw_zenoh_cpp \
+    && colcon build \
+        --merge-install \
+        --packages-up-to=rmw_zenoh_cpp \
+        --parallel-workers 2 \
+        --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /var/lib/apt/lists/*
 
 # overlay stage: underlay + service code built
@@ -111,6 +117,8 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
       --merge-install \
       --packages-above-and-dependencies=${SERVICE_PACKAGE} \
+      --parallel-workers 2 \
+      --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /opt/ros/underlay/src \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
