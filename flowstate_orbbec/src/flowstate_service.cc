@@ -1,7 +1,7 @@
 #include <fstream>
 #include <string>
 
-#include "flowstate/orbbec_driver_config.pb.h"
+#include "flowstate/orbbec_gemini_driver_config.pb.h"
 #include "flowstate_orbbec/spawner_node.h"
 #include "intrinsic/resources/proto/runtime_context.pb.h"
 #include "rclcpp/rclcpp.hpp"
@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     std::cerr << "Unable to parse runtime context file" << std::endl;
     return EXIT_FAILURE;
   }
-  orbbec_driver::OrbbecDriverConfig config;
+  orbbec_gemini_driver::OrbbecGeminiDriverConfig config;
   if (!runtime_context.config().UnpackTo(&config)) {
     std::cerr << "Unable to parse config proto" << std::endl;
     return EXIT_FAILURE;
