@@ -25,8 +25,12 @@ AdapterNode::AdapterNode(const std::string& serial,
   const std::string orbbec_node_name = std::string("orbbec_camera_node");
   const std::string orbbec_ns = std::string("orbbec/camera_") + serial;
 
+  const std::string camera_name = std::string("orbbec_") + serial;
+
   rclcpp::NodeOptions orbbec_node_options =
       rclcpp::NodeOptions()
+          .append_parameter_override(
+              rclcpp::Parameter("camera_name", camera_name))
           .append_parameter_override(rclcpp::Parameter("serial_number", serial))
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true))
@@ -51,11 +55,16 @@ AdapterNode::AdapterNode(const std::string& serial,
           .append_parameter_override(rclcpp::Parameter("right_ir_format", "Y8"))
           .append_parameter_override(rclcpp::Parameter("right_ir_width", 1280))
           .append_parameter_override(rclcpp::Parameter("right_ir_height", 800))
-          .append_parameter_override(rclcpp::Parameter("enable_right_ir", true));
+          .append_parameter_override(
+              rclcpp::Parameter("enable_right_ir", true));
   InitializeParameters();
 
   orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
       orbbec_node_name, orbbec_ns, orbbec_node_options);
+
+  // Create a TF Listener, which will be used to query extrinsics
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
   // Subscribe to color camera info
   color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
@@ -366,12 +375,18 @@ AdapterNode::BuildDescribeResponse() {
         "CameraInfo not yet received (waiting for RGB+IR)");
   }
 
-  response.sensors.push_back(
-      BuildSensorInformation(*color_camera_info_, "rgb", ColorImageTopic()));
+  absl::Status populate_status = PopulateExtrinsicsIfNeeded();
+  if (!populate_status.ok()) {
+    return populate_status;
+  }
+
+  response.sensors.push_back(BuildSensorInformation(
+      *color_camera_info_, "rgb", ColorImageTopic(), *color_transform_));
   response.sensors.push_back(BuildSensorInformation(
       *left_ir_camera_info_, "ir_left", LeftIrImageTopic()));
-  response.sensors.push_back(BuildSensorInformation(
-      *right_ir_camera_info_, "ir_right", RightIrImageTopic()));
+  response.sensors.push_back(
+      BuildSensorInformation(*right_ir_camera_info_, "ir_right",
+                             RightIrImageTopic(), *right_ir_transform_));
 
 #if SEND_DEPTH
   if (depth_camera_info_) {
@@ -470,6 +485,55 @@ AdapterNode::BuildSnapshotResponse() {
 #endif
 
   return response;
+}
+
+// If the extrinsics transforms have not yet been populated, use TF
+// to query them. They should be published shortly after the Orbbec
+// node starts running.
+absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
+  if (color_transform_ && right_ir_transform_) {
+    return absl::OkStatus();
+  }
+
+  const std::string parent_frame =
+      absl::StrFormat("orbbec_%s_depth_frame", serial_);
+  const std::string color_frame =
+      absl::StrFormat("orbbec_%s_color_frame", serial_);
+  const std::string right_ir_frame =
+      absl::StrFormat("orbbec_%s_right_ir_frame", serial_);
+
+  try {
+    geometry_msgs::msg::TransformStamped color_ts = tf_buffer_->lookupTransform(
+        color_frame, parent_frame, tf2::TimePointZero);
+    color_transform_ =
+        std::make_unique<geometry_msgs::msg::Transform>(color_ts.transform);
+
+    geometry_msgs::msg::TransformStamped right_ir_ts =
+        tf_buffer_->lookupTransform(right_ir_frame, parent_frame,
+                                    tf2::TimePointZero);
+    right_ir_transform_ =
+        std::make_unique<geometry_msgs::msg::Transform>(right_ir_ts.transform);
+  } catch (const tf2::TransformException& ex) {
+    return absl::UnavailableError(
+        absl::StrFormat("TF exception: %s", ex.what()));
+  }
+
+  RCLCPP_INFO(get_logger(),
+              "color extrinsics: [%.4f, %.4f, %.4f], [%.4f, %.4f, %.4f, %.4f]",
+              color_transform_->translation.x, color_transform_->translation.y,
+              color_transform_->translation.z, color_transform_->rotation.x,
+              color_transform_->rotation.y, color_transform_->rotation.z,
+              color_transform_->rotation.w);
+
+  RCLCPP_INFO(
+      get_logger(),
+      "right IR extrinsics: [%.4f, %.4f, %.4f], [%.4f, %.4f, %.4f, %.4f]",
+      right_ir_transform_->translation.x, right_ir_transform_->translation.y,
+      right_ir_transform_->translation.z, right_ir_transform_->rotation.x,
+      right_ir_transform_->rotation.y, right_ir_transform_->rotation.z,
+      right_ir_transform_->rotation.w);
+
+  return absl::OkStatus();
 }
 
 }  // namespace flowstate_orbbec
