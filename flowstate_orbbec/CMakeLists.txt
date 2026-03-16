@@ -8,9 +8,10 @@ add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 
 find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
-find_package(cv_bridge REQUIRED)
+find_package(flowstate_camera_common REQUIRED)
 find_package(orbbec_camera REQUIRED)
 find_package(orbbec_camera_msgs REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 find_package(OpenCV 4 REQUIRED
   COMPONENTS
     opencv_core
@@ -22,7 +23,6 @@ find_package(OrbbecSDK REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
-find_package(std_srvs REQUIRED)
 
 find_package(intrinsic_sdk_ros QUIET)
 
@@ -34,19 +34,22 @@ add_library(flowstate_orbbec
 )
 target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
 target_link_libraries(flowstate_orbbec
+  ${flowstate_camera_common_LIBRARIES}
   absl::status
+  absl::statusor
   absl::synchronization
   rclcpp::rclcpp
   ob::OrbbecSDK
   ${orbbec_camera_msgs_TARGETS}
+  ${rcl_interfaces_TARGETS}
   ${sensor_msgs_TARGETS}
   ${snapshot_interfaces_TARGETS}
-  ${std_srvs_TARGETS}
 )
 ament_target_dependencies(flowstate_orbbec
-  cv_bridge
+  flowstate_camera_common
   OpenCV
   orbbec_camera
+  rcl_interfaces
 )
 
 add_executable(spawner_node src/ros_main.cc)

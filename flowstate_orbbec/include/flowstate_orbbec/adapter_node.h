@@ -3,48 +3,41 @@
 
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "absl/status/status.h"
-#include "absl/synchronization/mutex.h"
+#include "absl/status/statusor.h"
+#include "flowstate_common/base_adapter_node.h"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "orbbec_camera_msgs/srv/set_int32.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
-#include "snapshot_interfaces/msg/image_snapshot.hpp"
+#include "sensor_msgs/msg/image.hpp"
 #include "snapshot_interfaces/srv/describe.hpp"
 #include "snapshot_interfaces/srv/snapshot.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 
 namespace flowstate_orbbec {
 
-class AdapterNode : public rclcpp::Node {
+class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
-  AdapterNode(const std::string& serial, const std::string& ip_address);
-
-  bool HasExitedThread() const { return exited_thread_; }
-  bool HasSerial(const std::string& serial) const {
-    return serial_ == serial;
-  }
-  std::string GetSerial() const { return serial_; }
+  AdapterNode(const std::string& serial,
+              const std::vector<std::string>& locators);
 
  private:
-  void DescribeCallback(
-      const std::shared_ptr<rmw_request_id_t> request_header,
-      const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>
-          request,
-      const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
-          response);
+  absl::Status Main() override ABSL_LOCKS_EXCLUDED(timeout_mutex_);
+  std::string ColorImageTopic() const override;
+  absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+  BuildDescribeResponse() override;
+  absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+  BuildSnapshotResponse() override;
 
-  void SnapshotCallback(
-      const std::shared_ptr<rmw_request_id_t> request_header,
-      const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>
-          request,
-      const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
-          response);
+  std::string LeftIrImageTopic() const;
+  std::string RightIrImageTopic() const;
+  std::string DepthImageTopic() const;
 
-  void init_parameters();
+  void InitializeParameters();
 
   rclcpp::node_interfaces::PreSetParametersCallbackHandle::SharedPtr
       pre_set_parameters_callback_handle_;
@@ -59,12 +52,6 @@ class AdapterNode : public rclcpp::Node {
       post_set_parameters_callback_handle_;
   void PostSetParametersCallback(
       const std::vector<rclcpp::Parameter>& parameters);
-
-
-  std::string ColorImageTopic() const;
-  std::string IrImageTopic() const;
-  std::string DepthImageTopic() const;
-  absl::Status Main();
 
   template <typename ServiceType, typename ValueType>
   void CallAsyncSet(std::shared_ptr<rclcpp::Client<ServiceType>> client,
@@ -98,49 +85,42 @@ class AdapterNode : public rclcpp::Node {
         });
   }
 
-  std::string serial_;
-  std::string ip_address_;
   bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
-  std::thread thread_;
-  bool exited_thread_ = false;
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
-  rclcpp::Service<snapshot_interfaces::srv::Describe>::SharedPtr
-      describe_service_;
-  rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr
-      snapshot_service_;
-  rclcpp::TimerBase::SharedPtr liveness_timer_;
+  // IR Data
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> left_ir_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      left_ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> left_ir_image_
+      ABSL_GUARDED_BY(image_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr left_ir_image_sub_;
 
-  mutable absl::Mutex camera_info_mutex_;
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> color_camera_info_;
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> ir_camera_info_;
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_;
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr color_info_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> right_ir_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      right_ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> right_ir_image_
+      ABSL_GUARDED_BY(image_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr right_ir_image_sub_;
+
+  // Depth Data
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_sub_;
-
-  mutable absl::Mutex image_mutex_;
-  std::unique_ptr<sensor_msgs::msg::Image> color_image_;
-  std::unique_ptr<sensor_msgs::msg::Image> ir_image_;
-  std::unique_ptr<sensor_msgs::msg::Image> depth_image_;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_image_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr ir_image_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> depth_image_
+      ABSL_GUARDED_BY(image_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
-
-  mutable absl::Mutex timeout_mutex_;
-  rclcpp::Time t_last_color_image_;
 
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr set_auto_exposure_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_exposure_client_;
-
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr
       set_auto_white_balance_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_white_balance_client_;
-
-  rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
-      set_gain_client_;
+  rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr set_gain_client_;
 };
 
 }  // namespace flowstate_orbbec

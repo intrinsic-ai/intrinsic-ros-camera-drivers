@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
   std::cout << "Creating spawner node..." << std::endl;
   std::shared_ptr<flowstate_luxonis::SpawnerNode> spawner_node =
       std::make_shared<flowstate_luxonis::SpawnerNode>();
+  spawner_node->UpdateCameras();
 
   // In the future, we should set the ip_address parameter with what we
   // find in the context file config proto.

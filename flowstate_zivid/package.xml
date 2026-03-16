@@ -13,6 +13,7 @@
 <depend>std_srvs</depend>
 <depend>zivid_camera</depend>
 <depend>snapshot_interfaces</depend>
+<depend>flowstate_camera_common</depend>
 
 <depend>abseil_cpp_vendor</depend>
 <depend>intrinsic_sdk_ros</depend>
