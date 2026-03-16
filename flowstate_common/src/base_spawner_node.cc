@@ -13,6 +13,12 @@
 
 namespace flowstate_common {
 
+struct DiscoveryResponse {
+  bool success = true;
+  std::string error_message;
+  std::vector<snapshot_interfaces::msg::DiscoveredCamera> cameras;
+};
+
 BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
                                  const std::string& driver_type,
                                  std::chrono::duration<double> update_period,
@@ -22,29 +28,30 @@ BaseSpawnerNode::BaseSpawnerNode(const std::string& node_name,
       create_publisher<snapshot_interfaces::msg::DiscoveryResponse>(
           "/cameras/discovery_responses", 10);
 
-  discovery_sub_ =
-      create_subscription<snapshot_interfaces::msg::DiscoveryRequest>(
-          "/cameras/discovery_request", 10,
-          [this](const snapshot_interfaces::msg::DiscoveryRequest::
-                     ConstSharedPtr /*msg*/) {
-            snapshot_interfaces::msg::DiscoveryResponse response;
+  discovery_sub_ = create_subscription<
+      snapshot_interfaces::msg::DiscoveryRequest>(
+      "/cameras/discovery_request", 10,
+      [this](const snapshot_interfaces::msg::DiscoveryRequest::
+                 ConstSharedPtr /*msg*/) {
+        RCLCPP_INFO(
+            get_logger(),
+            "Received DiscoveryRequest on topic '/cameras/discovery_request'.");
+        snapshot_interfaces::msg::DiscoveryResponse response;
 
-            response.success = true;
-            response.error_message = "";
-            {
-              absl::MutexLock lock(&this->nodes_mutex_);
-              for (const auto& node : spawned_nodes_) {
-                if (node) {
-                  snapshot_interfaces::msg::DiscoveredCamera camera;
-                  camera.driver_type = this->driver_type_;
-                  camera.camera_id = node->GetSerial();
-                  response.cameras.push_back(camera);
-                }
-              }
+        {
+          absl::MutexLock lock(&this->nodes_mutex_);
+          for (const auto& node : spawned_nodes_) {
+            if (node) {
+              snapshot_interfaces::msg::DiscoveredCamera camera;
+              camera.driver_type = this->driver_type_;
+              camera.camera_id = node->GetSerial();
+              response.cameras.push_back(camera);
             }
+          }
+        }
 
-            discovery_pub_->publish(response);
-          });
+        discovery_pub_->publish(response);
+      });
 
   // Initialize Timer
   timer_ =
