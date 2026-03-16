@@ -1,7 +1,7 @@
 #include <fstream>
 #include <string>
 
-#include "flowstate/orbbec_driver_config.pb.h"
+#include "flowstate/orbbec_gemini_driver_config.pb.h"
 #include "flowstate_orbbec/spawner_node.h"
 #include "intrinsic/resources/proto/runtime_context.pb.h"
 #include "rclcpp/rclcpp.hpp"
