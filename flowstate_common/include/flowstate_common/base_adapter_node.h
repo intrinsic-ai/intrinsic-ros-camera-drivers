@@ -10,6 +10,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
@@ -150,7 +151,7 @@ class BaseAdapterNode : public rclcpp::Node {
   /**
    * @brief Helper to pack CameraInfo into the Response.
    * Call this from BuildDescribeResponse() in derived classes to add a sensor
-   * description for the color camera.
+   * description. This form populates camera_t_sensor with a unity transform.
    * @param camera_info CameraInfo message to extract sensor parameters from
    * @param sensor_name Logical name for the sensor (e.g., "rgb")
    * @param topic_name ROS topic name for the sensor's image stream
@@ -159,6 +160,20 @@ class BaseAdapterNode : public rclcpp::Node {
   snapshot_interfaces::msg::SensorInfo BuildSensorInformation(
       const sensor_msgs::msg::CameraInfo& camera_info,
       const std::string& sensor_name, const std::string& topic_name);
+
+  /**
+   * @brief Helper to pack CameraInfo into the Response.
+   * Call this from BuildDescribeResponse() in derived classes to add a sensor
+   * description. This form accepts a camera_t_sensor transform.
+   * @param camera_info CameraInfo message to extract sensor parameters from
+   * @param sensor_name Logical name for the sensor (e.g., "rgb")
+   * @param topic_name ROS topic name for the sensor's image stream
+   * @return SensorInfo message populated with the provided info and parameters
+   */
+  snapshot_interfaces::msg::SensorInfo BuildSensorInformation(
+      const sensor_msgs::msg::CameraInfo& camera_info,
+      const std::string& sensor_name, const std::string& topic_name,
+      const geometry_msgs::msg::TransformStamped& camera_t_sensor);
 
   // Thread management
   std::thread thread_;

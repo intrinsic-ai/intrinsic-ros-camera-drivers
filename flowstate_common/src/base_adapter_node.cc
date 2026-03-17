@@ -99,6 +99,16 @@ snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
   return sensor_info;
 }
 
+snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
+    const sensor_msgs::msg::CameraInfo& camera_info,
+    const std::string& sensor_name, const std::string& topic_name,
+    const geometry_msgs::msg::TransformStamped& camera_t_sensor) {
+  snapshot_interfaces::msg::SensorInfo sensor_info =
+      BuildSensorInformation(camera_info, sensor_name, topic_name);
+  sensor_info.camera_t_sensor = camera_t_sensor;
+  return sensor_info;
+}
+
 void BaseAdapterNode::SnapshotCallback(
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>,
