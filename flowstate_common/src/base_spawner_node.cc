@@ -49,7 +49,7 @@ BaseSpawnerNode::~BaseSpawnerNode() {
   RCLCPP_INFO(get_logger(), "Camera SpawnerNode shutdown complete");
 }
 
-bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
+bool BaseSpawnerNode::IsAlreadySpawned(std::string_view serial) const {
   for (const auto& node : spawned_nodes_) {
     // Uses the helper from BaseAdapterNode
     if (node && serial == node->GetSerial()) {

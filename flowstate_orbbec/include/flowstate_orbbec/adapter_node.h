@@ -8,6 +8,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "flowstate_common/base_adapter_node.h"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "orbbec_camera_msgs/srv/set_int32.hpp"
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
@@ -17,6 +18,8 @@
 #include "snapshot_interfaces/srv/describe.hpp"
 #include "snapshot_interfaces/srv/snapshot.hpp"
 #include "std_srvs/srv/set_bool.hpp"
+#include "tf2_ros/buffer.hpp"
+#include "tf2_ros/transform_listener.hpp"
 
 namespace flowstate_orbbec {
 
@@ -33,7 +36,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
   BuildSnapshotResponse() override;
 
-  std::string IrImageTopic() const;
+  std::string LeftIrImageTopic() const;
+  std::string RightIrImageTopic() const;
   std::string DepthImageTopic() const;
 
   void InitializeParameters();
@@ -84,16 +88,27 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
         });
   }
 
+  absl::Status PopulateExtrinsicsIfNeeded();
+
   bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
   // IR Data
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> ir_camera_info_
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> left_ir_camera_info_
       ABSL_GUARDED_BY(camera_info_mutex_);
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr ir_info_sub_;
-  std::unique_ptr<sensor_msgs::msg::Image> ir_image_
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      left_ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> left_ir_image_
       ABSL_GUARDED_BY(image_mutex_);
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr ir_image_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr left_ir_image_sub_;
+
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> right_ir_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      right_ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> right_ir_image_
+      ABSL_GUARDED_BY(image_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr right_ir_image_sub_;
 
   // Depth Data
   std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_
@@ -111,6 +126,11 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_white_balance_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr set_gain_client_;
+
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  std::unique_ptr<geometry_msgs::msg::TransformStamped> color_transform_;
+  std::unique_ptr<geometry_msgs::msg::TransformStamped> right_ir_transform_;
 };
 
 }  // namespace flowstate_orbbec

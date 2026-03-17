@@ -344,12 +344,12 @@ AdapterNode::BuildDescribeResponse() {
 
   // Color sensor info
   response.sensors.push_back(
-      SensorInformation(*info_copy, "rgb", ColorImageTopic()));
+      BuildSensorInformation(*info_copy, "rgb", ColorImageTopic()));
   // Depth sensor info
   response.sensors.push_back(
-      SensorInformation(*info_copy, "depth", DepthImageTopic()));
+      BuildSensorInformation(*info_copy, "depth", DepthImageTopic()));
   response.sensors.push_back(
-      SensorInformation(*info_copy, "normal", NormalTopic()));
+      BuildSensorInformation(*info_copy, "normal", NormalTopic()));
 
   return response;
 }

@@ -90,6 +90,9 @@ absl::Status AdapterNode::Main() {
       });
 
   executor.add_node(this->get_node_base_interface());
+  // luxonis_node_ is already a managed std::shared_ptr<rclcpp::Node>.
+  // The executor's overloaded add_node() natively accepts it, making
+  // an explicit ->get_node_base_interface() call redundant.
   executor.add_node(luxonis_node_);  //->get_node_base_interface());
   executor.spin();
   return absl::OkStatus();
@@ -104,7 +107,7 @@ AdapterNode::BuildDescribeResponse() {
   }
 
   response.sensors.push_back(
-      SensorInformation(*color_camera_info_, "color", ColorImageTopic()));
+      BuildSensorInformation(*color_camera_info_, "color", ColorImageTopic()));
   return response;
 }
 

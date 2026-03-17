@@ -7,5 +7,5 @@ fi
 set -o errexit
 set -o verbose
 src/sdk-ros/scripts/setup_docker.sh
-src/sdk-ros/scripts/build_container.sh --service_name orbbec_driver --service_package flowstate_orbbec --dockerfile src/flowstate-ros-camera-drivers/flowstate_orbbec/flowstate/Dockerfile.flowstate_service
-src/sdk-ros/scripts/build_bundle.sh --service_name orbbec_driver --service_package flowstate_orbbec
+src/sdk-ros/scripts/build_container.sh --service_name orbbec_gemini_driver --service_package flowstate_orbbec --dockerfile src/flowstate-ros-camera-drivers/flowstate_orbbec/flowstate/Dockerfile.flowstate_service
+src/sdk-ros/scripts/build_bundle.sh --service_name orbbec_gemini_driver --service_package flowstate_orbbec

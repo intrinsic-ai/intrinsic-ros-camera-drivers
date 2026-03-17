@@ -91,7 +91,7 @@ class BaseSpawnerNode : public rclcpp::Node {
   std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> spawned_nodes_
       ABSL_GUARDED_BY(nodes_mutex_);
 
-  bool IsAlreadySpawned(const std::string& serial) const
+  bool IsAlreadySpawned(std::string_view serial) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
   void CleanupDeadNodes(const std::vector<std::string>& current_serials)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);

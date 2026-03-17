@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package orbbec_gemini_driver;
+
+message OrbbecGeminiDriverConfig {
+  repeated string ip_address = 1;
+}

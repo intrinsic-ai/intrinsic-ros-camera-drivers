@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package orbbec_driver;
-
-message OrbbecDriverConfig {
-  repeated string ip_address = 1;
-}
