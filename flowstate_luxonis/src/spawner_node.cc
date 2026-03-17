@@ -15,7 +15,7 @@ namespace flowstate_luxonis {
 
 SpawnerNode::SpawnerNode()
     : flowstate_common::BaseSpawnerNode("luxonis_spawner", "luxonis",
-                                        std::chrono::seconds(10)) {}
+                                        std::chrono::seconds(20)) {}
 
 std::string SpawnerNode::DeviceStateToString(XLinkDeviceState_t state) {
   switch (state) {
@@ -36,7 +36,7 @@ std::string SpawnerNode::DeviceStateToString(XLinkDeviceState_t state) {
 
 std::vector<std::string> SpawnerNode::GetSerials() {
   std::vector<std::string> serials;
-  std::vector<dai::DeviceInfo> devices = dai::Device::getAllAvailableDevices();
+  std::vector<dai::DeviceInfo> devices = dai::Device::getAllConnectedDevices();
   for (const auto& device_info : devices) {
     serials.push_back(device_info.deviceId);
   }

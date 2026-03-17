@@ -84,7 +84,7 @@ void BaseAdapterNode::DescribeCallback(
   response->success = true;
 }
 
-snapshot_interfaces::msg::SensorInfo BaseAdapterNode::SensorInformation(
+snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
     const sensor_msgs::msg::CameraInfo& camera_info,
     const std::string& sensor_name, const std::string& topic_name) {
   snapshot_interfaces::msg::SensorInfo sensor_info;
@@ -96,6 +96,16 @@ snapshot_interfaces::msg::SensorInfo BaseAdapterNode::SensorInformation(
       1.0;  // todo: get static transform
 
   sensor_info.info.push_back(camera_info);
+  return sensor_info;
+}
+
+snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
+    const sensor_msgs::msg::CameraInfo& camera_info,
+    const std::string& sensor_name, const std::string& topic_name,
+    const geometry_msgs::msg::TransformStamped& camera_t_sensor) {
+  snapshot_interfaces::msg::SensorInfo sensor_info =
+      BuildSensorInformation(camera_info, sensor_name, topic_name);
+  sensor_info.camera_t_sensor = camera_t_sensor;
   return sensor_info;
 }
 
