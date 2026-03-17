@@ -51,6 +51,7 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
       --merge-install \
       --packages-above-and-dependencies=${SERVICE_PACKAGE} \
+      --packages-skip intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor \
       --parallel-workers 2 \
       --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /opt/ros/underlay/src \
