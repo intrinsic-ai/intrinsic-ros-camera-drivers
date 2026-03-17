@@ -1,0 +1,59 @@
+name: Build and Push Underlays
+
+on:
+  workflow_dispatch: # Allows you to run this manually from the GitHub UI
+  push:
+    paths:
+      - '**/Dockerfile.zivid_underlay'
+      # Add paths to sdk-ros submodules or dependency lists here if needed
+
+jobs:
+  build-zivid-underlay:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write # Critical: allows pushing to GHCR
+
+    steps:
+      - name: Create Workspace Directory
+        run: mkdir -p workspace/src
+
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+
+      - name: Checkout Camera Drivers
+        uses: actions/checkout@v4
+        with:
+          path: workspace/src/flowstate-ros-camera-drivers
+
+      - name: Checkout sdk-ros
+        uses: actions/checkout@v4
+        with:
+          repository: intrinsic-ai/sdk-ros
+          path: workspace/src/sdk-ros
+
+      - name: Clone Zivid Dependencies
+        working-directory: workspace/src
+        run: git clone https://github.com/zivid/zivid-ros.git
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Zivid Underlay
+        uses: docker/build-push-action@v5
+        with:
+          context: workspace
+          file: workspace/src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/Dockerfile.zivid_underlay
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/zivid-underlay:latest
