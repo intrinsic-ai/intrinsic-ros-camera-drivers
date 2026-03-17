@@ -10,7 +10,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
-#include "geometry_msgs/msg/transform.hpp"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
@@ -173,7 +173,7 @@ class BaseAdapterNode : public rclcpp::Node {
   snapshot_interfaces::msg::SensorInfo BuildSensorInformation(
       const sensor_msgs::msg::CameraInfo& camera_info,
       const std::string& sensor_name, const std::string& topic_name,
-      const geometry_msgs::msg::Transform& camera_t_sensor);
+      const geometry_msgs::msg::TransformStamped& camera_t_sensor);
 
   // Thread management
   std::thread thread_;

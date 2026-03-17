@@ -102,7 +102,7 @@ snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
 snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
     const sensor_msgs::msg::CameraInfo& camera_info,
     const std::string& sensor_name, const std::string& topic_name,
-    const geometry_msgs::msg::Transform& camera_t_sensor) {
+    const geometry_msgs::msg::TransformStamped& camera_t_sensor) {
   snapshot_interfaces::msg::SensorInfo sensor_info =
       BuildSensorInformation(camera_info, sensor_name, topic_name);
   sensor_info.camera_t_sensor = camera_t_sensor;

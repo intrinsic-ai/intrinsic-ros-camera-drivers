@@ -4,6 +4,7 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
 #include "rcl_interfaces/msg/floating_point_range.hpp"
@@ -503,16 +504,13 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
       absl::StrFormat("orbbec_%s_right_ir_frame", serial_);
 
   try {
-    geometry_msgs::msg::TransformStamped color_ts = tf_buffer_->lookupTransform(
-        color_frame, parent_frame, tf2::TimePointZero);
-    color_transform_ =
-        std::make_unique<geometry_msgs::msg::Transform>(color_ts.transform);
-
-    geometry_msgs::msg::TransformStamped right_ir_ts =
-        tf_buffer_->lookupTransform(right_ir_frame, parent_frame,
-                                    tf2::TimePointZero);
+    color_transform_ = std::make_unique<geometry_msgs::msg::TransformStamped>(
+        tf_buffer_->lookupTransform(color_frame, parent_frame,
+                                    tf2::TimePointZero));
     right_ir_transform_ =
-        std::make_unique<geometry_msgs::msg::Transform>(right_ir_ts.transform);
+        std::make_unique<geometry_msgs::msg::TransformStamped>(
+            tf_buffer_->lookupTransform(right_ir_frame, parent_frame,
+                                        tf2::TimePointZero));
   } catch (const tf2::TransformException& ex) {
     return absl::UnavailableError(
         absl::StrFormat("TF exception: %s", ex.what()));
@@ -520,18 +518,24 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
 
   RCLCPP_INFO(get_logger(),
               "color extrinsics: [%.4f, %.4f, %.4f], [%.4f, %.4f, %.4f, %.4f]",
-              color_transform_->translation.x, color_transform_->translation.y,
-              color_transform_->translation.z, color_transform_->rotation.x,
-              color_transform_->rotation.y, color_transform_->rotation.z,
-              color_transform_->rotation.w);
+              color_transform_->transform.translation.x,
+              color_transform_->transform.translation.y,
+              color_transform_->transform.translation.z,
+              color_transform_->transform.rotation.x,
+              color_transform_->transform.rotation.y,
+              color_transform_->transform.rotation.z,
+              color_transform_->transform.rotation.w);
 
   RCLCPP_INFO(
       get_logger(),
       "right IR extrinsics: [%.4f, %.4f, %.4f], [%.4f, %.4f, %.4f, %.4f]",
-      right_ir_transform_->translation.x, right_ir_transform_->translation.y,
-      right_ir_transform_->translation.z, right_ir_transform_->rotation.x,
-      right_ir_transform_->rotation.y, right_ir_transform_->rotation.z,
-      right_ir_transform_->rotation.w);
+      right_ir_transform_->transform.translation.x,
+      right_ir_transform_->transform.translation.y,
+      right_ir_transform_->transform.translation.z,
+      right_ir_transform_->transform.rotation.x,
+      right_ir_transform_->transform.rotation.y,
+      right_ir_transform_->transform.rotation.z,
+      right_ir_transform_->transform.rotation.w);
 
   return absl::OkStatus();
 }

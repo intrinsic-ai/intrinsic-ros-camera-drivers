@@ -8,7 +8,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "flowstate_common/base_adapter_node.h"
-#include "geometry_msgs/msg/transform.hpp"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "orbbec_camera_msgs/srv/set_int32.hpp"
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
@@ -129,8 +129,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-  std::unique_ptr<geometry_msgs::msg::Transform> color_transform_;
-  std::unique_ptr<geometry_msgs::msg::Transform> right_ir_transform_;
+  std::unique_ptr<geometry_msgs::msg::TransformStamped> color_transform_;
+  std::unique_ptr<geometry_msgs::msg::TransformStamped> right_ir_transform_;
 };
 
 }  // namespace flowstate_orbbec
