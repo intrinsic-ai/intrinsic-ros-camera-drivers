@@ -1,8 +1,8 @@
 # Build up the service with these stages:
-#   - base (ros:jazzy + settings) ->
-#   - underlay (dependencies) ->
-#   - overlay (user code) ->
-#   - result (base + copied install folder of underlay and overlay)
+#   - base (NVIDIA CUDA + ROS Jazzy + configs) ->
+#   - underlay (PULLED from GHCR, contains heavy dependencies) ->
+#   - overlay (user service code built on top of underlay) ->
+#   - result (base + copied install folders of underlay and overlay)
 
 # base stage: ros:jazzy + configs
 # base stage: NVIDIA CUDA base + ROS Jazzy + configs
@@ -28,71 +28,8 @@ ENV ROS_DISTRO=jazzy
 ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 
-# underlay stage: base + dependencies built
-FROM base AS underlay
-
-ARG ZIVID_VERSION
-ADD src/zivid-ros /opt/ros/underlay/src/zivid-ros
-ADD src/flowstate-ros-camera-drivers /opt/ros/underlay/src/flowstate-ros-camera-drivers
-ADD src/sdk-ros /opt/ros/underlay/src/sdk-ros
-
-# Install build dependencies AND pre-compiled system packages for gRPC/Protobuf/Abseil
-RUN . /opt/ros/jazzy/setup.sh && \
-    apt-get update && \
-    apt-get install -y \
-    ocl-icd-libopencl1 gcc g++ clinfo \
-    python3-rosdep \
-    python3-colcon-common-extensions \
-    ros-jazzy-ament-cmake-vendor-package \
-    valgrind ninja-build \
-    libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev protobuf-compiler libabsl-dev \
-    && rosdep init && \
-    rosdep update && \
-    rosdep install --from-paths /opt/ros/underlay/src --ignore-src --rosdistro jazzy -y --skip-keys "snapshot_interfaces OrbbecSDK" && \
-    colcon build \
-        --continue-on-error \
-        --merge-install \
-        --packages-up-to intrinsic_sdk \
-        --parallel-workers 2 \
-        --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-        && \
-    rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /var/lib/apt/lists/* /root/.ros/rosdep
-
-# Configure OpenCL for NVIDIA GPU
-RUN mkdir -p /etc/OpenCL/vendors && \
-    echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
-
-# Set environment for NVIDIA GPU access during build
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-
-RUN apt-get update && apt-get install -y wget && \
-    wget \
-    https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid_${ZIVID_VERSION}_amd64.deb \
-    https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-studio_${ZIVID_VERSION}_amd64.deb \
-    https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-tools_${ZIVID_VERSION}_amd64.deb \
-    https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-genicam_${ZIVID_VERSION}_amd64.deb && \
-    apt-get install -y ./*.deb && \
-    rm ./*.deb && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set LD_LIBRARY_PATH to include NVIDIA libraries for OpenCL discovery during build
-ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
-
-# install rmw_zenoh
-RUN cd /opt/ros/underlay/src/ \
-    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ../.. \
-    && . /opt/ros/jazzy/setup.sh \
-    && apt-get update \
-    && rosdep update \
-    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
-    && colcon build \
-        --merge-install \
-        --packages-up-to=rmw_zenoh_cpp \
-        --parallel-workers 2 \
-        --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /var/lib/apt/lists/*
+# underlay stage: pull pre-built dependencies from GHCR
+FROM ghcr.io/intrinsic-dev/zivid-underlay:latest AS underlay
 
 # overlay stage: underlay + service code built
 FROM underlay AS overlay
@@ -143,7 +80,6 @@ RUN apt-get clean \
     ros-jazzy-image-transport-plugins \
     ocl-icd-libopencl1 \
     ros-jazzy-std-srvs \
-    libgrpc++-dev libprotobuf-dev libabsl-dev \
     wget && \
     # Download and install Zivid SDK runtime dependencies
     wget -O zivid.deb https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid_${ZIVID_VERSION}_amd64.deb && \
