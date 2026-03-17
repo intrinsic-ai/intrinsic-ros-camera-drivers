@@ -2,7 +2,7 @@ name: Camera Drivers Presubmit
 
 on:
   pull_request:
-    branches: [ main, sprivas/simplify-cameradrivers ] # TODO remove sprivas/simplify-cameradrivers before merge
+    branches: [ main ]
   push:
     branches: [ main ]
 

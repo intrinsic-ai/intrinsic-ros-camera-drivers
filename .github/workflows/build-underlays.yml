@@ -1,7 +1,7 @@
 name: Build and Push Underlays
 
 on:
-  workflow_dispatch: # Allows you to run this manually from the GitHub UI
+  workflow_dispatch:
   push:
     paths:
       - '**/Dockerfile.zivid_underlay'
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: write # Critical: allows pushing to GHCR
+      packages: write
 
     steps:
       - name: Create Workspace Directory
