@@ -8,6 +8,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "flowstate_common/base_adapter_node.h"
+#include "flowstate_orbbec/orbbec_startup_parameters.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "orbbec_camera_msgs/srv/set_int32.hpp"
@@ -90,6 +91,11 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   absl::Status PopulateExtrinsicsIfNeeded();
 
+  std::string OrbbecNodeNamespace();
+
+  void CreateOrbbecNode();
+  void DestroyOrbbecNode();
+
   bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
@@ -132,6 +138,18 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   std::unique_ptr<geometry_msgs::msg::TransformStamped> color_transform_;
   std::unique_ptr<geometry_msgs::msg::TransformStamped> left_ir_transform_;
   std::unique_ptr<geometry_msgs::msg::TransformStamped> right_ir_transform_;
+
+  // Some parameters can only be set at node launch time. We will keep these
+  // in an object, along with its own "has_changed" flag, to indicate when the
+  // internal OBCameraNodeDriver must be re-created.
+  OrbbecStartupParameters startup_parameters_;
+
+  rclcpp::Time t_last_right_ir_image_ ABSL_GUARDED_BY(timeout_mutex_);
+  rclcpp::Time t_last_left_ir_image_ ABSL_GUARDED_BY(timeout_mutex_);
+  rclcpp::Time t_last_depth_image_ ABSL_GUARDED_BY(timeout_mutex_);
+
+  std::unique_ptr<std::thread> orbbec_thread_;
+  std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> orbbec_executor_;
 };
 
 }  // namespace flowstate_orbbec
