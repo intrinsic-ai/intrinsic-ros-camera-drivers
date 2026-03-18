@@ -1,0 +1,33 @@
+FROM ros:jazzy-ros-core AS underlay
+
+WORKDIR /opt/ros/underlay
+ENV ROS_DISTRO=jazzy
+ENV ROS_HOME=/tmp
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+
+# Install build tools
+RUN apt-get update && apt install -y \
+    clang ros-jazzy-ament-cmake-vendor-package ros-dev-tools git wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rosdep init && rosdep update
+
+# Add the shared heavy source code
+ADD src/sdk-ros /opt/ros/underlay/src/intrinsic_sdk_ros
+
+# Install the custom rmw_zenoh fork
+RUN cd /opt/ros/underlay/src/ \
+    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format \
+    && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4
+
+# Install rosdep dependencies for these core packages
+RUN . /opt/ros/jazzy/setup.sh \
+    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build the core packages (this is the slow step you only want to do once!)
+RUN . /opt/ros/jazzy/setup.sh \
+    && colcon build \
+        --merge-install \
+        --packages-up-to intrinsic_sdk_ros snapshot_interfaces rmw_zenoh_cpp \
+        --cmake-args -DCMAKE_BUILD_TYPE=Release
