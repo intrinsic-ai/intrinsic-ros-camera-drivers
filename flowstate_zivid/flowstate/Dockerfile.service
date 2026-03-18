@@ -45,7 +45,6 @@ RUN apt-get clean \
 
 ADD src /opt/ros/overlay/src
 
-RUN rm -rf /opt/ros/overlay/src/sdk-ros
 
 RUN . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
@@ -53,6 +52,24 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
       --merge-install \
       --packages-above-and-dependencies=${SERVICE_PACKAGE} \
+      --packages-skip \
+        intrinsic_sdk \
+        intrinsic_sdk_ros \
+        intrinsic_sdk_cmake \
+        grpc_vendor \
+        abseil_cpp_vendor \
+        re2_vendor \
+        rmw_zenoh_cpp \
+        ortools_vendor \
+        eigen_vendor \
+        gz_make_vendor \
+        gz_utils_vendor \
+        intrinsic_pybind11_vendor \
+        gz_math_vendor \
+        prometheus_cpp_vendor \
+        bazelisk_vendor \
+        flatbuffers_vendor \
+        opencensus_cpp_vendor \      
       --parallel-workers 2 \
       --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /opt/ros/underlay/src \
