@@ -56,6 +56,7 @@ RUN . /opt/ros/jazzy/setup.sh \
         intrinsic_sdk \
         intrinsic_sdk_ros \
         intrinsic_sdk_cmake \
+        gz_msgs_vendor \
         grpc_vendor \
         abseil_cpp_vendor \
         re2_vendor \

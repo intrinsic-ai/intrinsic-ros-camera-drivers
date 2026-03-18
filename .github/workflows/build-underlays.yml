@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - '**/Dockerfile.zivid_underlay'
-      # Add paths to sdk-ros submodules or dependency lists here if needed
+      - '**/Dockerfile.core_underlay'
 
 jobs:
   build-zivid-underlay:
