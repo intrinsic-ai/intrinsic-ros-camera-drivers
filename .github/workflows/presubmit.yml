@@ -73,7 +73,7 @@ jobs:
         working-directory: workspace/src
         run: |
           if [ "${{ matrix.camera }}" == "orbbec" ]; then
-            git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
+            git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install
             git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
             
           elif [ "${{ matrix.camera }}" == "luxonis" ]; then
