@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - '**/Dockerfile.zivid_underlay'
-      - '**/Dockerfile.core_underlay'
+      - 'core_builds/Dockerfile.core_underlay'
 
 jobs:
   build-underlays:

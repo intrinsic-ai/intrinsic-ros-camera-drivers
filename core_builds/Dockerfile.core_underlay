@@ -21,7 +21,8 @@ RUN cd /opt/ros/underlay/src/ \
     && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4
 
 # Install rosdep dependencies for these core packages
-RUN . /opt/ros/jazzy/setup.sh \
+RUN apt-get update \
+    && . /opt/ros/jazzy/setup.sh \
     && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
     && rm -rf /var/lib/apt/lists/*
 
