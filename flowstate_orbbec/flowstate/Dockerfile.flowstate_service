@@ -12,39 +12,7 @@ WORKDIR /opt/ros/underlay
 ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 
-# underlay stage: base + dependencies built
-FROM base AS underlay
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && apt-get update \
-    && apt install -y clang ros-jazzy-ament-cmake-vendor-package ros-dev-tools \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN rosdep init
-
-ADD src/sdk-ros /opt/ros/underlay/src/intrinsic_sdk_ros
-
-# Install a compatible fork of rmw_zenoh
-RUN cd /opt/ros/underlay/src/ \
-    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ../..
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && apt-get update \
-    && rosdep update \
-    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build \
-        --merge-install \
-        --packages-up-to intrinsic_sdk_ros snapshot_interfaces \
-        --cmake-args -DCMAKE_BUILD_TYPE=Release
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build \
-        --merge-install \
-        --packages-up-to=rmw_zenoh_cpp \
-        --cmake-args -DCMAKE_BUILD_TYPE=Release
+FROM ghcr.io/intrinsic-dev/core-underlay:latest AS underlay
 
 # overlay stage: underlay + service code built
 FROM underlay AS overlay
@@ -68,7 +36,25 @@ RUN . /opt/ros/jazzy/setup.sh \
       --merge-install \
       --executor sequential \
       --packages-up-to=${SERVICE_PACKAGE} \
-      --packages-skip intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor \
+      --packages-skip \
+        intrinsic_sdk \
+        intrinsic_sdk_ros \
+        intrinsic_sdk_cmake \
+        gz_msgs_vendor \
+        grpc_vendor \
+        abseil_cpp_vendor \
+        re2_vendor \
+        rmw_zenoh_cpp \
+        ortools_vendor \
+        eigen_vendor \
+        gz_make_vendor \
+        gz_utils_vendor \
+        intrinsic_pybind11_vendor \
+        gz_math_vendor \
+        prometheus_cpp_vendor \
+        bazelisk_vendor \
+        flatbuffers_vendor \
+        opencensus_cpp_vendor \
       --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DCMAKE_BUILD_TYPE=Release
 
 # result stage: base + copied install folders from the overlay + service setup
