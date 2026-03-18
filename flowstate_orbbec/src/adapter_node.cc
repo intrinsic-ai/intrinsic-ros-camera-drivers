@@ -384,7 +384,7 @@ AdapterNode::BuildDescribeResponse() {
   response.sensors.push_back(BuildSensorInformation(
       *color_camera_info_, "rgb", ColorImageTopic(), *color_transform_));
   response.sensors.push_back(BuildSensorInformation(
-      *left_ir_camera_info_, "ir_left", LeftIrImageTopic(), *depth_transform_));
+      *left_ir_camera_info_, "ir_left", LeftIrImageTopic(), *left_ir_transform_));
   response.sensors.push_back(
       BuildSensorInformation(*right_ir_camera_info_, "ir_right",
                              RightIrImageTopic(), *right_ir_transform_));
@@ -392,7 +392,7 @@ AdapterNode::BuildDescribeResponse() {
 #if SEND_DEPTH
   if (depth_camera_info_) {
     response.sensors.push_back(BuildSensorInformation(
-        *depth_camera_info_, "depth", DepthImageTopic(), *depth_transform_));
+        *depth_camera_info_, "depth", DepthImageTopic(), *left_ir_transform_));
   }
 #endif
 
@@ -496,25 +496,23 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
     return absl::OkStatus();
   }
 
-  const std::string camera_frame =
-      absl::StrFormat("orbbec_%s_depth_frame", serial_);
   const std::string color_frame =
       absl::StrFormat("orbbec_%s_color_optical_frame", serial_);
   const std::string right_ir_frame =
       absl::StrFormat("orbbec_%s_right_ir_optical_frame", serial_);
-  const std::string depth_frame =
+  const std::string left_ir_frame =
       absl::StrFormat("orbbec_%s_depth_optical_frame", serial_);
 
   try {
     color_transform_ = std::make_unique<geometry_msgs::msg::TransformStamped>(
-        tf_buffer_->lookupTransform(color_frame, camera_frame,
+        tf_buffer_->lookupTransform(color_frame, color_frame,
                                     tf2::TimePointZero));
     right_ir_transform_ =
         std::make_unique<geometry_msgs::msg::TransformStamped>(
-            tf_buffer_->lookupTransform(right_ir_frame, camera_frame,
+            tf_buffer_->lookupTransform(right_ir_frame, color_frame,
                                         tf2::TimePointZero));
-    depth_transform_ = std::make_unique<geometry_msgs::msg::TransformStamped>(
-        tf_buffer_->lookupTransform(depth_frame, camera_frame,
+    left_ir_transform_ = std::make_unique<geometry_msgs::msg::TransformStamped>(
+        tf_buffer_->lookupTransform(left_ir_frame, color_frame,
                                     tf2::TimePointZero));
   } catch (const tf2::TransformException& ex) {
     return absl::UnavailableError(
@@ -533,7 +531,7 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
 
   RCLCPP_INFO(
       get_logger(),
-      "right IR extrinsics: [%.4f, %.4f, %.4f], [%.4f, %.4f, %.4f, %.4f]",
+      "right_ir extrinsics: [%.4f, %.4f, %.4f], [%.4f, %.4f, %.4f, %.4f]",
       right_ir_transform_->transform.translation.x,
       right_ir_transform_->transform.translation.y,
       right_ir_transform_->transform.translation.z,
@@ -542,15 +540,16 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
       right_ir_transform_->transform.rotation.z,
       right_ir_transform_->transform.rotation.w);
 
-  RCLCPP_INFO(get_logger(),
-              "depth extrinsics: [%.4f, %.4f, %.4f], [%.4f, %.4f, %.4f, %.4f]",
-              depth_transform_->transform.translation.x,
-              depth_transform_->transform.translation.y,
-              depth_transform_->transform.translation.z,
-              depth_transform_->transform.rotation.x,
-              depth_transform_->transform.rotation.y,
-              depth_transform_->transform.rotation.z,
-              depth_transform_->transform.rotation.w);
+  RCLCPP_INFO(
+      get_logger(),
+      "left_ir extrinsics: [%.4f, %.4f, %.4f], [%.4f, %.4f, %.4f, %.4f]",
+      left_ir_transform_->transform.translation.x,
+      left_ir_transform_->transform.translation.y,
+      left_ir_transform_->transform.translation.z,
+      left_ir_transform_->transform.rotation.x,
+      left_ir_transform_->transform.rotation.y,
+      left_ir_transform_->transform.rotation.z,
+      left_ir_transform_->transform.rotation.w);
 
   return absl::OkStatus();
 }
