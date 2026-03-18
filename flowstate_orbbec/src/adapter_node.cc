@@ -4,6 +4,7 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
+#include "flowstate_orbbec/spawner_node.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
@@ -650,6 +651,7 @@ void AdapterNode::DestroyOrbbecNode() {
 }
 
 void AdapterNode::CreateOrbbecNode() {
+  absl::MutexLock lock(&SpawnerNode::s_discovery_mutex);
   RCLCPP_INFO(get_logger(), "Creating Orbbec node for %s", serial_.c_str());
   if (orbbec_node_) {
     RCLCPP_INFO(get_logger(), "Orbbec node already existed. Destroying it");

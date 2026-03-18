@@ -6,11 +6,14 @@
 #include <string>
 #include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "flowstate_orbbec/adapter_node.h"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_orbbec {
+
+ABSL_CONST_INIT absl::Mutex SpawnerNode::s_discovery_mutex(absl::kConstInit);
 
 SpawnerNode::SpawnerNode()
     : flowstate_common::BaseSpawnerNode("orbbec_spawner", "orbbec",
@@ -18,6 +21,8 @@ SpawnerNode::SpawnerNode()
 }
 
 std::vector<std::string> SpawnerNode::GetSerials() {
+  absl::MutexLock lock(&s_discovery_mutex);
+  RCLCPP_INFO(get_logger(), "flowstate_orbbec::SpawnerNode::GetSerials() entry");
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();
   std::vector<std::string> serials;
@@ -27,11 +32,13 @@ std::vector<std::string> SpawnerNode::GetSerials() {
       serials.push_back(list->serialNumber(i));
     }
   }
+  RCLCPP_INFO(get_logger(), "flowstate_orbbec::SpawnerNode::GetSerials() exit");
   return serials;
 }
 
 std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> 
 SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
+  RCLCPP_INFO(get_logger(), "flowstate_orbbec::SpawnerNode::SpawnNodes()");
   std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> new_nodes;
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();
