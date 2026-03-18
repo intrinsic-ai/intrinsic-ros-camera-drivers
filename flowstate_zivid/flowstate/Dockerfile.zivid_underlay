@@ -47,7 +47,7 @@ RUN apt-get update && apt-get install -y wget && \
 
 ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
-# Install rmw_zenoh
+# Install rmw_zenoh test
 RUN cd /opt/ros/underlay/src/ && \
     git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && \
     cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ../.. && \
