@@ -26,7 +26,26 @@ AdapterNode::AdapterNode(const std::string& serial,
                          const std::vector<std::string>& locators)
     : flowstate_common::BaseAdapterNode(serial, locators, "orbbec") {
   InitializeParameters();
-  CreateOrbbecNode();
+
+  absl::MutexLock lock(&SpawnerNode::s_discovery_mutex);
+  RCLCPP_INFO(get_logger(), "Creating OBCameraNodeDriver for %s", serial_.c_str());
+  try {
+    orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
+        std::string(kOrbbecNodeName), OrbbecNodeNamespace(),
+        CreateOrbbecNodeOptions(serial_));
+  } catch (...) {
+    RCLCPP_FATAL(get_logger(), "Some exception happened");
+  }
+#if 0
+  orbbec_thread_ = std::make_unique<std::thread>([this]() {
+    this->orbbec_executor_ =
+        std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
+    this->orbbec_executor_->add_node(
+        this->orbbec_node_->get_node_base_interface());
+    this->orbbec_executor_->spin();
+  });
+  rclcpp::sleep_for(std::chrono::seconds(2));
+#endif
 
   // Create a TF Listener, which will be used to query extrinsics
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -110,6 +129,10 @@ AdapterNode::AdapterNode(const std::string& serial,
   StartExecutorThread();
 }
 
+AdapterNode::~AdapterNode() {
+  RCLCPP_INFO(get_logger(), "AdapterNode dtor");
+}
+
 std::string AdapterNode::ColorImageTopic() const {
   return absl::StrFormat("/orbbec/camera_%s/color/image_raw", serial_);
 }
@@ -139,6 +162,15 @@ void AdapterNode::InitializeParameters() {
 
   set_gain_client_ = create_client<orbbec_camera_msgs::srv::SetInt32>(
       absl::StrFormat("/orbbec/camera_%s/set_color_gain", serial_));
+
+  toggle_color_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/toggle_color", serial_));
+  toggle_depth_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/toggle_depth", serial_));
+  toggle_left_ir_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/toggle_left_ir", serial_));
+  toggle_right_ir_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/toggle_right_ir", serial_));
 
   pre_set_parameters_callback_handle_ =
       add_pre_set_parameters_callback(std::bind(
@@ -360,26 +392,16 @@ void AdapterNode::PostSetParametersCallback(
     } else if (parameter.get_name() == "gain") {
       CallAsyncSet(set_gain_client_, parameter.as_int());
     } else if (parameter.get_name() == "fps") {
-      const absl::Status status =
-          startup_parameters_.SetFps(parameter.as_int());
-      if (!status.ok()) {
-        RCLCPP_ERROR(get_logger(), std::string(status.message()).c_str());
-      }
+      RCLCPP_WARN(get_logger(), "fps parameter is not currently implemented");
     } else if (parameter.get_name() == "enable_rgb") {
-      startup_parameters_.EnableRgb(parameter.as_bool());
+      CallAsyncSet(toggle_color_client_, parameter.as_bool());
     } else if (parameter.get_name() == "enable_left_ir") {
-      startup_parameters_.EnableLeftIr(parameter.as_bool());
+      CallAsyncSet(toggle_left_ir_client_, parameter.as_bool());
     } else if (parameter.get_name() == "enable_right_ir") {
-      startup_parameters_.EnableRightIr(parameter.as_bool());
+      CallAsyncSet(toggle_right_ir_client_, parameter.as_bool());
     } else if (parameter.get_name() == "enable_depth") {
-      startup_parameters_.EnableDepth(parameter.as_bool());
+      CallAsyncSet(toggle_depth_client_, parameter.as_bool());
     }
-  }
-  if (startup_parameters_.HasChanged()) {
-    RCLCPP_INFO(get_logger(),
-                "startup parameters have changed. Restarting device node...");
-    startup_parameters_.ResetHasChanged();
-    CreateOrbbecNode();
   }
 }
 
@@ -397,26 +419,23 @@ absl::Status AdapterNode::Main() {
       create_wall_timer(std::chrono::seconds(1), [this, &executor]() {
         absl::MutexLock timeout_lock(&timeout_mutex_);
         const rclcpp::Time t = get_clock()->now();
-        if (startup_parameters_.IsRgbEnabled() &&
-            (t - t_last_color_image_).seconds() > 30.0) {
+        if (IsRgbEnabled() && (t - t_last_color_image_).seconds() > 30.0) {
           RCLCPP_ERROR(get_logger(),
                        "No new color image arrived for 30 seconds");
           executor.cancel();
         }
-        if (startup_parameters_.IsLeftIrEnabled() &&
-            (t - t_last_left_ir_image_).seconds() > 30.0) {
+        if (IsLeftIrEnabled() && (t - t_last_left_ir_image_).seconds() > 30.0) {
           RCLCPP_ERROR(get_logger(),
                        "No new left IR image arrived for 30 seconds");
           executor.cancel();
         }
-        if (startup_parameters_.IsRightIrEnabled() &&
+        if (IsRightIrEnabled() &&
             (t - t_last_right_ir_image_).seconds() > 30.0) {
           RCLCPP_ERROR(get_logger(),
                        "No new right IR image arrived for 30 seconds");
           executor.cancel();
         }
-        if (startup_parameters_.IsDepthEnabled() &&
-            (t - t_last_depth_image_).seconds() > 30.0) {
+        if (IsDepthEnabled() && (t - t_last_depth_image_).seconds() > 30.0) {
           RCLCPP_ERROR(get_logger(),
                        "No new depth image arrived for 30 seconds");
           executor.cancel();
@@ -424,8 +443,9 @@ absl::Status AdapterNode::Main() {
       });
 
   executor.add_node(this->get_node_base_interface());
+  executor.add_node(orbbec_node_->get_node_base_interface());
   executor.spin();
-  DestroyOrbbecNode();
+  RCLCPP_INFO(get_logger(), "Exiting AdapterNode::Main()");
   return absl::OkStatus();
 }
 
@@ -465,16 +485,14 @@ AdapterNode::BuildSnapshotResponse() {
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   snapshot_interfaces::msg::ImageSnapshot left_ir_snapshot;
   snapshot_interfaces::msg::ImageSnapshot right_ir_snapshot;
-#if SEND_DEPTH
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
-#endif
 
   color_snapshot.topic_name = ColorImageTopic();
   left_ir_snapshot.topic_name = LeftIrImageTopic();
   right_ir_snapshot.topic_name = RightIrImageTopic();
-#if SEND_DEPTH
-  depth_snapshot.topic_name = DepthImageTopic();
-#endif
+  if (IsDepthEnabled()) {
+    depth_snapshot.topic_name = DepthImageTopic();
+  }
 
   // Currently, Flowstate is querying this service much faster than
   // images are being produced. In order to avoid sending the same
@@ -495,20 +513,18 @@ AdapterNode::BuildSnapshotResponse() {
         !right_ir_camera_info_) {
       return absl::UnavailableError("CameraInfo not yet received");
     }
+    if (IsDepthEnabled() && !depth_camera_info_) {
+      return absl::UnavailableError("Depth CameraInfo not yet received.");
+    }
     color_snapshot.camera_info = *color_camera_info_;
     left_ir_snapshot.camera_info = *left_ir_camera_info_;
     right_ir_snapshot.camera_info = *right_ir_camera_info_;
-#if SEND_DEPTH
-    if (depth_camera_info_) {
+    if (IsDepthEnabled()) {
       depth_snapshot.camera_info = *depth_camera_info_;
     }
-#endif
   }
 
-  sensor_msgs::msg::Image color_copy, left_ir_copy, right_ir_copy;
-#if SEND_DEPTH
-  sensor_msgs::msg::Image depth_copy;
-#endif
+  sensor_msgs::msg::Image color_copy, left_ir_copy, right_ir_copy, depth_copy;
   // Lock and copy the most recent Image messages
   {
     absl::MutexLock lock(&image_mutex_);
@@ -519,43 +535,45 @@ AdapterNode::BuildSnapshotResponse() {
     left_ir_copy = *left_ir_image_;
     right_ir_copy = *right_ir_image_;
 
-#if SEND_DEPTH
-    if (!depth_image_) {
-      return absl::UnavailableError("Depth image not yet received from camera");
+    if (IsDepthEnabled()) {
+      if (!depth_image_) {
+        return absl::UnavailableError(
+            "Depth image not yet received from camera");
+      }
+      depth_copy = *depth_image_;
     }
-    depth_copy = *depth_image_;
-#endif
   }
 
-  color_snapshot.image = color_copy;
+  color_snapshot.image = std::move(color_copy);
   response.images.push_back(std::move(color_snapshot));
 
-  left_ir_snapshot.image = left_ir_copy;
+  left_ir_snapshot.image = std::move(left_ir_copy);
   response.images.push_back(std::move(left_ir_snapshot));
 
-  right_ir_snapshot.image = right_ir_copy;
+  right_ir_snapshot.image = std::move(right_ir_copy);
   response.images.push_back(std::move(right_ir_snapshot));
 
-#if SEND_DEPTH
-  // The Orbbec camera returns the depth image as 16-bit images in millimeters.
-  // We want to convert that to 32-bit float (meters) for Flowstate.
-  depth_snapshot.image.header = depth_copy.header;
-  depth_snapshot.image.height = depth_copy.height;
-  depth_snapshot.image.width = depth_copy.width;
-  depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-  depth_snapshot.image.is_bigendian = false;
-  depth_snapshot.image.step = 4 * depth_snapshot.image.width;
-  depth_snapshot.image.data.resize(depth_snapshot.image.step *
-                                   depth_snapshot.image.height);
-  // Use OpenCV's amazingly optimized implementation to do the conversion
-  const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width, CV_16U,
-                               depth_copy.data.data());
-  cv::Mat depth_float(depth_snapshot.image.height, depth_snapshot.image.width,
-                      CV_32F, depth_snapshot.image.data.data());
-  depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
+  if (IsDepthEnabled()) {
+    // The Orbbec camera returns the depth image as 16-bit images in
+    // millimeters. We want to convert that to 32-bit float (meters) for
+    // Flowstate.
+    depth_snapshot.image.header = depth_copy.header;
+    depth_snapshot.image.height = depth_copy.height;
+    depth_snapshot.image.width = depth_copy.width;
+    depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+    depth_snapshot.image.is_bigendian = false;
+    depth_snapshot.image.step = 4 * depth_snapshot.image.width;
+    depth_snapshot.image.data.resize(depth_snapshot.image.step *
+                                     depth_snapshot.image.height);
+    // Use OpenCV's amazingly optimized implementation to do the conversion
+    const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width, CV_16U,
+                                 depth_copy.data.data());
+    cv::Mat depth_float(depth_snapshot.image.height, depth_snapshot.image.width,
+                        CV_32F, depth_snapshot.image.data.data());
+    depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
 
-  response.images.push_back(std::move(depth_snapshot));
-#endif
+    response.images.push_back(std::move(depth_snapshot));
+  }
 
   return response;
 }
@@ -630,47 +648,95 @@ std::string AdapterNode::OrbbecNodeNamespace() {
   return std::string(kOrbbecNodeNamespacePrefix) + serial_;
 }
 
-void AdapterNode::DestroyOrbbecNode() {
-  RCLCPP_INFO(get_logger(), "Destroying orbbec_node");
-  orbbec_node_.reset();
-  RCLCPP_INFO(get_logger(), "Waiting a few seconds");
-  rclcpp::sleep_for(std::chrono::seconds(10));
-  if (orbbec_executor_) {
-    orbbec_executor_->cancel();
-    orbbec_executor_.reset();
+rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
+    const std::string& serial) {
+  const std::string camera_name = std::string("orbbec_") + serial;
+
+  rclcpp::NodeOptions options =
+      rclcpp::NodeOptions()
+          .append_parameter_override(
+              rclcpp::Parameter("camera_name", camera_name))
+          .append_parameter_override(rclcpp::Parameter("serial_number", serial))
+          .append_parameter_override(
+              rclcpp::Parameter("enumerate_net_device", true));
+
+  if (IsRgbEnabled()) {
+    options =
+        options.append_parameter_override(rclcpp::Parameter("color_fps", 5))
+            .append_parameter_override(rclcpp::Parameter("color_format", "RGB"))
+            .append_parameter_override(rclcpp::Parameter("color_width", 1280))
+            .append_parameter_override(rclcpp::Parameter("color_height", 800))
+            .append_parameter_override(rclcpp::Parameter("color_sharpness", 75))
+            .append_parameter_override(rclcpp::Parameter("enable_color", true));
+  } else {
+    options = options.append_parameter_override(
+        rclcpp::Parameter("enable_color", false));
   }
 
-  if (!orbbec_thread_) {
-    RCLCPP_ERROR(get_logger(), "Expected orbbec_thread to exist!");
+  if (IsDepthEnabled()) {
+    options =
+        options.append_parameter_override(rclcpp::Parameter("depth_fps", 5))
+            .append_parameter_override(rclcpp::Parameter("enable_depth", true));
   } else {
-    RCLCPP_INFO(get_logger(), "Joining orbbec_thread");
-    orbbec_thread_->join();
-    RCLCPP_INFO(get_logger(), "Done joining orbbec_thread");
-    orbbec_thread_.reset();
+    options = options.append_parameter_override(
+        rclcpp::Parameter("enable_depth", false));
   }
+
+  if (IsLeftIrEnabled()) {
+    options =
+        options.append_parameter_override(rclcpp::Parameter("left_ir_fps", 5))
+            .append_parameter_override(
+                rclcpp::Parameter("left_ir_format", "Y8"))
+            .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
+            .append_parameter_override(rclcpp::Parameter("left_ir_height", 800))
+            .append_parameter_override(
+                rclcpp::Parameter("enable_left_ir", true));
+  } else {
+    options = options.append_parameter_override(
+        rclcpp::Parameter("enable_left_ir", false));
+  }
+
+  if (IsRightIrEnabled()) {
+    options =
+        options.append_parameter_override(rclcpp::Parameter("right_ir_fps", 5))
+            .append_parameter_override(
+                rclcpp::Parameter("right_ir_format", "Y8"))
+            .append_parameter_override(
+                rclcpp::Parameter("right_ir_width", 1280))
+            .append_parameter_override(
+                rclcpp::Parameter("right_ir_height", 800))
+            .append_parameter_override(
+                rclcpp::Parameter("enable_right_ir", true));
+  } else {
+    options = options.append_parameter_override(
+        rclcpp::Parameter("enable_right_ir", false));
+  }
+
+  return options;
 }
 
-void AdapterNode::CreateOrbbecNode() {
-  absl::MutexLock lock(&SpawnerNode::s_discovery_mutex);
-  RCLCPP_INFO(get_logger(), "Creating Orbbec node for %s", serial_.c_str());
-  if (orbbec_node_) {
-    RCLCPP_INFO(get_logger(), "Orbbec node already existed. Destroying it");
-    DestroyOrbbecNode();
-  }
+bool AdapterNode::IsRgbEnabled() {
+  bool enable_rgb = true;
+  get_parameter<bool>("enable_rgb", enable_rgb);
+  return enable_rgb;
+}
 
-  try {
-    orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
-        std::string(kOrbbecNodeName), OrbbecNodeNamespace(),
-        startup_parameters_.CreateNodeOptions(serial_));
-  } catch (...) {
-    RCLCPP_FATAL(get_logger(), "Some exception happened");
-  }
-  orbbec_thread_ = std::make_unique<std::thread>([this]() {
-    this->orbbec_executor_ =
-        std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
-    this->orbbec_executor_->add_node(
-        this->orbbec_node_->get_node_base_interface());
-  });
+bool AdapterNode::IsDepthEnabled() {
+  bool enable_depth = true;
+  get_parameter<bool>("enable_depth", enable_depth);
+  return enable_depth;
+}
+
+bool AdapterNode::IsLeftIrEnabled() {
+  bool enable_left_ir = true;
+  get_parameter<bool>("enable_left_ir", enable_left_ir);
+  return enable_left_ir;
+}
+
+bool AdapterNode::IsRightIrEnabled() {
+  bool enable_right_ir = true;
+  get_parameter<bool>("enable_right_ir", enable_right_ir);
+  return enable_right_ir;
 }
 
 }  // namespace flowstate_orbbec

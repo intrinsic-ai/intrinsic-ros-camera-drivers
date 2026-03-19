@@ -22,7 +22,6 @@ SpawnerNode::SpawnerNode()
 
 std::vector<std::string> SpawnerNode::GetSerials() {
   absl::MutexLock lock(&s_discovery_mutex);
-  RCLCPP_INFO(get_logger(), "flowstate_orbbec::SpawnerNode::GetSerials() entry");
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();
   std::vector<std::string> serials;
@@ -32,7 +31,6 @@ std::vector<std::string> SpawnerNode::GetSerials() {
       serials.push_back(list->serialNumber(i));
     }
   }
-  RCLCPP_INFO(get_logger(), "flowstate_orbbec::SpawnerNode::GetSerials() exit");
   return serials;
 }
 

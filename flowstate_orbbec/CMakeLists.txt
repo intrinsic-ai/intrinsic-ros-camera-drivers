@@ -30,7 +30,6 @@ include_directories(include)
 
 add_library(flowstate_orbbec
   src/adapter_node.cc
-  src/orbbec_startup_parameters.cc
   src/spawner_node.cc
 )
 target_compile_definitions(flowstate_orbbec PUBLIC ROS_JAZZY)
