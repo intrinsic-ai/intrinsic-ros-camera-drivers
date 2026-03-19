@@ -55,6 +55,8 @@ RUN apt-get clean \
         ros-jazzy-sensor-msgs \
         libzmq3-dev \
         cppzmq-dev \
+        libbz2-dev \
+        zlib1g-dev \
         ${DEPENDENCIES} \
     && rm -rf /var/lib/apt/lists/*
 
