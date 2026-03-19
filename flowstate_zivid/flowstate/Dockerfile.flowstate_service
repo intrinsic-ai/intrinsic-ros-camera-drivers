@@ -40,7 +40,14 @@ ARG DEPENDENCIES
 RUN apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get update \
-    && apt install -y --fix-missing python3-protobuf libopencv-dev nlohmann-json3-dev ${DEPENDENCIES} \
+    && apt install -y --fix-missing \
+        build-essential \
+        python3-colcon-common-extensions \
+        ros-dev-tools \
+        python3-protobuf \
+        libopencv-dev \
+        nlohmann-json3-dev \
+        ${DEPENDENCIES} \
     && rm -rf /var/lib/apt/lists/*
 
 ADD src /opt/ros/overlay/src

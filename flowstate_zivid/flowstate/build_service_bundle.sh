@@ -8,5 +8,5 @@ set -o errexit
 set -o verbose
 
 src/sdk-ros/scripts/setup_docker.sh
-src/sdk-ros/scripts/build_container.sh --service_name zivid_driver --service_package flowstate_zivid --dockerfile src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/Dockerfile.service
+src/sdk-ros/scripts/build_container.sh --service_name zivid_driver --service_package flowstate_zivid --dockerfile src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/Dockerfile.flowstate_service
 src/sdk-ros/scripts/build_bundle.sh --service_name zivid_driver --service_package flowstate_zivid
