@@ -416,6 +416,18 @@ AdapterNode::BuildSnapshotResponse() {
   depth_snapshot.topic_name = DepthImageTopic();
 #endif
 
+  // Currently, Flowstate is querying this service much faster than
+  // images are being produced. In order to avoid sending the same
+  // image over and over (on average, it is sent 4 times per "real"
+  // image), as a temporary measure this manual sleep_for() will
+  // slow the response down to match the camera's actual 5 fps rate.
+  // Because the iamge mutex is not locked until the following block,
+  // this does not increase latency, it only slows the response rate
+  // to prevent unnecessary immediate re-query of the same frame.
+  // This should be replaced in the future by a more sophisticated
+  // method.
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
   // Lock and copy the most recent CameraInfo messages
   {
     absl::MutexLock lock(&camera_info_mutex_);
