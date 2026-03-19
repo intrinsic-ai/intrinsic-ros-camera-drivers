@@ -98,4 +98,10 @@ jobs:
         working-directory: workspace
         run: |
           chmod +x src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh
-          ./src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh ${{ matrix.camera }}_driver flowstate_${{ matrix.camera }}
+          # Set the exact service name based on the camera type
+          if [ "${{ matrix.camera }}" == "orbbec" ]; then
+            TARGET_SERVICE="orbbec_gemini_driver"
+          else
+            TARGET_SERVICE="${{ matrix.camera }}_driver"
+          fi
+          ./src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh $TARGET_SERVICE flowstate_${{ matrix.camera }}
