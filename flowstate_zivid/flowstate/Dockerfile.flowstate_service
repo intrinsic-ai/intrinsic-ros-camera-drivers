@@ -32,7 +32,6 @@ ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 FROM ghcr.io/intrinsic-dev/zivid-underlay:latest AS underlay
 
 # overlay stage: underlay + service code built
-# overlay stage: underlay + service code built
 FROM underlay AS overlay
 
 ARG SERVICE_PACKAGE
@@ -54,6 +53,8 @@ RUN apt-get clean \
         ros-jazzy-cv-bridge \
         ros-jazzy-camera-info-manager \
         ros-jazzy-sensor-msgs \
+        libzmq3-dev \
+        cppzmq-dev \
         ${DEPENDENCIES} \
     && rm -rf /var/lib/apt/lists/*
 
