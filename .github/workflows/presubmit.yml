@@ -97,5 +97,5 @@ jobs:
       - name: Build Service Bundle
         working-directory: workspace
         run: |
-          chmod +x src/flowstate-ros-camera-drivers/flowstate_${{ matrix.camera }}/flowstate/build_service_bundle.sh
-          ./src/flowstate-ros-camera-drivers/flowstate_${{ matrix.camera }}/flowstate/build_service_bundle.sh
+          chmod +x src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh
+          ./src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh ${{ matrix.camera }}_driver flowstate_${{ matrix.camera }}
