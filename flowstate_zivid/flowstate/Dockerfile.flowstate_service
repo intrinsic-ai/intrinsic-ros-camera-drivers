@@ -64,6 +64,10 @@ RUN . /opt/ros/jazzy/setup.sh \
         intrinsic_sdk_ros \
         intrinsic_sdk_cmake \
         gz_msgs_vendor \
+        gz_cmake_vendor \
+        gz_transport_vendor \
+        pybind11_abseil_vendor \
+        pybind11_protobuf_vendor \
         grpc_vendor \
         abseil_cpp_vendor \
         re2_vendor \
