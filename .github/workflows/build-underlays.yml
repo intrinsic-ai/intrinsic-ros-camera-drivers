@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - '**/Dockerfile.zivid_underlay'
+      - 'ci_scripts/Dockerfile.zivid_underlay'
       - 'ci_scripts/Dockerfile.core_underlay'
       - 'ci_scripts/Dockerfile.luxonis_underlay'
       - 'ci_scripts/Dockerfile.orbbec_underlay'
