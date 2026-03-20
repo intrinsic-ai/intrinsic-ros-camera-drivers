@@ -10,7 +10,8 @@ on:
       - 'ci_scripts/Dockerfile.orbbec_underlay'
 
 jobs:
-  build-underlays:
+  build-core:
+    name: Build Core Underlay
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -27,9 +28,6 @@ jobs:
           large-packages: true
           docker-images: true
 
-      - name: Create Workspace Directory
-        run: mkdir -p workspace/src
-
       - name: Checkout Camera Drivers
         uses: actions/checkout@v4
         with:
@@ -40,25 +38,6 @@ jobs:
         with:
           repository: intrinsic-ai/sdk-ros
           path: workspace/src/sdk-ros
-
-      - name: Checkout Luxonis SDKs
-        working-directory: workspace/src
-        run: |
-          git clone https://github.com/codebot/depthai-core --branch kilted
-          cd depthai-core && git submodule update --init --recursive && cd ..
-          git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
-      
-      - name: Checkout Orbbec SDKs
-        working-directory: workspace/src
-        run: |
-          git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install
-          git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
-      
-      - name: Checkout Zivid Dependencies
-        uses: actions/checkout@v4
-        with:
-          repository: zivid/zivid-ros
-          path: workspace/src/zivid-ros
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -77,27 +56,69 @@ jobs:
           file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/core-underlay:latest
-      
-      - name: Build and push Luxonis Underlay
-        uses: docker/build-push-action@v5
-        with:
-          context: workspace
-          file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.luxonis_underlay
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/luxonis-underlay:latest
-      
-      - name: Build and push Orbbec Underlay
-        uses: docker/build-push-action@v5
-        with:
-          context: workspace
-          file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.orbbec_underlay
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orbbec-underlay:latest
 
-      - name: Build and push Zivid Underlay
+  build-cameras:
+    name: Build ${{ matrix.camera }} Underlay
+    needs: build-core
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - camera: orbbec
+            file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.orbbec_underlay
+          - camera: luxonis
+            file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.luxonis_underlay
+          - camera: zivid
+            file: workspace/src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/Dockerfile.zivid_underlay
+
+    steps:
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          large-packages: true
+          docker-images: true
+
+      - name: Checkout Camera Drivers
+        uses: actions/checkout@v4
+        with:
+          path: workspace/src/flowstate-ros-camera-drivers
+
+      - name: Clone Specific Camera Dependencies
+        working-directory: workspace/src
+        run: |
+          if [ "${{ matrix.camera }}" == "orbbec" ]; then
+            git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install
+            git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
+            
+          elif [ "${{ matrix.camera }}" == "luxonis" ]; then
+            git clone https://github.com/codebot/depthai-core --branch kilted
+            cd depthai-core && git submodule update --init --recursive && cd ..
+            git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
+            
+          elif [ "${{ matrix.camera }}" == "zivid" ]; then
+            git clone https://github.com/zivid/zivid-ros.git
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.camera }} Underlay
         uses: docker/build-push-action@v5
         with:
           context: workspace
-          file: workspace/src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/Dockerfile.zivid_underlay
+          file: ${{ matrix.file }}
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/zivid-underlay:latest
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.camera }}-underlay:latest
