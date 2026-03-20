@@ -1,0 +1,18 @@
+# Dockerfile.orbbec_underlay
+FROM ghcr.io/intrinsic-dev/core-underlay:latest AS underlay
+
+RUN apt-get update \
+    && apt-get install -y python3-protobuf libopencv-dev nlohmann-json3-dev ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs libgl1-mesa-dev ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD src/OrbbecSDK /opt/ros/underlay/src/OrbbecSDK
+ADD src/OrbbecSDK_ROS2 /opt/ros/underlay/src/OrbbecSDK_ROS2
+
+# Compile the Orbbec SDKs into the underlay
+RUN . /opt/ros/jazzy/setup.sh \
+    && cd /opt/ros/underlay \
+    && colcon build \
+      --merge-install \
+      --executor sequential \
+      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache

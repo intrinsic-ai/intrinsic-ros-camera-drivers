@@ -5,7 +5,9 @@ on:
   push:
     paths:
       - '**/Dockerfile.zivid_underlay'
-      - 'core_builds/Dockerfile.core_underlay'
+      - 'ci_scripts/Dockerfile.core_underlay'
+      - 'ci_scripts/Dockerfile.luxonis_underlay'
+      - 'ci_scripts/Dockerfile.orbbec_underlay'
 
 jobs:
   build-underlays:
@@ -39,6 +41,19 @@ jobs:
           repository: intrinsic-ai/sdk-ros
           path: workspace/src/sdk-ros
 
+      - name: Checkout Luxonis SDKs
+        working-directory: workspace/src
+        run: |
+          git clone https://github.com/codebot/depthai-core --branch kilted
+          cd depthai-core && git submodule update --init --recursive && cd ..
+          git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
+      
+      - name: Checkout Orbbec SDKs
+        working-directory: workspace/src
+        run: |
+          git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install
+          git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
+      
       - name: Checkout Zivid Dependencies
         uses: actions/checkout@v4
         with:
@@ -62,6 +77,22 @@ jobs:
           file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/core-underlay:latest
+      
+      - name: Build and push Luxonis Underlay
+        uses: docker/build-push-action@v5
+        with:
+          context: workspace
+          file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.luxonis_underlay
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/luxonis-underlay:latest
+      
+      - name: Build and push Orbbec Underlay
+        uses: docker/build-push-action@v5
+        with:
+          context: workspace
+          file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.orbbec_underlay
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orbbec-underlay:latest
 
       - name: Build and push Zivid Underlay
         uses: docker/build-push-action@v5
