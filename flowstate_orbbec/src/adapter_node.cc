@@ -339,7 +339,7 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
         break;
       }
     } else if (parameter.get_name() == "fps") {
-      if (parameter.as_int() != 5 && parameter.as_int() != 10) {
+      if (parameter.as_double() != 5.0 && parameter.as_double() != 10.0) {
         result.successful = false;
         result.reason = "fps must be either 5 or 10";
         break;
