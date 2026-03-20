@@ -453,25 +453,45 @@ absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
 AdapterNode::BuildDescribeResponse() {
   snapshot_interfaces::srv::Describe::Response response;
   absl::MutexLock lock(&camera_info_mutex_);
-  if (!color_camera_info_ || !left_ir_camera_info_ || !right_ir_camera_info_) {
-    return absl::UnavailableError(
-        "CameraInfo not yet received (waiting for RGB+IR)");
-  }
-
   absl::Status populate_status = PopulateExtrinsicsIfNeeded();
   if (!populate_status.ok()) {
     return populate_status;
   }
 
-  response.sensors.push_back(BuildSensorInformation(
-      *color_camera_info_, "rgb", ColorImageTopic(), *color_transform_));
-  response.sensors.push_back(BuildSensorInformation(
-      *left_ir_camera_info_, "ir_left", LeftIrImageTopic(), *left_ir_transform_));
-  response.sensors.push_back(
-      BuildSensorInformation(*right_ir_camera_info_, "ir_right",
-                             RightIrImageTopic(), *right_ir_transform_));
+  if (IsRgbEnabled()) {
+    if (!color_camera_info_) {
+      return absl::UnavailableError(
+          "CameraInfo not yet received (waiting for RGB)");
+    }
+    response.sensors.push_back(BuildSensorInformation(
+        *color_camera_info_, "rgb", ColorImageTopic(), *color_transform_));
+  }
 
-  if (depth_camera_info_) {
+  if (IsLeftIrEnabled()) {
+    if (!left_ir_camera_info_) {
+      return absl::UnavailableError(
+          "CameraInfo not yet received (waiting for left IR)");
+    }
+    response.sensors.push_back(
+        BuildSensorInformation(*left_ir_camera_info_, "ir_left",
+                               LeftIrImageTopic(), *left_ir_transform_));
+  }
+
+  if (IsRightIrEnabled()) {
+    if (!right_ir_camera_info_) {
+      return absl::UnavailableError(
+          "CameraInfo not yet received (waiting for right IR)");
+    }
+    response.sensors.push_back(
+        BuildSensorInformation(*right_ir_camera_info_, "ir_right",
+                               RightIrImageTopic(), *right_ir_transform_));
+  }
+
+  if (IsDepthEnabled()) {
+    if (!depth_camera_info_) {
+      return absl::UnavailableError(
+          "CameraInfo not yet received (waiting for depth)");
+    }
     response.sensors.push_back(BuildSensorInformation(
         *depth_camera_info_, "depth", DepthImageTopic(), *left_ir_transform_));
   }
@@ -482,17 +502,6 @@ AdapterNode::BuildDescribeResponse() {
 absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
 AdapterNode::BuildSnapshotResponse() {
   snapshot_interfaces::srv::Snapshot::Response response;
-  snapshot_interfaces::msg::ImageSnapshot color_snapshot;
-  snapshot_interfaces::msg::ImageSnapshot left_ir_snapshot;
-  snapshot_interfaces::msg::ImageSnapshot right_ir_snapshot;
-  snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
-
-  color_snapshot.topic_name = ColorImageTopic();
-  left_ir_snapshot.topic_name = LeftIrImageTopic();
-  right_ir_snapshot.topic_name = RightIrImageTopic();
-  if (IsDepthEnabled()) {
-    depth_snapshot.topic_name = DepthImageTopic();
-  }
 
   // Currently, Flowstate is querying this service much faster than
   // images are being produced. In order to avoid sending the same
@@ -506,73 +515,86 @@ AdapterNode::BuildSnapshotResponse() {
   // method.
   std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
-  // Lock and copy the most recent CameraInfo messages
+  // Lock and copy the most recent CameraInfo and Image messages
   {
-    absl::MutexLock lock(&camera_info_mutex_);
-    if (!color_camera_info_ || !left_ir_camera_info_ ||
-        !right_ir_camera_info_) {
-      return absl::UnavailableError("CameraInfo not yet received");
-    }
-    if (IsDepthEnabled() && !depth_camera_info_) {
-      return absl::UnavailableError("Depth CameraInfo not yet received.");
-    }
-    color_snapshot.camera_info = *color_camera_info_;
-    left_ir_snapshot.camera_info = *left_ir_camera_info_;
-    right_ir_snapshot.camera_info = *right_ir_camera_info_;
-    if (IsDepthEnabled()) {
-      depth_snapshot.camera_info = *depth_camera_info_;
-    }
-  }
+    absl::MutexLock camera_info_lock(&camera_info_mutex_);
+    absl::MutexLock image_lock(&image_mutex_);
 
-  sensor_msgs::msg::Image color_copy, left_ir_copy, right_ir_copy, depth_copy;
-  // Lock and copy the most recent Image messages
-  {
-    absl::MutexLock lock(&image_mutex_);
-    if (!color_image_ || !left_ir_image_ || !right_ir_image_) {
-      return absl::UnavailableError("Images not yet received from camera");
-    }
-    color_copy = *color_image_;
-    left_ir_copy = *left_ir_image_;
-    right_ir_copy = *right_ir_image_;
-
-    if (IsDepthEnabled()) {
-      if (!depth_image_) {
-        return absl::UnavailableError(
-            "Depth image not yet received from camera");
+    if (IsRgbEnabled()) {
+      if (!color_camera_info_) {
+        return absl::UnavailableError("Color CameraInfo not yet received");
       }
-      depth_copy = *depth_image_;
+      if (!color_image_) {
+        return absl::UnavailableError("Color image not yet received");
+      }
+      snapshot_interfaces::msg::ImageSnapshot color_snapshot;
+      color_snapshot.topic_name = ColorImageTopic();
+      color_snapshot.camera_info = *color_camera_info_;
+      color_snapshot.image = *color_image_;
+      response.images.push_back(std::move(color_snapshot));
     }
-  }
 
-  color_snapshot.image = std::move(color_copy);
-  response.images.push_back(std::move(color_snapshot));
+    if (IsLeftIrEnabled()) {
+      if (!left_ir_camera_info_) {
+        return absl::UnavailableError("Left IR CameraInfo not yet received");
+      }
+      if (!left_ir_image_) {
+        return absl::UnavailableError("Left IR Image not yet received");
+      }
+      snapshot_interfaces::msg::ImageSnapshot left_ir_snapshot;
+      left_ir_snapshot.topic_name = LeftIrImageTopic();
+      left_ir_snapshot.camera_info = *left_ir_camera_info_;
+      left_ir_snapshot.image = *left_ir_image_;
+      response.images.push_back(std::move(left_ir_snapshot));
+    }
 
-  left_ir_snapshot.image = std::move(left_ir_copy);
-  response.images.push_back(std::move(left_ir_snapshot));
+    if (IsRightIrEnabled()) {
+      if (!right_ir_camera_info_) {
+        return absl::UnavailableError("Right IR CameraInfo not yet received");
+      }
+      if (!right_ir_image_) {
+        return absl::UnavailableError("Right IR Image not yet received");
+      }
+      snapshot_interfaces::msg::ImageSnapshot right_ir_snapshot;
+      right_ir_snapshot.topic_name = RightIrImageTopic();
+      right_ir_snapshot.camera_info = *right_ir_camera_info_;
+      right_ir_snapshot.image = *right_ir_image_;
+      response.images.push_back(std::move(right_ir_snapshot));
+    }
 
-  right_ir_snapshot.image = std::move(right_ir_copy);
-  response.images.push_back(std::move(right_ir_snapshot));
+    if (IsDepthEnabled()) {
+      if (!depth_camera_info_) {
+        return absl::UnavailableError("Depth CameraInfo not yet received.");
+      }
+      if (!depth_image_) {
+        return absl::UnavailableError("Depth image not yet received");
+      }
+      snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
+      depth_snapshot.topic_name = DepthImageTopic();
+      depth_snapshot.camera_info = *depth_camera_info_;
+      sensor_msgs::msg::Image depth_copy = *depth_image_;
 
-  if (IsDepthEnabled()) {
-    // The Orbbec camera returns the depth image as 16-bit images in
-    // millimeters. We want to convert that to 32-bit float (meters) for
-    // Flowstate.
-    depth_snapshot.image.header = depth_copy.header;
-    depth_snapshot.image.height = depth_copy.height;
-    depth_snapshot.image.width = depth_copy.width;
-    depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-    depth_snapshot.image.is_bigendian = false;
-    depth_snapshot.image.step = 4 * depth_snapshot.image.width;
-    depth_snapshot.image.data.resize(depth_snapshot.image.step *
-                                     depth_snapshot.image.height);
-    // Use OpenCV's amazingly optimized implementation to do the conversion
-    const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width, CV_16U,
-                                 depth_copy.data.data());
-    cv::Mat depth_float(depth_snapshot.image.height, depth_snapshot.image.width,
-                        CV_32F, depth_snapshot.image.data.data());
-    depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
+      // The Orbbec camera returns the depth image as 16-bit images in
+      // millimeters. We want to convert that to 32-bit float (meters) for
+      // Flowstate.
+      depth_snapshot.image.header = depth_copy.header;
+      depth_snapshot.image.height = depth_copy.height;
+      depth_snapshot.image.width = depth_copy.width;
+      depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+      depth_snapshot.image.is_bigendian = false;
+      depth_snapshot.image.step = 4 * depth_snapshot.image.width;
+      depth_snapshot.image.data.resize(depth_snapshot.image.step *
+                                       depth_snapshot.image.height);
+      // Use OpenCV's amazingly optimized implementation to do the conversion
+      const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width, CV_16U,
+                                   depth_copy.data.data());
+      cv::Mat depth_float(depth_snapshot.image.height,
+                          depth_snapshot.image.width, CV_32F,
+                          depth_snapshot.image.data.data());
+      depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
 
-    response.images.push_back(std::move(depth_snapshot));
+      response.images.push_back(std::move(depth_snapshot));
+    }
   }
 
   return response;
@@ -582,7 +604,7 @@ AdapterNode::BuildSnapshotResponse() {
 // to query them. They should be published shortly after the Orbbec
 // node starts running.
 absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
-  if (color_transform_ && right_ir_transform_) {
+  if (color_transform_ && right_ir_transform_ && left_ir_transform_) {
     return absl::OkStatus();
   }
 
