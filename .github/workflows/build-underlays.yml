@@ -74,7 +74,7 @@ jobs:
           - camera: luxonis
             file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.luxonis_underlay
           - camera: zivid
-            file: workspace/src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/Dockerfile.zivid_underlay
+            file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.zivid_underlay
 
     steps:
       - name: Free Disk Space

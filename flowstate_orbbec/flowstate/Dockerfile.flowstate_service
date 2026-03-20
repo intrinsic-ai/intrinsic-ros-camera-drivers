@@ -1,9 +1,3 @@
-# Build up the service with these stages:
-#   - base (ros:jazzy + settings) ->
-#   - underlay (dependencies) ->
-#   - overlay (user code) ->
-#   - result (base + copied install folder of underlay and overlay)
-
 # base stage: ros:jazzy + configs
 FROM ros:jazzy-ros-core AS base
 
@@ -12,7 +6,8 @@ WORKDIR /opt/ros/underlay
 ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 
-FROM ghcr.io/intrinsic-dev/core-underlay:latest AS underlay
+# 1. Pull the NEW pre-compiled Orbbec underlay!
+FROM ghcr.io/intrinsic-dev/orbbec-underlay:latest AS underlay
 
 # overlay stage: underlay + service code built
 FROM underlay AS overlay
@@ -25,8 +20,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
-ADD src/OrbbecSDK /opt/ros/overlay/src/OrbbecSDK
-ADD src/OrbbecSDK_ROS2 /opt/ros/overlay/src/OrbbecSDK_ROS2
 
 # skip a few packages that are already built, and are somewhat slow to process
 RUN . /opt/ros/jazzy/setup.sh \
@@ -55,7 +48,8 @@ RUN . /opt/ros/jazzy/setup.sh \
         bazelisk_vendor \
         flatbuffers_vendor \
         opencensus_cpp_vendor \
-      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DCMAKE_BUILD_TYPE=Release
+      --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /root/.cache
 
 # result stage: base + copied install folders from the overlay + service setup
 FROM base

@@ -72,16 +72,7 @@ jobs:
       - name: Clone Vendor Dependencies
         working-directory: workspace/src
         run: |
-          if [ "${{ matrix.camera }}" == "orbbec" ]; then
-            git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install
-            git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
-            
-          elif [ "${{ matrix.camera }}" == "luxonis" ]; then
-            git clone https://github.com/codebot/depthai-core --branch kilted
-            cd depthai-core && git submodule update --init --recursive && cd ..
-            git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
-            
-          elif [ "${{ matrix.camera }}" == "zivid" ]; then
+          if [ "${{ matrix.camera }}" == "zivid" ]; then
             git clone https://github.com/zivid/zivid-ros.git
           fi
       - name: Prune Docker
