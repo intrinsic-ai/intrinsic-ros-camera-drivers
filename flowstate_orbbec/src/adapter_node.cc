@@ -181,17 +181,17 @@ void AdapterNode::InitializeParameters() {
       std::bind(&AdapterNode::PostSetParametersCallback, this,
                 std::placeholders::_1));
 
-  rcl_interfaces::msg::IntegerRange fps_range;
-  fps_range.from_value = 5;
-  fps_range.to_value = 10;
-  fps_range.step = 5;
+  rcl_interfaces::msg::FloatingPointRange fps_range;
+  fps_range.from_value = 5.0;
+  fps_range.to_value = 10.0;
+  fps_range.step = 5.0;
   rcl_interfaces::msg::ParameterDescriptor fps_descriptor;
   fps_descriptor.name = "fps";
-  fps_descriptor.type = rclcpp::ParameterType::PARAMETER_INTEGER;
+  fps_descriptor.type = rclcpp::ParameterType::PARAMETER_DOUBLE;
   fps_descriptor.description = "FPS (framerate)";
   fps_descriptor.read_only = false;
-  fps_descriptor.integer_range.push_back(fps_range);
-  declare_parameter("fps", 5, fps_descriptor);
+  fps_descriptor.floating_point_range.push_back(fps_range);
+  declare_parameter("fps", 5.0, fps_descriptor);
 
   rcl_interfaces::msg::ParameterDescriptor enable_rgb_descriptor;
   enable_rgb_descriptor.name = "enable_rgb";
