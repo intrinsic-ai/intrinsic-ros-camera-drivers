@@ -149,6 +149,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Time t_last_right_ir_image_ ABSL_GUARDED_BY(timeout_mutex_);
   rclcpp::Time t_last_left_ir_image_ ABSL_GUARDED_BY(timeout_mutex_);
   rclcpp::Time t_last_depth_image_ ABSL_GUARDED_BY(timeout_mutex_);
+
+  int reboot_count_ = 0;
 };
 
 }  // namespace flowstate_orbbec

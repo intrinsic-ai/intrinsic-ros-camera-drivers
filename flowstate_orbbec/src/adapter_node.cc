@@ -16,6 +16,7 @@
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "snapshot_interfaces/msg/image_snapshot.hpp"
+#include "std_srvs/srv/empty.hpp"
 
 namespace flowstate_orbbec {
 
@@ -36,16 +37,6 @@ AdapterNode::AdapterNode(const std::string& serial,
   } catch (...) {
     RCLCPP_FATAL(get_logger(), "Some exception happened");
   }
-#if 0
-  orbbec_thread_ = std::make_unique<std::thread>([this]() {
-    this->orbbec_executor_ =
-        std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
-    this->orbbec_executor_->add_node(
-        this->orbbec_node_->get_node_base_interface());
-    this->orbbec_executor_->spin();
-  });
-  rclcpp::sleep_for(std::chrono::seconds(2));
-#endif
 
   // Create a TF Listener, which will be used to query extrinsics
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -394,12 +385,20 @@ void AdapterNode::PostSetParametersCallback(
     } else if (parameter.get_name() == "fps") {
       RCLCPP_WARN(get_logger(), "fps parameter is not currently implemented");
     } else if (parameter.get_name() == "enable_rgb") {
+      absl::MutexLock timeout_lock(&timeout_mutex_);
+      t_last_color_image_ = get_clock()->now();
       CallAsyncSet(toggle_color_client_, parameter.as_bool());
     } else if (parameter.get_name() == "enable_left_ir") {
+      absl::MutexLock timeout_lock(&timeout_mutex_);
+      t_last_left_ir_image_ = get_clock()->now();
       CallAsyncSet(toggle_left_ir_client_, parameter.as_bool());
     } else if (parameter.get_name() == "enable_right_ir") {
+      absl::MutexLock timeout_lock(&timeout_mutex_);
+      t_last_right_ir_image_ = get_clock()->now();
       CallAsyncSet(toggle_right_ir_client_, parameter.as_bool());
     } else if (parameter.get_name() == "enable_depth") {
+      absl::MutexLock timeout_lock(&timeout_mutex_);
+      t_last_depth_image_ = get_clock()->now();
       CallAsyncSet(toggle_depth_client_, parameter.as_bool());
     }
   }
@@ -417,28 +416,67 @@ absl::Status AdapterNode::Main() {
   rclcpp::executors::SingleThreadedExecutor executor;
   liveness_timer_ =
       create_wall_timer(std::chrono::seconds(1), [this, &executor]() {
-        absl::MutexLock timeout_lock(&timeout_mutex_);
-        const rclcpp::Time t = get_clock()->now();
-        if (IsRgbEnabled() && (t - t_last_color_image_).seconds() > 30.0) {
-          RCLCPP_ERROR(get_logger(),
-                       "No new color image arrived for 30 seconds");
-          executor.cancel();
+        bool should_reboot = false;
+        {
+          absl::MutexLock timeout_lock(&timeout_mutex_);
+          const rclcpp::Time t = get_clock()->now();
+
+          if (IsRgbEnabled() && (t - t_last_color_image_).seconds() > 30.0) {
+            RCLCPP_ERROR(get_logger(),
+                         "No new color image arrived for 30 seconds");
+            should_reboot = true;
+          }
+          if (IsLeftIrEnabled() &&
+              (t - t_last_left_ir_image_).seconds() > 30.0) {
+            RCLCPP_ERROR(get_logger(),
+                         "No new left IR image arrived for 30 seconds");
+            should_reboot = true;
+          }
+          if (IsRightIrEnabled() &&
+              (t - t_last_right_ir_image_).seconds() > 30.0) {
+            RCLCPP_ERROR(get_logger(),
+                         "No new right IR image arrived for 30 seconds");
+            should_reboot = true;
+          }
+          if (IsDepthEnabled() && (t - t_last_depth_image_).seconds() > 30.0) {
+            RCLCPP_ERROR(get_logger(),
+                         "No new depth image arrived for 30 seconds");
+            should_reboot = true;
+          }
         }
-        if (IsLeftIrEnabled() && (t - t_last_left_ir_image_).seconds() > 30.0) {
-          RCLCPP_ERROR(get_logger(),
-                       "No new left IR image arrived for 30 seconds");
-          executor.cancel();
-        }
-        if (IsRightIrEnabled() &&
-            (t - t_last_right_ir_image_).seconds() > 30.0) {
-          RCLCPP_ERROR(get_logger(),
-                       "No new right IR image arrived for 30 seconds");
-          executor.cancel();
-        }
-        if (IsDepthEnabled() && (t - t_last_depth_image_).seconds() > 30.0) {
-          RCLCPP_ERROR(get_logger(),
-                       "No new depth image arrived for 30 seconds");
-          executor.cancel();
+
+        if (should_reboot) {
+          {
+            absl::MutexLock timeout_lock(&timeout_mutex_);
+            t_last_color_image_ = get_clock()->now();
+            t_last_left_ir_image_ = get_clock()->now();
+            t_last_right_ir_image_ = get_clock()->now();
+            t_last_depth_image_ = get_clock()->now();
+          }
+          if (reboot_count_++ < 1) {
+            // Try to reboot the device
+            absl::MutexLock lock(&SpawnerNode::s_discovery_mutex);
+            rclcpp::Client<std_srvs::srv::Empty>::SharedPtr reboot_client =
+                create_client<std_srvs::srv::Empty>(absl::StrFormat(
+                    "/orbbec/camera_%s/reboot_device", serial_));
+            reboot_client->async_send_request(
+                std::make_shared<std_srvs::srv::Empty::Request>(),
+                [this](
+                    rclcpp::Client<std_srvs::srv::Empty>::SharedFuture future) {
+                  if (future.valid()) {
+                    auto response = future.get();
+                    RCLCPP_INFO(this->get_logger(),
+                                "Received valid future from reboot client");
+                  } else {
+                    RCLCPP_ERROR(
+                        this->get_logger(),
+                        "Did not receive a valid future from reboot client");
+                  }
+                });
+          } else {
+            // Tear down this node. The spawner will re-spawn it soon.
+            executor.cancel();
+          }
         }
       });
 
