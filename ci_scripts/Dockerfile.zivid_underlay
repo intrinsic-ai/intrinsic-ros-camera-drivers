@@ -28,6 +28,16 @@ RUN apt-get update && apt-get install -y wget && \
 
 ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
+RUN apt-get update \
+    && apt-get install -y \
+        ros-jazzy-cv-bridge \
+        ros-jazzy-image-transport \
+        ros-jazzy-diagnostic-updater \
+        ros-jazzy-sensor-msgs \
+        ros-jazzy-geometry-msgs \
+        ros-jazzy-std-srvs \
+    && rm -rf /var/lib/apt/lists/*
+
 ADD src/zivid-ros /opt/ros/underlay/src/zivid-ros
 
 # Compile the Zivid ROS wrapper into the underlay
