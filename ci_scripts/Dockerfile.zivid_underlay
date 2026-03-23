@@ -30,12 +30,25 @@ ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
 RUN apt-get update \
     && apt-get install -y \
+        build-essential \
+        python3-colcon-common-extensions \
+        ros-dev-tools \
+        ros-jazzy-ament-cmake-vendor-package \
         ros-jazzy-cv-bridge \
         ros-jazzy-image-transport \
+        ros-jazzy-image-transport-plugins \
+        ros-jazzy-camera-info-manager \
         ros-jazzy-diagnostic-updater \
         ros-jazzy-sensor-msgs \
         ros-jazzy-geometry-msgs \
         ros-jazzy-std-srvs \
+        python3-protobuf \
+        libopencv-dev \
+        nlohmann-json3-dev \
+        libzmq3-dev \
+        cppzmq-dev \
+        libbz2-dev \
+        zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 ADD src/zivid-ros /opt/ros/underlay/src/zivid-ros
