@@ -8,6 +8,8 @@ on:
       - 'ci_scripts/Dockerfile.core_underlay'
       - 'ci_scripts/Dockerfile.luxonis_underlay'
       - 'ci_scripts/Dockerfile.orbbec_underlay'
+  schedule:
+    - cron: "0 4 * * *"
 
 jobs:
   build-core:
