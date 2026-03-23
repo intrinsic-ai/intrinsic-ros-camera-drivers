@@ -59,6 +59,6 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
       --merge-install \
       --executor sequential \
-      --packages-skip zivid_rviz_plugin
+      --packages-skip zivid_rviz_plugin \
       --cmake-args -DCMAKE_BUILD_TYPE=Release \
     && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
