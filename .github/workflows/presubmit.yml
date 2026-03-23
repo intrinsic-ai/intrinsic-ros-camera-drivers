@@ -46,7 +46,6 @@ jobs:
       - name: Create Workspace Directory
         run: mkdir -p workspace/src
       
-      # Need to free space otherwise we run out of it during build
       - name: Free Disk Space
         uses: jlumbroso/free-disk-space@main
         with:
@@ -69,12 +68,6 @@ jobs:
           repository: intrinsic-ai/sdk-ros
           path: workspace/src/sdk-ros
 
-      - name: Clone Vendor Dependencies
-        working-directory: workspace/src
-        run: |
-          if [ "${{ matrix.camera }}" == "zivid" ]; then
-            git clone https://github.com/zivid/zivid-ros.git
-          fi
       - name: Prune Docker
         run: docker system prune -af
       
