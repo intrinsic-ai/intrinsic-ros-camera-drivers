@@ -10,7 +10,7 @@ FROM nvidia/cuda:12.5.1-base-ubuntu24.04 AS base
 
 ARG ZIVID_VERSION=2.17.0+5fc9f05e-1
 
-# Install ROS Jazzy
+# Install ROS Jazzy TODO remove
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg2 \
