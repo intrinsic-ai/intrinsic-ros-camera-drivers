@@ -1,8 +1,8 @@
 # Build up the service with these stages:
 #   - base (NVIDIA CUDA + ROS Jazzy + configs) ->
-#   - underlay (PULLED from GHCR, contains heavy dependencies) ->
+#   - underlay (PULLED from GHCR) ->
 #   - overlay (user service code built on top of underlay) ->
-#   - result (base + copied install folders of underlay and overlay)
+#   - result (base + copied install folder of underlay and overlay)
 
 # base stage: ros:jazzy + configs
 # base stage: NVIDIA CUDA base + ROS Jazzy + configs

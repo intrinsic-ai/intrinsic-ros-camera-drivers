@@ -19,14 +19,12 @@ FROM ghcr.io/intrinsic-dev/luxonis-underlay:latest AS underlay
 FROM underlay AS overlay
 
 ARG SERVICE_PACKAGE
-ARG DEPENDENCIES
 
 RUN apt-get update \
     && apt-get install -y \
         python3-protobuf \
         libopencv-dev \
         nlohmann-json3-dev \
-        ${DEPENDENCIES} \
         ros-jazzy-tf2-ros \
         ros-jazzy-tf2-geometry-msgs \
         libgl1-mesa-dev \
@@ -81,13 +79,11 @@ FROM base
 
 ARG SERVICE_PACKAGE
 ARG SERVICE_NAME
-ARG DEPENDENCIES
 
 RUN apt-get update \
     && apt-get install -y \
         python3-protobuf \
         libopencv-core-dev \
-        ${DEPENDENCIES} \
         iputils-ping \
         net-tools \
         ros-jazzy-tf2-ros \
