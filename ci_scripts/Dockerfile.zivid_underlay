@@ -13,6 +13,7 @@ WORKDIR /opt/ros/underlay
 ENV ROS_DISTRO=jazzy
 ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+ENV COMMON_SKIP_PACKAGES="intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake gz_msgs_vendor grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor gz_make_vendor gz_utils_vendor intrinsic_pybind11_vendor gz_math_vendor prometheus_cpp_vendor bazelisk_vendor flatbuffers_vendor opencensus_cpp_vendor pybind11_abseil_vendor pybind11_protobuf_vendor gz_cmake_vendor gz_transport_vendor"
 
 RUN mkdir -p /etc/OpenCL/vendors && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 ENV NVIDIA_VISIBLE_DEVICES=all

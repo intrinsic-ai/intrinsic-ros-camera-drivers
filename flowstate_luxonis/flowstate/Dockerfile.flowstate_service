@@ -20,27 +20,6 @@ FROM underlay AS overlay
 
 ARG SERVICE_PACKAGE
 
-RUN apt-get update \
-    && apt-get install -y \
-        python3-protobuf \
-        libopencv-dev \
-        nlohmann-json3-dev \
-        ros-jazzy-tf2-ros \
-        ros-jazzy-tf2-geometry-msgs \
-        libgl1-mesa-dev \
-        ros-jazzy-cv-bridge \
-        ros-jazzy-backward-ros \
-        ros-jazzy-camera-info-manager \
-        ros-jazzy-image-transport \
-        ros-jazzy-image-publisher \
-        ros-jazzy-tf2-eigen \
-        ros-jazzy-tf2-sensor-msgs \
-        ros-jazzy-diagnostic-updater \
-        curl zip unzip tar libusb-1.0-0-dev \
-        ros-jazzy-vision-msgs \
-        ros-jazzy-ffmpeg-image-transport-msgs \
-    && rm -rf /var/lib/apt/lists/*
-
 ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
 
 # skip a few packages that are already built, and are somewhat slow to process
@@ -52,25 +31,7 @@ RUN . /opt/ros/jazzy/setup.sh \
       --merge-install \
       --executor sequential \
       --packages-up-to=${SERVICE_PACKAGE} \
-      --packages-skip \
-        intrinsic_sdk \
-        intrinsic_sdk_ros \
-        intrinsic_sdk_cmake \
-        gz_msgs_vendor \
-        grpc_vendor \
-        abseil_cpp_vendor \
-        re2_vendor \
-        rmw_zenoh_cpp \
-        ortools_vendor \
-        eigen_vendor \
-        gz_make_vendor \
-        gz_utils_vendor \
-        intrinsic_pybind11_vendor \
-        gz_math_vendor \
-        prometheus_cpp_vendor \
-        bazelisk_vendor \
-        flatbuffers_vendor \
-        opencensus_cpp_vendor \
+      --packages-skip $COMMON_SKIP_PACKAGES \
       --cmake-args -DBUILD_SHARED_LIBS=ON -DDEPTHAI_BOOTSTRAP_VCPKG=ON \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /root/.cache
 

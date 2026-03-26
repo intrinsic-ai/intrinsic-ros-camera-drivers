@@ -1,3 +1,4 @@
+# ci_scripts/Dockerfile.core_underlay
 FROM ros:jazzy-ros-core AS underlay
 
 WORKDIR /opt/ros/underlay
@@ -5,10 +6,30 @@ ENV ROS_DISTRO=jazzy
 ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 
-# Install build tool
+# Install build tool and common dependencies for all underlays
 RUN apt-get update && apt install -y \
     clang ros-jazzy-ament-cmake-vendor-package ros-dev-tools git wget \
+    python3-protobuf \
+    libopencv-dev \
+    nlohmann-json3-dev \
+    ros-jazzy-tf2-ros \
+    ros-jazzy-tf2-geometry-msgs \
+    libgl1-mesa-dev \
+    ros-jazzy-cv-bridge \
+    ros-jazzy-backward-ros \
+    ros-jazzy-camera-info-manager \
+    ros-jazzy-image-transport \
+    ros-jazzy-image-publisher \
+    ros-jazzy-tf2-eigen \
+    ros-jazzy-tf2-sensor-msgs \
+    ros-jazzy-diagnostic-updater \
+    curl zip unzip tar libusb-1.0-0-dev \
+    ros-jazzy-vision-msgs \
+    ros-jazzy-ffmpeg-image-transport-msgs \
     && rm -rf /var/lib/apt/lists/*
+
+# Skip these packages in downstream service wrapper builds to save time
+ENV COMMON_SKIP_PACKAGES="intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake gz_msgs_vendor grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor gz_make_vendor gz_utils_vendor intrinsic_pybind11_vendor gz_math_vendor prometheus_cpp_vendor bazelisk_vendor flatbuffers_vendor opencensus_cpp_vendor pybind11_abseil_vendor pybind11_protobuf_vendor gz_cmake_vendor gz_transport_vendor"
 
 RUN rosdep init && rosdep update
 
