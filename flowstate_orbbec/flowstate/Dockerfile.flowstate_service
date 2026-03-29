@@ -62,6 +62,15 @@ ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-d
 ADD src/OrbbecSDK /opt/ros/overlay/src/OrbbecSDK
 ADD src/OrbbecSDK_ROS2 /opt/ros/overlay/src/OrbbecSDK_ROS2
 
+RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
+    && cd /opt/ros/overlay \
+    && colcon build \
+      --event-handlers=console_direct+ \
+      --merge-install \
+      --packages-select OrbbecSDK \
+      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DOB_BUILD_EXAMPLES=OFF -DOB_BUILD_TOOLS=OFF -DOB_BUILD_DOCS=OFF -DCMAKE_BUILD_TYPE=Release
+
 # skip a few packages that are already built, and are somewhat slow to process
 RUN . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
@@ -69,10 +78,10 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
       --event-handlers=console_direct+ \
       --merge-install \
-      --executor sequential \
+      --executor parallel \
       --packages-up-to=${SERVICE_PACKAGE} \
-      --packages-skip intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor \
-      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DCMAKE_BUILD_TYPE=Release
+      --packages-skip OrbbecSDK intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # result stage: base + copied install folders from the overlay + service setup
 FROM base
