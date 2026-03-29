@@ -775,25 +775,25 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
   return options;
 }
 
-bool AdapterNode::IsRgbEnabled() {
+bool AdapterNode::IsRgbEnabled() const {
   bool enable_rgb = true;
   get_parameter<bool>("enable_rgb", enable_rgb);
   return enable_rgb;
 }
 
-bool AdapterNode::IsDepthEnabled() {
+bool AdapterNode::IsDepthEnabled() const {
   bool enable_depth = true;
   get_parameter<bool>("enable_depth", enable_depth);
   return enable_depth;
 }
 
-bool AdapterNode::IsLeftIrEnabled() {
+bool AdapterNode::IsLeftIrEnabled() const {
   bool enable_left_ir = true;
   get_parameter<bool>("enable_left_ir", enable_left_ir);
   return enable_left_ir;
 }
 
-bool AdapterNode::IsRightIrEnabled() {
+bool AdapterNode::IsRightIrEnabled() const {
   bool enable_right_ir = true;
   get_parameter<bool>("enable_right_ir", enable_right_ir);
   return enable_right_ir;

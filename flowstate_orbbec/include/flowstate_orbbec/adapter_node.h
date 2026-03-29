@@ -44,10 +44,10 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   void InitializeParameters();
   rclcpp::NodeOptions CreateOrbbecNodeOptions(const std::string& serial);
 
-  bool IsRgbEnabled();
-  bool IsDepthEnabled();
-  bool IsLeftIrEnabled();
-  bool IsRightIrEnabled();
+  bool IsRgbEnabled() const;
+  bool IsDepthEnabled() const;
+  bool IsLeftIrEnabled() const;
+  bool IsRightIrEnabled() const;
 
   rclcpp::node_interfaces::PreSetParametersCallbackHandle::SharedPtr
       pre_set_parameters_callback_handle_;
