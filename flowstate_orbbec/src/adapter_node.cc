@@ -34,8 +34,8 @@ AdapterNode::AdapterNode(const std::string& serial,
     orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
         std::string(kOrbbecNodeName), OrbbecNodeNamespace(),
         CreateOrbbecNodeOptions(serial_));
-  } catch (...) {
-    RCLCPP_FATAL(get_logger(), "Some exception happened");
+  } catch (const std::exception& e) {
+    RCLCPP_FATAL(get_logger(), "Failed to create OBCameraNodeDriver: %s", e.what());
   }
 
   // Create a TF Listener, which will be used to query extrinsics
