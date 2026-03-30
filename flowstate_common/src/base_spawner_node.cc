@@ -81,6 +81,9 @@ void BaseSpawnerNode::CleanupDeadNodes(
       }
 
       it = spawned_nodes_.erase(it);
+      RCLCPP_INFO(get_logger(), "Waiting a few seconds after deleting node");
+      std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+      RCLCPP_INFO(get_logger(), "Done waiting after deleting node");
     } else {
       ++it;
     }
