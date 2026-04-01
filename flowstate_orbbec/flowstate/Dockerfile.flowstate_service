@@ -16,13 +16,22 @@ ARG SERVICE_PACKAGE
 
 ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
 
+RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
+    && cd /opt/ros/overlay \
+    && colcon build \
+      --event-handlers=console_direct+ \
+      --merge-install \
+      --packages-select OrbbecSDK \
+      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DOB_BUILD_EXAMPLES=OFF -DOB_BUILD_TOOLS=OFF -DOB_BUILD_DOCS=OFF -DCMAKE_BUILD_TYPE=Release
+
 # skip a few packages that are already built, and are somewhat slow to process
 RUN . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/overlay \
     && colcon build \
       --merge-install \
-      --executor sequential \
+      --executor parallel \
       --packages-up-to=${SERVICE_PACKAGE} \
       --packages-skip $COMMON_SKIP_PACKAGES \
       --cmake-args -DCMAKE_BUILD_TYPE=Release \

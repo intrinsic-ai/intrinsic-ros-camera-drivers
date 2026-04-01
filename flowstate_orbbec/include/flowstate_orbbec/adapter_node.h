@@ -27,6 +27,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
   AdapterNode(const std::string& serial,
               const std::vector<std::string>& locators);
+  virtual ~AdapterNode();
 
  private:
   absl::Status Main() override ABSL_LOCKS_EXCLUDED(timeout_mutex_);
@@ -41,6 +42,12 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   std::string DepthImageTopic() const;
 
   void InitializeParameters();
+  rclcpp::NodeOptions CreateOrbbecNodeOptions(const std::string& serial);
+
+  bool IsRgbEnabled() const;
+  bool IsDepthEnabled() const;
+  bool IsLeftIrEnabled() const;
+  bool IsRightIrEnabled() const;
 
   rclcpp::node_interfaces::PreSetParametersCallbackHandle::SharedPtr
       pre_set_parameters_callback_handle_;
@@ -90,6 +97,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   absl::Status PopulateExtrinsicsIfNeeded();
 
+  std::string OrbbecNodeNamespace();
+
   bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
@@ -126,11 +135,22 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_white_balance_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr set_gain_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_color_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_depth_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_left_ir_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_right_ir_client_;
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::unique_ptr<geometry_msgs::msg::TransformStamped> color_transform_;
+  std::unique_ptr<geometry_msgs::msg::TransformStamped> left_ir_transform_;
   std::unique_ptr<geometry_msgs::msg::TransformStamped> right_ir_transform_;
+
+  rclcpp::Time t_last_right_ir_image_ ABSL_GUARDED_BY(timeout_mutex_);
+  rclcpp::Time t_last_left_ir_image_ ABSL_GUARDED_BY(timeout_mutex_);
+  rclcpp::Time t_last_depth_image_ ABSL_GUARDED_BY(timeout_mutex_);
+
+  int reboot_count_ = 0;
 };
 
 }  // namespace flowstate_orbbec
