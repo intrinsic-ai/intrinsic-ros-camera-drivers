@@ -32,6 +32,7 @@ jobs:
           haskell: true
           large-packages: true
           docker-images: true
+          swap-storage: true
 
       - name: Checkout Camera Drivers
         uses: actions/checkout@v4
