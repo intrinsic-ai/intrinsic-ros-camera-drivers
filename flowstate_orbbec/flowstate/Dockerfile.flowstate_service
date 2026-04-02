@@ -6,7 +6,6 @@ WORKDIR /opt/ros/underlay
 ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 
-# 1. Pull the NEW pre-compiled Orbbec underlay!
 FROM ghcr.io/intrinsic-dev/orbbec-underlay:latest AS underlay
 
 # overlay stage: underlay + service code built

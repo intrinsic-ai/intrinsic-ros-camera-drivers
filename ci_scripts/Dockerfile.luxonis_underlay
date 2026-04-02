@@ -12,6 +12,7 @@ RUN apt-get update \
 ADD src/depthai-core /opt/ros/underlay/src/depthai-core
 ADD src/depthai-ros /opt/ros/underlay/src/depthai-ros
 
+# TODO remove this once the maintainer tag is added to the package.xml in the depthai-core repo
 RUN sed -i '/<\/license>/a \  <maintainer email="support@luxonis.com">Luxonis Support</maintainer>' \
     /opt/ros/underlay/src/depthai-core/package.xml
 
