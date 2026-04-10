@@ -27,16 +27,7 @@ AdapterNode::AdapterNode(const std::string& serial,
                          const std::vector<std::string>& locators)
     : flowstate_common::BaseAdapterNode(serial, locators, "orbbec") {
   InitializeParameters();
-
-  absl::MutexLock lock(&SpawnerNode::s_discovery_mutex);
-  RCLCPP_INFO(get_logger(), "Creating OBCameraNodeDriver for %s", serial_.c_str());
-  try {
-    orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
-        std::string(kOrbbecNodeName), OrbbecNodeNamespace(),
-        CreateOrbbecNodeOptions(serial_));
-  } catch (const std::exception& e) {
-    RCLCPP_FATAL(get_logger(), "Failed to create OBCameraNodeDriver: %s", e.what());
-  }
+  CreateOrbbecNode();
 
   // Create a TF Listener, which will be used to query extrinsics
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -174,7 +165,7 @@ void AdapterNode::InitializeParameters() {
 
   rcl_interfaces::msg::FloatingPointRange fps_range;
   fps_range.from_value = 5.0;
-  fps_range.to_value = 10.0;
+  fps_range.to_value = 30.0;
   fps_range.step = 5.0;
   rcl_interfaces::msg::ParameterDescriptor fps_descriptor;
   fps_descriptor.name = "fps";
@@ -304,6 +295,70 @@ void AdapterNode::PreSetParametersCallback(
     parameters.insert(parameters.begin(),
                       rclcpp::Parameter("auto_white_balance", false));
   }
+
+  const auto fps_it = std::find_if(
+      parameters.begin(), parameters.end(),
+      [](const rclcpp::Parameter& param) { return param.get_name() == "fps"; });
+  const bool sets_fps = (fps_it != parameters.end());
+  const double requested_fps = sets_fps ? fps_it->as_double() : fps_;
+
+  if (requested_fps > 5.0) {
+    // if FPS is > 10.0, ensure that only one stream is enabled. Otherwise
+    // change or add the request to 5 fps
+    const auto enable_color_it =
+        std::find_if(parameters.begin(), parameters.end(),
+                     [](const rclcpp::Parameter& param) {
+                       return param.get_name() == "enable_color";
+                     });
+    const bool requested_color = (enable_color_it != parameters.end())
+                                     ? enable_color_it->as_bool()
+                                     : IsRgbEnabled();
+
+    const auto enable_left_ir_it =
+        std::find_if(parameters.begin(), parameters.end(),
+                     [](const rclcpp::Parameter& param) {
+                       return param.get_name() == "enable_left_ir";
+                     });
+    const bool requested_left_ir = (enable_left_ir_it != parameters.end())
+                                       ? enable_left_ir_it->as_bool()
+                                       : IsLeftIrEnabled();
+    const auto enable_right_ir_it =
+        std::find_if(parameters.begin(), parameters.end(),
+                     [](const rclcpp::Parameter& param) {
+                       return param.get_name() == "enable_right_ir";
+                     });
+    const bool requested_right_ir = (enable_right_ir_it != parameters.end())
+                                        ? enable_right_ir_it->as_bool()
+                                        : IsLeftIrEnabled();
+
+    const auto enable_depth_it =
+        std::find_if(parameters.begin(), parameters.end(),
+                     [](const rclcpp::Parameter& param) {
+                       return param.get_name() == "enable_depth";
+                     });
+    const bool requested_depth = (enable_depth_it != parameters.end())
+                                     ? enable_depth_it->as_bool()
+                                     : IsLeftIrEnabled();
+
+    int num_streams = (requested_color ? 1 : 0) + (requested_left_ir ? 1 : 0) +
+                      (requested_right_ir ? 1 : 0) + (requested_depth ? 1 : 0);
+
+    RCLCPP_INFO(get_logger(), "number requested streams: %d", num_streams);
+    if (num_streams > 1) {
+      RCLCPP_ERROR(get_logger(),
+                   "requested >5 fps and >1 streams. Reducing fps to 5");
+      if (sets_fps) {
+        // overwrite the requested fps parameter in the vector with 5
+        for (size_t i = 0; i < parameters.size(); i++) {
+          if (parameters[i].get_name() == "fps") {
+            parameters[i] = rclcpp::Parameter("fps", 5.0);
+          }
+        }
+      } else {
+        parameters.insert(parameters.begin(), rclcpp::Parameter("fps", 5.0));
+      }
+    }
+  }
 }
 
 rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
@@ -330,9 +385,11 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
         break;
       }
     } else if (parameter.get_name() == "fps") {
-      if (parameter.as_double() != 5.0 && parameter.as_double() != 10.0) {
+      if (parameter.as_double() != 5.0 && parameter.as_double() != 10.0 &&
+          parameter.as_double() != 15.0 && parameter.as_double() != 30.0) {
         result.successful = false;
-        result.reason = "fps must be either 5 or 10";
+        result.reason =
+            "fps must be either 5, 10, 15, or 30, and fit in 1 gigabit/sec.";
         break;
       }
     }
@@ -344,6 +401,40 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
 // in this case by forwarding them to the Orbbec Driver node.
 void AdapterNode::PostSetParametersCallback(
     const std::vector<rclcpp::Parameter>& parameters) {
+
+  // First, check if we need to adjust FPS, since that requires a camera reset
+  // If we are resetting the camera, many of the subsequent changes are already
+  // running, so we need to not toggle them again.
+  bool reset_complete_ = false;
+  for (const rclcpp::Parameter& parameter : parameters) {
+    if (parameter.get_name() == "fps") {
+      if (fps_ == parameter.as_double()) {
+        RCLCPP_INFO(get_logger(), "Ignoring identical FPS request: %.1f", fps_);
+        continue;
+      }
+      RCLCPP_INFO(get_logger(), "Resetting camera to set fps: %.1f", fps_);
+      fps_ = parameter.as_double();
+      {
+        absl::MutexLock timeout_lock(&timeout_mutex_);
+        t_last_color_image_ = get_clock()->now();
+        t_last_left_ir_image_ = get_clock()->now();
+        t_last_right_ir_image_ = get_clock()->now();
+        t_last_depth_image_ = get_clock()->now();
+      }
+
+      try {
+        orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
+            std::string(kOrbbecNodeName), OrbbecNodeNamespace(),
+            CreateOrbbecNodeOptions(serial_));
+      } catch (const std::exception& e) {
+        RCLCPP_FATAL(get_logger(), "Failed to create OBCameraNodeDriver: %s",
+                     e.what());
+      }
+      reset_complete_ = true;
+    }
+  }
+
+  // Now, handle everything _other_ than fps
   for (const rclcpp::Parameter& parameter : parameters) {
     std::string value_str = "(type not converted to string)";
     if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_BOOL) {
@@ -382,21 +473,19 @@ void AdapterNode::PostSetParametersCallback(
       CallAsyncSet(set_white_balance_client_, parameter.as_int());
     } else if (parameter.get_name() == "gain") {
       CallAsyncSet(set_gain_client_, parameter.as_int());
-    } else if (parameter.get_name() == "fps") {
-      RCLCPP_WARN(get_logger(), "fps parameter is not currently implemented");
-    } else if (parameter.get_name() == "enable_rgb") {
+    } else if (parameter.get_name() == "enable_rgb" && !reset_complete_) {
       absl::MutexLock timeout_lock(&timeout_mutex_);
       t_last_color_image_ = get_clock()->now();
       CallAsyncSet(toggle_color_client_, parameter.as_bool());
-    } else if (parameter.get_name() == "enable_left_ir") {
+    } else if (parameter.get_name() == "enable_left_ir" && !reset_complete_) {
       absl::MutexLock timeout_lock(&timeout_mutex_);
       t_last_left_ir_image_ = get_clock()->now();
       CallAsyncSet(toggle_left_ir_client_, parameter.as_bool());
-    } else if (parameter.get_name() == "enable_right_ir") {
+    } else if (parameter.get_name() == "enable_right_ir" && !reset_complete_) {
       absl::MutexLock timeout_lock(&timeout_mutex_);
       t_last_right_ir_image_ = get_clock()->now();
       CallAsyncSet(toggle_right_ir_client_, parameter.as_bool());
-    } else if (parameter.get_name() == "enable_depth") {
+    } else if (parameter.get_name() == "enable_depth" && !reset_complete_) {
       absl::MutexLock timeout_lock(&timeout_mutex_);
       t_last_depth_image_ = get_clock()->now();
       CallAsyncSet(toggle_depth_client_, parameter.as_bool());
@@ -481,7 +570,6 @@ absl::Status AdapterNode::Main() {
       });
 
   executor.add_node(this->get_node_base_interface());
-  executor.add_node(orbbec_node_->get_node_base_interface());
   executor.spin();
   RCLCPP_INFO(get_logger(), "Exiting AdapterNode::Main()");
   return absl::OkStatus();
@@ -543,15 +631,19 @@ AdapterNode::BuildSnapshotResponse() {
 
   // Currently, Flowstate is querying this service much faster than
   // images are being produced. In order to avoid sending the same
-  // image over and over (on average, it is sent 4 times per "real"
-  // image), as a temporary measure this manual sleep_for() will
-  // slow the response down to match the camera's actual 5 fps rate.
+  // image over and over (on average, it is sent as fast as every 50ms),
+  // as a temporary measure this manual sleep_for() will
+  // slow the response down to match the camera's actual fps.
   // Because the iamge mutex is not locked until the following block,
   // this does not increase latency, it only slows the response rate
   // to prevent unnecessary immediate re-query of the same frame.
   // This should be replaced in the future by a more sophisticated
   // method.
-  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+  double delay_seconds = 1.0 / fps_ - 0.05;
+  if (delay_seconds > 0.0) {
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(static_cast<int>(delay_seconds * 1000)));
+  }
 
   // Lock and copy the most recent CameraInfo and Image messages
   {
@@ -722,7 +814,9 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
 
   if (IsRgbEnabled()) {
     options =
-        options.append_parameter_override(rclcpp::Parameter("color_fps", 5))
+        options
+            .append_parameter_override(
+                rclcpp::Parameter("color_fps", static_cast<int>(fps_)))
             .append_parameter_override(rclcpp::Parameter("color_format", "RGB"))
             .append_parameter_override(rclcpp::Parameter("color_width", 1280))
             .append_parameter_override(rclcpp::Parameter("color_height", 800))
@@ -735,7 +829,9 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
 
   if (IsDepthEnabled()) {
     options =
-        options.append_parameter_override(rclcpp::Parameter("depth_fps", 5))
+        options
+            .append_parameter_override(
+                rclcpp::Parameter("depth_fps", static_cast<int>(fps_)))
             .append_parameter_override(rclcpp::Parameter("enable_depth", true));
   } else {
     options = options.append_parameter_override(
@@ -744,7 +840,9 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
 
   if (IsLeftIrEnabled()) {
     options =
-        options.append_parameter_override(rclcpp::Parameter("left_ir_fps", 5))
+        options
+            .append_parameter_override(
+                rclcpp::Parameter("left_ir_fps", static_cast<int>(fps_)))
             .append_parameter_override(
                 rclcpp::Parameter("left_ir_format", "Y8"))
             .append_parameter_override(rclcpp::Parameter("left_ir_width", 1280))
@@ -757,16 +855,17 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
   }
 
   if (IsRightIrEnabled()) {
-    options =
-        options.append_parameter_override(rclcpp::Parameter("right_ir_fps", 5))
-            .append_parameter_override(
-                rclcpp::Parameter("right_ir_format", "Y8"))
-            .append_parameter_override(
-                rclcpp::Parameter("right_ir_width", 1280))
-            .append_parameter_override(
-                rclcpp::Parameter("right_ir_height", 800))
-            .append_parameter_override(
-                rclcpp::Parameter("enable_right_ir", true));
+    options = options
+                  .append_parameter_override(
+                      rclcpp::Parameter("right_ir_fps", static_cast<int>(fps_)))
+                  .append_parameter_override(
+                      rclcpp::Parameter("right_ir_format", "Y8"))
+                  .append_parameter_override(
+                      rclcpp::Parameter("right_ir_width", 1280))
+                  .append_parameter_override(
+                      rclcpp::Parameter("right_ir_height", 800))
+                  .append_parameter_override(
+                      rclcpp::Parameter("enable_right_ir", true));
   } else {
     options = options.append_parameter_override(
         rclcpp::Parameter("enable_right_ir", false));
@@ -797,6 +896,52 @@ bool AdapterNode::IsRightIrEnabled() const {
   bool enable_right_ir = true;
   get_parameter<bool>("enable_right_ir", enable_right_ir);
   return enable_right_ir;
+}
+
+void AdapterNode::CreateOrbbecNode() {
+  absl::MutexLock lock(&SpawnerNode::s_discovery_mutex);
+  RCLCPP_INFO(get_logger(), "Creating OBCameraNodeDriver for %s",
+              serial_.c_str());
+  if (orbbec_node_) {
+    RCLCPP_INFO(get_logger(), "Orbbec node already existed. Destroying it");
+    DestroyOrbbecNode();
+  }
+
+  try {
+    orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
+        std::string(kOrbbecNodeName), OrbbecNodeNamespace(),
+        CreateOrbbecNodeOptions(serial_));
+  } catch (const std::exception& e) {
+    RCLCPP_FATAL(get_logger(), "Failed to create OBCameraNodeDriver: %s", e.what());
+  }
+  orbbec_thread_ = std::make_unique<std::thread>([this]() {
+    this->orbbec_executor_ =
+        std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
+    this->orbbec_executor_->add_node(
+        this->orbbec_node_->get_node_base_interface());
+    this->orbbec_executor_->spin();
+  });
+  RCLCPP_INFO(get_logger(), "Sleeping a bit to allow Orbbec thread to start");
+  rclcpp::sleep_for(std::chrono::seconds(2));
+}
+
+void AdapterNode::DestroyOrbbecNode() {
+  RCLCPP_INFO(get_logger(), "Destroying orbbec_node");
+  orbbec_node_.reset();
+  RCLCPP_INFO(get_logger(), "Waiting a few seconds");
+  rclcpp::sleep_for(std::chrono::seconds(10));
+  if (orbbec_executor_) {
+    orbbec_executor_->cancel();
+    orbbec_executor_.reset();
+  }
+  if (!orbbec_thread_) {
+    RCLCPP_ERROR(get_logger(), "Expected orbbec_thread to exist!");
+  } else {
+    RCLCPP_INFO(get_logger(), "Joining orbbec_thread");
+    orbbec_thread_->join();
+    RCLCPP_INFO(get_logger(), "Done joining orbbec_thread");
+    orbbec_thread_.reset();
+  }
 }
 
 }  // namespace flowstate_orbbec

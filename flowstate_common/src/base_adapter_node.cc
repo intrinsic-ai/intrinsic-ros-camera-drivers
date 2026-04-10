@@ -114,8 +114,6 @@ void BaseAdapterNode::SnapshotCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
         response) {
-  RCLCPP_INFO(get_logger(), "=== SNAPSHOT SERVICE ===");
-
   absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
       snapshot_response = BuildSnapshotResponse();
 
