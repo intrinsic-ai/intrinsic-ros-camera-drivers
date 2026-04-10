@@ -1,4 +1,5 @@
 #include "flowstate_ensenso/spawner_node.h"
+#include "flowstate_ensenso/adapter_node.h"
 
 #include <regex>
 #include <unordered_set>

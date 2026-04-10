@@ -68,7 +68,7 @@ if (intrinsic_sdk_ros_FOUND)
     ensenso_driver_protos
     rclcpp::rclcpp
   )
-  add_dependencies(flowstate_service ensenso_driver_manifest)
+  add_dependencies(flowstate_service ensenso_driver_manifest ensenso_driver_default_config)
   install(TARGETS flowstate_service
           DESTINATION lib/${PROJECT_NAME})
 else()
