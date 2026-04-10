@@ -125,9 +125,9 @@ COPY --from=overlay /opt/ros/overlay/install /opt/ros/overlay/install
 
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/local.conf && ldconfig
 
-RUN cp \
-        /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/service_manifest.binarypb \
-        /service_manifest.binarypb \
+RUN cp /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/service_manifest.binarypb /service_manifest.binarypb \
+    && cp /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/default_config.binarypb /default_config.binarypb \
+    && cp /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/ensenso_driver_protos.desc /parameter-descriptor-set.proto.bin \
     && sed --in-place \
         --expression '$isource "/opt/ros/overlay/install/setup.bash"' \
         /ros_entrypoint.sh
