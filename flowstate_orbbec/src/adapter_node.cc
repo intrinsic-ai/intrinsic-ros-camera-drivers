@@ -329,7 +329,7 @@ void AdapterNode::PreSetParametersCallback(
                      });
     const bool requested_right_ir = (enable_right_ir_it != parameters.end())
                                         ? enable_right_ir_it->as_bool()
-                                        : IsLeftIrEnabled();
+                                        : IsRightIrEnabled();
 
     const auto enable_depth_it =
         std::find_if(parameters.begin(), parameters.end(),
@@ -338,7 +338,7 @@ void AdapterNode::PreSetParametersCallback(
                      });
     const bool requested_depth = (enable_depth_it != parameters.end())
                                      ? enable_depth_it->as_bool()
-                                     : IsLeftIrEnabled();
+                                     : IsDepthEnabled();
 
     int num_streams = (requested_color ? 1 : 0) + (requested_left_ir ? 1 : 0) +
                       (requested_right_ir ? 1 : 0) + (requested_depth ? 1 : 0);
@@ -422,14 +422,7 @@ void AdapterNode::PostSetParametersCallback(
         t_last_depth_image_ = get_clock()->now();
       }
 
-      try {
-        orbbec_node_ = std::make_unique<orbbec_camera::OBCameraNodeDriver>(
-            std::string(kOrbbecNodeName), OrbbecNodeNamespace(),
-            CreateOrbbecNodeOptions(serial_));
-      } catch (const std::exception& e) {
-        RCLCPP_FATAL(get_logger(), "Failed to create OBCameraNodeDriver: %s",
-                     e.what());
-      }
+      CreateOrbbecNode();
       reset_complete_ = true;
     }
   }
