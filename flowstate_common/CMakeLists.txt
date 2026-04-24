@@ -15,8 +15,11 @@
 cmake_minimum_required(VERSION 3.8)
 project(flowstate_camera_common)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 20)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
+
 
 add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 

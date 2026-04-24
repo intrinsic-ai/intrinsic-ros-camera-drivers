@@ -3,6 +3,7 @@
 
 #include <regex>
 #include <unordered_set>
+#include <nxLib.h>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -10,24 +11,31 @@ namespace flowstate_ensenso {
 
 SpawnerNode::SpawnerNode()
     : flowstate_common::BaseSpawnerNode("ensenso_spawner", "ensenso",
-                                      std::chrono::seconds(20)) {}
+                                      std::chrono::seconds(20)) {
+  nxLibInitialize();
+}
+
+SpawnerNode::~SpawnerNode() {
+  nxLibFinalize();
+}
 
 std::vector<std::string> SpawnerNode::GetSerials() {
   std::vector<std::string> serials;
-  std::unordered_set<std::string> serial_set;
-  static const std::regex topic_pattern(
-      R"(^/ensenso/camera_([^/]+)/rectified/left/image$)");
-
-  const auto topics = this->get_topic_names_and_types();
-  for (const auto& topic_entry : topics) {
-    std::smatch match;
-    if (std::regex_match(topic_entry.first, match, topic_pattern) &&
-        match.size() == 2) {
-      serial_set.insert(match[1].str());
+  try {
+    NxLibItem cameras = NxLibItem()["Cameras"]["BySerialNo"];
+    
+    if (cameras.exists()) {
+      for (int i = 0; i < cameras.count(); ++i) {
+        std::string name = cameras[i].name();
+        if (name != "BySerialNo" && name != "ByEepromId") {
+          serials.push_back(name);
+        }
+      }
     }
-  }
 
-  serials.assign(serial_set.begin(), serial_set.end());
+  } catch (const std::exception& e) {
+    RCLCPP_ERROR(get_logger(), "Failed to get serials from NxLib: %s", e.what());
+  }
   return serials;
 }
 
@@ -37,10 +45,25 @@ SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
   std::unordered_set<std::string> serials_to_spawn(serials.begin(), serials.end());
 
   for (const auto& serial : serials_to_spawn) {
-    RCLCPP_INFO(get_logger(), "Spawning Ensenso adapter for camera %s",
-                serial.c_str());
-    new_nodes.push_back(std::make_shared<flowstate_ensenso::AdapterNode>(
-        serial, std::vector<std::string>{}));
+    bool is_available = false;
+    
+    // Check if the camera is ready to be claimed before spawning
+    try {
+      NxLibItem available_item = NxLibItem()["Cameras"]["BySerialNo"][serial]["Status"]["Available"];
+      if (available_item.exists()) {
+        is_available = available_item.asBool();
+      }
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR(get_logger(), "NxLib error checking availability for %s: %s", serial.c_str(), e.what());
+    }
+
+    if (is_available) {
+      RCLCPP_INFO(get_logger(), "Spawning Ensenso adapter for camera %s", serial.c_str());
+      new_nodes.push_back(std::make_shared<flowstate_ensenso::AdapterNode>(
+          serial, std::vector<std::string>{}));
+    } else {
+      RCLCPP_WARN(get_logger(), "Camera %s physically present but UNAVAILABLE. Waiting...", serial.c_str());
+    }
   }
 
   return new_nodes;

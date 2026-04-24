@@ -9,6 +9,7 @@
 
   <depend>abseil_cpp_vendor</depend>
   <depend>flowstate_camera_common</depend>
+  <depend>ensenso_camera</depend>
   <depend>geometry_msgs</depend>
   <depend>intrinsic_sdk_ros</depend>
   <depend>rcl_interfaces</depend>

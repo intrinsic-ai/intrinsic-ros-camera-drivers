@@ -12,6 +12,7 @@ namespace flowstate_ensenso {
 class SpawnerNode : public flowstate_common::BaseSpawnerNode {
  public:
   SpawnerNode();
+  virtual ~SpawnerNode();
 
  protected:
   std::vector<std::string> GetSerials() override;
