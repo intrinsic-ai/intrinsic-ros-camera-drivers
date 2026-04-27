@@ -96,3 +96,73 @@ eligible for the [Google Open Source Software Vulnerability Rewards
 Program](https://bughunters.google.com/open-source-security).
 
 These drivers are designed to be compatible with the Intrinsic Platform. Use of the Intrinsic Platform is subject to the Intrinsic Terms of Service. Please review them here: [Intrinsic Platform Terms of Service URL](https://www.intrinsic.ai/legal/platform-terms)
+
+# Ensenso details
+
+To build and run the Ensenso driver locally follow these steps:
+
+1. **Clone the Ensenso ROS 2 Driver**:
+   Clone the official Ensenso ROS driver repository into your workspace `src` directory.
+   ```bash
+   cd ~/ros_cameras_ws/src
+   git clone https://github.com/ensenso/ros_driver
+   ```
+
+2. **Prepare the ROS 2 Build**:
+   Navigate to the cloned directory and run the prepare script. This ignores ROS1 packages and prepares ROS2 files.
+   ```bash
+   cd ~/ros_cameras_ws/src/ros_driver
+   export ROS_VERSION=2
+   ./.github/scripts/prepare_ros2_build.sh
+   ```
+
+3. **Install Ensenso SDK and Dependencies**:
+   You can install the dependencies either by running the provided script or manually.
+
+   **Option A (Recommended): Using the script**
+   ```bash
+   export ENSENSO_INSTALL=/opt/ensenso
+   export ENSENSO_SDK_VERSION=4.3.905 # Version used in Dockerfile
+   export ROS_VERSION=2
+   export ROS_DISTRO=jazzy
+   ./.github/scripts/install_external_dependencies.sh
+   ```
+
+   **Option B: Manual installation**
+   If you already have the SDK installed (e.g., via `wget` and `dpkg`), you can install the remaining dependencies:
+   ```bash
+   sudo apt update
+   sudo apt install -y libopencv-dev python3-opencv
+   sudo apt install -y ros-jazzy-tf-transformations
+   sudo pip3 install transforms3d --break-system-packages
+   ```
+
+   For xacro-based launch files, install these additional dependencies:
+   ```bash
+   sudo apt install -y ros-jazzy-joint-state-publisher-gui
+   sudo apt install -y ros-jazzy-xacro
+   ```
+
+4. **Build the Packages**:
+   Navigate to the workspace root and build `flowstate_ensenso`.
+   ```bash
+   cd ~/ros_cameras_ws
+   source /opt/ros/jazzy/setup.bash
+   colcon build --packages-above-and-dependencies flowstate_ensenso
+   ```
+
+5. **Run the Nodes and Scripts**:
+   After the build, you can run the Ensenso camera nodes and Python scripts.
+   ```bash
+   source ~/ros_cameras_ws/install/setup.bash
+
+   # To see available scripts and nodes
+   ros2 run ensenso_camera <tab><tab>
+
+   # To see available launch files
+   ros2 launch ensenso_camera <tab><tab>
+   ```
+   To test the Flowstate specific node:
+   ```bash
+   ros2 run flowstate_ensenso ensenso_spawner_node
+   ```
