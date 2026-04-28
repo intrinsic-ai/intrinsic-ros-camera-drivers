@@ -26,7 +26,7 @@ UNDERLAY_DOCKERFILE="src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.${CA
 LOCAL_TAG="intrinsic-dev-orbbec_gemini_driver-underlay:latest"
 
 echo " Building local core underlay..."
-docker build -t "intrinsic-dev-core-underlay:latest" -f "src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay" src/flowstate-ros-camera-drivers/
+docker build -t "intrinsic-dev-core-underlay:latest" -f "src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay" .
 
 echo " Building local underlay for $CAMERA_TYPE..."  
 docker build -t "$LOCAL_TAG" -f "$UNDERLAY_DOCKERFILE" src/flowstate-ros-camera-drivers/

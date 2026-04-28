@@ -95,7 +95,12 @@ jobs:
       - name: Fetch and Alias Underlay
         run: |
           # The daily build pushes to ghcr.io/intrinsic-dev/camera_underlay
-          REMOTE_IMAGE="ghcr.io/intrinsic-dev/${{ matrix.camera }}_underlay:latest"
+          if [ "${{ matrix.camera }}" == "orbbec_gemini" ]; then
+            REMOTE_CAMERA="orbbec"
+          else
+            REMOTE_CAMERA="${{ matrix.camera }}"
+          fi
+          REMOTE_IMAGE="ghcr.io/intrinsic-dev/${REMOTE_CAMERA}-underlay:latest"
           
           LOCAL_TAG="intrinsic-dev-${{ matrix.camera }}_driver-underlay:latest"
           
