@@ -19,6 +19,17 @@ if [ ! -d "src/sdk-ros" ] || [ ! -d "src/flowstate-ros-camera-drivers" ]; then
 fi
 
 set -o errexit
+
+CAMERA_TYPE="zivid"
+UNDERLAY_DOCKERFILE="src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.${CAMERA_TYPE}_underlay"
+
+LOCAL_TAG="intrinsic-dev-${CAMERA_TYPE}_driver-underlay:latest"
+
+echo " Building local core underlay..."
+docker build -t "intrinsic-dev-core-underlay:latest" -f "src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay" src/flowstate-ros-camera-drivers/
+
+echo " Building local underlay for $CAMERA_TYPE..."  
+docker build -t "$LOCAL_TAG" -f "$UNDERLAY_DOCKERFILE" src/flowstate-ros-camera-drivers/
 set -o verbose
 
 src/sdk-ros/scripts/setup_docker.sh

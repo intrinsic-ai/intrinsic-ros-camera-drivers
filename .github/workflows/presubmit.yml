@@ -24,7 +24,7 @@ jobs:
         id: filter
         with:
           filters: |
-            orbbec:
+            orbbec_gemini:
               - 'flowstate_orbbec/**'
               - 'flowstate_common/**'
             luxonis:
@@ -81,14 +81,41 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Fetch and Alias Core Underlay
+        run: |
+          REMOTE_IMAGE="ghcr.io/intrinsic-dev/core-underlay:latest"
+          LOCAL_TAG="intrinsic-dev-core-underlay:latest"
+          
+          echo "Pulling $REMOTE_IMAGE..."
+          docker pull $REMOTE_IMAGE
+          
+          echo "Aliasing to $LOCAL_TAG..."
+          docker tag $REMOTE_IMAGE $LOCAL_TAG
+
+      - name: Fetch and Alias Underlay
+        run: |
+          # The daily build pushes to ghcr.io/intrinsic-dev/camera_underlay
+          REMOTE_IMAGE="ghcr.io/intrinsic-dev/${{ matrix.camera }}_underlay:latest"
+          
+          LOCAL_TAG="intrinsic-dev-${{ matrix.camera }}_driver-underlay:latest"
+          
+          echo "Pulling $REMOTE_IMAGE..."
+          docker pull $REMOTE_IMAGE
+          
+          echo "Aliasing to $LOCAL_TAG..."
+          docker tag $REMOTE_IMAGE $LOCAL_TAG
+
       - name: Build Service Bundle
         working-directory: workspace
         run: |
           chmod +x src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh
-          # Set the exact service name based on the camera type
-          if [ "${{ matrix.camera }}" == "orbbec" ]; then
-            TARGET_SERVICE="orbbec_gemini_driver"
+          TARGET_SERVICE="${{ matrix.camera }}_driver"
+          
+          # Map matrix name to folder name for Orbbec
+          if [ "${{ matrix.camera }}" == "orbbec_gemini" ]; then
+            FOLDER_NAME="flowstate_orbbec"
           else
-            TARGET_SERVICE="${{ matrix.camera }}_driver"
+            FOLDER_NAME="flowstate_${{ matrix.camera }}"
           fi
-          ./src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh $TARGET_SERVICE flowstate_${{ matrix.camera }}
+          
+          ./src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh $TARGET_SERVICE $FOLDER_NAME

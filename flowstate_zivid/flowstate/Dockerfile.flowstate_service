@@ -29,7 +29,7 @@ ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 
 # underlay stage: pull pre-built dependencies from GHCR
-FROM ghcr.io/intrinsic-dev/zivid-underlay:latest AS underlay
+FROM intrinsic-dev-zivid_driver-underlay:latest AS underlay
 
 # overlay stage: underlay + service code built
 FROM underlay AS overlay

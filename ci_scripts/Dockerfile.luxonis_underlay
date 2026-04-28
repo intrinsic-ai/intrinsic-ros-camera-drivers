@@ -1,5 +1,5 @@
 # ci_scripts/Dockerfile.luxonis_underlay
-FROM ghcr.io/intrinsic-dev/core-underlay:latest AS underlay
+FROM intrinsic-dev-core-underlay:latest AS underlay
 
 RUN apt-get update \
     && apt-get install -y \

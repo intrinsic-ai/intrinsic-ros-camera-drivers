@@ -1,5 +1,5 @@
 # Dockerfile.orbbec_underlay
-FROM ghcr.io/intrinsic-dev/core-underlay:latest AS underlay
+FROM intrinsic-dev-core-underlay:latest AS underlay
 
 ADD src/OrbbecSDK /opt/ros/underlay/src/OrbbecSDK
 ADD src/OrbbecSDK_ROS2 /opt/ros/underlay/src/OrbbecSDK_ROS2

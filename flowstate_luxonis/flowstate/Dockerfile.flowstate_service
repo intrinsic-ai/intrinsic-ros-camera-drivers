@@ -13,7 +13,7 @@ ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 
 # Underlay pulled from registry
-FROM ghcr.io/intrinsic-dev/luxonis-underlay:latest AS underlay
+FROM intrinsic-dev-luxonis_driver-underlay:latest AS underlay
 
 # overlay stage: underlay + service code built
 FROM underlay AS overlay
