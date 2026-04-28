@@ -32,9 +32,23 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
   BuildSnapshotResponse() override ABSL_LOCKS_EXCLUDED(data_mutex_);
 
+  void InitializeParameters();
+  rcl_interfaces::msg::SetParametersResult SetParametersCallback(
+      const std::vector<rclcpp::Parameter>& parameters);
+
   std::string DepthImageTopic() const;
   std::string LeftCameraInfoTopic() const;
   std::string DepthCameraInfoTopic() const;
+
+  struct CaptureParameters {
+    double exposure_time = 0.01;
+    double gain = 1.0;
+    double gamma = 1.0;
+    double projector_brightness = 1.0;
+    double aperture = 1.0;
+    bool outlier_removal_enabled = false;
+    double outlier_removal_threshold = 0.5;
+  };
 
   struct CaptureData {
     sensor_msgs::msg::Image::UniquePtr left_image;
@@ -54,9 +68,14 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   // Ensenso uses an Action instead of a Service to trigger data
   rclcpp_action::Client<ensenso_camera_msgs::action::RequestData>::SharedPtr request_data_client_;
+  rclcpp_action::Client<ensenso_camera_msgs::action::SetParameter>::SharedPtr set_parameter_client_;
 
   mutable absl::Mutex data_mutex_;
   CaptureData data_ ABSL_GUARDED_BY(data_mutex_);
+
+  CaptureParameters capture_params_ ABSL_GUARDED_BY(capture_params_mutex_);
+  mutable absl::Mutex capture_params_mutex_;
+  rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr set_parameters_callback_handle_;
 };
 
 }  // namespace flowstate_ensenso
