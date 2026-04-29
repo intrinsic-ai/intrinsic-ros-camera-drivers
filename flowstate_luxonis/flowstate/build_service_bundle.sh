@@ -20,17 +20,40 @@ fi
 
 set -o errexit
 
-CAMERA_TYPE="luxonis"
-UNDERLAY_DOCKERFILE="src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.${CAMERA_TYPE}_underlay"
-
-LOCAL_TAG="intrinsic-dev-${CAMERA_TYPE}_driver-underlay:latest"
-
-echo " Building local core underlay..."
-docker build -t "intrinsic-dev-core-underlay:latest" -f "src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay" .
-
-echo " Building local underlay for $CAMERA_TYPE..."  
-docker build -t "$LOCAL_TAG" -f "$UNDERLAY_DOCKERFILE" src/flowstate-ros-camera-drivers/
-set -o verbose
 src/sdk-ros/scripts/setup_docker.sh
-src/sdk-ros/scripts/build_container.sh --service_name luxonis_driver --service_package flowstate_luxonis --dockerfile src/flowstate-ros-camera-drivers/flowstate_luxonis/flowstate/Dockerfile.flowstate_service
-src/sdk-ros/scripts/build_bundle.sh --service_name luxonis_driver --service_package flowstate_luxonis
+
+CAMERA_TYPE="luxonis"
+SERVICE_NAME="luxonis_driver"
+SERVICE_PACKAGE="flowstate_luxonis"
+LOCAL_TAG="intrinsic-dev-${SERVICE_NAME}-underlay:latest"
+FINAL_TAG="${SERVICE_PACKAGE}:${SERVICE_NAME}"
+
+echo "Building local core underlay..."
+docker build -t "intrinsic-dev-core-underlay:latest" \
+  -f "src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay" .
+
+echo "Building local underlay for $CAMERA_TYPE..."
+docker build -t "$LOCAL_TAG" \
+  -f "src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.${CAMERA_TYPE}_underlay" .
+
+echo "Building final service image..."
+docker build -t "$FINAL_TAG" \
+  -f "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/Dockerfile.flowstate_service" \
+  --build-arg="SERVICE_PACKAGE=$SERVICE_PACKAGE" \
+  --build-arg="SERVICE_NAME=$SERVICE_NAME" \
+  --build-arg="SERVICE_EXECUTABLE_NAME=${SERVICE_NAME}_main" \
+  --build-arg="ROS_DISTRO=jazzy" \
+  --build-arg="UNDERLAY_TAG=$LOCAL_TAG" \
+  .
+
+TAR_DEST="./images/${SERVICE_NAME}/${SERVICE_NAME}.tar"
+mkdir -p "./images/${SERVICE_NAME}"
+
+echo "Exporting image to ${TAR_DEST}..."
+docker save -o "$TAR_DEST" "$FINAL_TAG"
+
+set -o verbose
+src/sdk-ros/scripts/build_bundle.sh \
+  --service_name "$SERVICE_NAME" \
+  --service_package "$SERVICE_PACKAGE" \
+  --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto"
