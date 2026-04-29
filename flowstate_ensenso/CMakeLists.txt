@@ -10,6 +10,7 @@ add_compile_definitions(ROS2)
 
 find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
+find_package(absl REQUIRED)
 find_package(flowstate_camera_common REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
@@ -33,20 +34,30 @@ find_package(geometry_msgs REQUIRED)
 find_package(ensenso_camera REQUIRED)
 find_package(intrinsic_sdk_ros QUIET)
 
-include_directories(
-  include
-  /opt/ensenso/development/c/include
-  /opt/ros/underlay/install/include
-)
+find_path(NXLIB_INCLUDE_DIR nxLib.h PATHS /opt/ensenso/development/c/include)
+find_library(NXLIB_LIBRARY NxLib64 PATHS /opt/ensenso/development/c/lib64)
 
-link_directories(
-  /opt/ensenso/development/c/lib64
-  /opt/ros/underlay/install/lib
-)
+if(NOT NXLIB_INCLUDE_DIR OR NOT NXLIB_LIBRARY)
+  message(FATAL_ERROR "NxLib not found! Please ensure Ensenso SDK is installed.")
+endif()
 
-add_library(flowstate_ensenso
+add_library(flowstate_ensenso SHARED
   src/adapter_node.cc
   src/spawner_node.cc
+)
+
+target_include_directories(flowstate_ensenso PUBLIC
+  include
+)
+
+target_include_directories(flowstate_ensenso PRIVATE
+  ${NXLIB_INCLUDE_DIR}
+)
+
+find_library(ENSENSO_CAMERA_LIB 
+  NAMES ensenso_camera ensenso_camera_node ensenso_camera_component
+  PATHS /opt/ros/underlay/install/ensenso_camera/lib /opt/ros/underlay/install/lib
+  REQUIRED
 )
 
 target_link_libraries(flowstate_ensenso
@@ -55,8 +66,8 @@ target_link_libraries(flowstate_ensenso
   absl::statusor
   absl::synchronization
   absl::strings
-  NxLib64
-  ensenso_camera
+  ${NXLIB_LIBRARY}
+  ${ENSENSO_CAMERA_LIB} # <--- Links the absolute path of the .so file
 )
 
 ament_target_dependencies(flowstate_ensenso
@@ -85,12 +96,10 @@ ament_target_dependencies(flowstate_ensenso
 
 add_executable(ensenso_spawner_node src/ros_main.cc)
 target_link_libraries(ensenso_spawner_node flowstate_ensenso)
-ament_target_dependencies(ensenso_spawner_node
-  rclcpp
-)
+ament_target_dependencies(ensenso_spawner_node rclcpp)
 
 if (intrinsic_sdk_ros_FOUND)
-  message("intrinsic_sdk_ros found")
+  message(STATUS "intrinsic_sdk_ros found")
   intrinsic_sdk_generate_service_manifest(
     SERVICE_NAME ensenso_driver
     MANIFEST flowstate/ensenso_driver.manifest.textproto
@@ -111,17 +120,26 @@ if (intrinsic_sdk_ros_FOUND)
     flowstate_ensenso
     intrinsic_sdk_cmake::intrinsic_sdk_cmake
     ensenso_driver_protos
-    rclcpp::rclcpp
   )
+  ament_target_dependencies(flowstate_service rclcpp)
   add_dependencies(flowstate_service ensenso_driver_manifest ensenso_driver_default_config)
+  
   install(TARGETS flowstate_service
           DESTINATION lib/${PROJECT_NAME})
 else()
-  message("intrinsic_sdk_ros not found")
+  message(STATUS "intrinsic_sdk_ros not found")
 endif()
+
+install(TARGETS flowstate_ensenso 
+  DESTINATION lib
+)
 
 install(TARGETS flowstate_ensenso ensenso_spawner_node
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+  DESTINATION include
 )
 
 ament_export_include_directories(include)

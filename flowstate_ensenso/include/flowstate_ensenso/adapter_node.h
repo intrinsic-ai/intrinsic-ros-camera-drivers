@@ -2,6 +2,7 @@
 #define FLOWSTATE_ENSENSO_FLOWSTATE_ENSENSO_ADAPTER_NODE_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -46,16 +47,18 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
     double gain = 1.0;
     double gamma = 1.0;
     double projector_brightness = 1.0;
-    double aperture = 1.0;
-    bool outlier_removal_enabled = false;
-    double outlier_removal_threshold = 0.5;
   };
 
   struct CaptureData {
-    sensor_msgs::msg::Image::UniquePtr left_image;
-    sensor_msgs::msg::Image::UniquePtr depth_image;
-    std::unique_ptr<sensor_msgs::msg::CameraInfo> left_camera_info;
-    std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info;
+    std::optional<sensor_msgs::msg::Image> left_image;
+    std::optional<sensor_msgs::msg::Image> depth_image;
+    std::optional<sensor_msgs::msg::CameraInfo> left_camera_info;
+    std::optional<sensor_msgs::msg::CameraInfo> depth_camera_info;
+  };
+
+  struct CachedCameraInfo {
+    std::optional<sensor_msgs::msg::CameraInfo> left;
+    std::optional<sensor_msgs::msg::CameraInfo> depth;
   };
 
   /**
@@ -71,7 +74,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp_action::Client<ensenso_camera_msgs::action::SetParameter>::SharedPtr set_parameter_client_;
 
   mutable absl::Mutex data_mutex_;
-  CaptureData data_ ABSL_GUARDED_BY(data_mutex_);
+  CachedCameraInfo cached_info_ ABSL_GUARDED_BY(data_mutex_);
 
   CaptureParameters capture_params_ ABSL_GUARDED_BY(capture_params_mutex_);
   mutable absl::Mutex capture_params_mutex_;

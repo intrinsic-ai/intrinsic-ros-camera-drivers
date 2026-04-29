@@ -1,7 +1,6 @@
 #include "flowstate_ensenso/spawner_node.h"
 #include "flowstate_ensenso/adapter_node.h"
 
-#include <regex>
 #include <unordered_set>
 #include <nxLib.h>
 
@@ -27,6 +26,7 @@ std::vector<std::string> SpawnerNode::GetSerials() {
     if (cameras.exists()) {
       for (int i = 0; i < cameras.count(); ++i) {
         std::string name = cameras[i].name();
+        // NXLib API automatically places these in the BySerialNo tree, we want to ignore those keys.
         if (name != "BySerialNo" && name != "ByEepromId") {
           serials.push_back(name);
         }
@@ -59,8 +59,7 @@ SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
 
     if (is_available) {
       RCLCPP_INFO(get_logger(), "Spawning Ensenso adapter for camera %s", serial.c_str());
-      new_nodes.push_back(std::make_shared<flowstate_ensenso::AdapterNode>(
-          serial, std::vector<std::string>{}));
+      new_nodes.push_back(std::make_shared<flowstate_ensenso::AdapterNode>(serial, std::vector<std::string>{}));
     } else {
       RCLCPP_WARN(get_logger(), "Camera %s physically present but UNAVAILABLE. Waiting...", serial.c_str());
     }

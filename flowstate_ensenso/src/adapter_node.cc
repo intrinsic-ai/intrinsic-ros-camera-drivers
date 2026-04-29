@@ -53,60 +53,43 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
   result.successful = true;
   
   absl::MutexLock lock(&capture_params_mutex_);
-  
   auto goal_msg = ensenso_camera_msgs::action::SetParameter::Goal();
   bool requires_camera_update = false;
+
+  auto add_param = [&](const std::string& key, double value, const std::string& auto_key = "") {
+    if (!auto_key.empty()) {
+      ensenso_camera_msgs::msg::Parameter auto_toggle;
+      auto_toggle.key = auto_key;
+      auto_toggle.bool_value = false;
+      goal_msg.parameters.push_back(auto_toggle);
+    }
+    ensenso_camera_msgs::msg::Parameter p;
+    p.key = key;
+    p.float_value = static_cast<float>(value);
+    goal_msg.parameters.push_back(p);
+    requires_camera_update = true;
+  };
 
   for (const auto& param : parameters) {
     RCLCPP_INFO_STREAM(get_logger(), "AdapterNode: Setting parameter '"
                                          << param.get_name() << "' to '"
                                          << param.value_to_string() << "'");
 
-    ensenso_camera_msgs::msg::Parameter ensenso_param;
-    ensenso_camera_msgs::msg::Parameter auto_toggle_param;
-
     if (param.get_name() == "exposure_time") {
       capture_params_.exposure_time = param.as_double();
-      
-      auto_toggle_param.key = ensenso_camera_msgs::msg::Parameter::AUTO_EXPOSURE;
-      auto_toggle_param.bool_value = false;
-      goal_msg.parameters.push_back(auto_toggle_param);
-
-      ensenso_param.key = ensenso_camera_msgs::msg::Parameter::EXPOSURE;
-      ensenso_param.float_value = capture_params_.exposure_time;
-      goal_msg.parameters.push_back(ensenso_param);
-      
-      requires_camera_update = true;
-
+      add_param(ensenso_camera_msgs::msg::Parameter::EXPOSURE, capture_params_.exposure_time, ensenso_camera_msgs::msg::Parameter::AUTO_EXPOSURE);
     } else if (param.get_name() == "gain") {
       capture_params_.gain = param.as_double();
-      
-      auto_toggle_param.key = ensenso_camera_msgs::msg::Parameter::AUTO_GAIN;
-      auto_toggle_param.bool_value = false;
-      goal_msg.parameters.push_back(auto_toggle_param);
-
-      ensenso_param.key = ensenso_camera_msgs::msg::Parameter::GAIN;
-      ensenso_param.float_value = capture_params_.gain;
-      goal_msg.parameters.push_back(ensenso_param);
-      
-      requires_camera_update = true;
-
+      add_param(ensenso_camera_msgs::msg::Parameter::GAIN, capture_params_.gain, ensenso_camera_msgs::msg::Parameter::AUTO_GAIN);
     } else if (param.get_name() == "gamma") {
       capture_params_.gamma = param.as_double();
-      
-      ensenso_param.key = "Gamma"; 
-      ensenso_param.float_value = capture_params_.gamma;
-      goal_msg.parameters.push_back(ensenso_param);
-      
-      requires_camera_update = true;
-
+      add_param("Gamma", capture_params_.gamma);
     } else if (param.get_name() == "projector_brightness") {
       capture_params_.projector_brightness = param.as_double();
-      
-      ensenso_param.key = ensenso_camera_msgs::msg::Parameter::PROJECTOR;
-      ensenso_param.bool_value = (capture_params_.projector_brightness > 0.0);
-      goal_msg.parameters.push_back(ensenso_param);
-      
+      ensenso_camera_msgs::msg::Parameter projector_param;
+      projector_param.key = ensenso_camera_msgs::msg::Parameter::PROJECTOR;
+      projector_param.bool_value = (capture_params_.projector_brightness > 0.0);
+      goal_msg.parameters.push_back(projector_param);
       requires_camera_update = true;
     }
   }
@@ -189,34 +172,26 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture(bool only_info_nee
   auto wrapped_result = result_future.get();
   auto result = wrapped_result.result;
 
-  if (wrapped_result.code != rclcpp_action::ResultCode::SUCCEEDED) {
-    return absl::InternalError("Action failed.");
+  if (wrapped_result.code != rclcpp_action::ResultCode::SUCCEEDED || !result) {
+    return absl::InternalError("Action failed or returned null result.");
   }
 
   CaptureData result_data;
   
   if (!only_info_needed) {
     if (!result->left_rectified_images.empty()) {
-      result_data.left_image = std::make_unique<sensor_msgs::msg::Image>(std::move(result->left_rectified_images[0]));
+      result_data.left_image = std::move(result->left_rectified_images[0]);
     }
-    result_data.depth_image = std::make_unique<sensor_msgs::msg::Image>(std::move(result->depth_image));
+    result_data.depth_image = std::move(result->depth_image);
   }
   
-  result_data.left_camera_info = std::make_unique<sensor_msgs::msg::CameraInfo>(std::move(result->left_rectified_camera_info));
-  result_data.depth_camera_info = std::make_unique<sensor_msgs::msg::CameraInfo>(std::move(result->depth_image_info));
+  result_data.left_camera_info = std::move(result->left_rectified_camera_info);
+  result_data.depth_camera_info = std::move(result->depth_image_info);
 
   {
     absl::MutexLock lock(&data_mutex_);
-    data_.left_camera_info = std::make_unique<sensor_msgs::msg::CameraInfo>(*result_data.left_camera_info);
-    data_.depth_camera_info = std::make_unique<sensor_msgs::msg::CameraInfo>(*result_data.depth_camera_info);
-    if (!only_info_needed) {
-      if (result_data.left_image) {
-        data_.left_image = std::make_unique<sensor_msgs::msg::Image>(*result_data.left_image);
-      }
-      if (result_data.depth_image) {
-        data_.depth_image = std::make_unique<sensor_msgs::msg::Image>(*result_data.depth_image);
-      }
-    }
+    cached_info_.left = result_data.left_camera_info;
+    cached_info_.depth = result_data.depth_camera_info;
   }
 
   return result_data;
@@ -225,20 +200,16 @@ absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture(bool only_info_nee
 absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
 AdapterNode::BuildDescribeResponse() {
   snapshot_interfaces::srv::Describe::Response response;
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> info_copy;
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_info_copy;
+  std::optional<sensor_msgs::msg::CameraInfo> info_copy;
+  std::optional<sensor_msgs::msg::CameraInfo> depth_info_copy;
 
   {
     absl::MutexLock lock(&data_mutex_);
-    if (data_.left_camera_info) {
-      info_copy = std::make_unique<sensor_msgs::msg::CameraInfo>(*data_.left_camera_info);
-    }
-    if (data_.depth_camera_info) {
-      depth_info_copy = std::make_unique<sensor_msgs::msg::CameraInfo>(*data_.depth_camera_info);
-    }
+    info_copy = cached_info_.left;
+    depth_info_copy = cached_info_.depth;
   }
 
-  if (info_copy == nullptr || depth_info_copy == nullptr) {
+  if (!info_copy.has_value() || !depth_info_copy.has_value()) {
     RCLCPP_INFO(get_logger(), "No cached CameraInfo available, triggering warm-up capture...");
     auto capture_data = Capture(true);
     if (!capture_data.ok()) {
@@ -248,11 +219,15 @@ AdapterNode::BuildDescribeResponse() {
     depth_info_copy = std::move(capture_data->depth_camera_info);
   }
 
+  if (!info_copy.has_value() || !depth_info_copy.has_value()) {
+    return absl::InternalError("Failed to retrieve valid CameraInfo from device.");
+  }
+
   response.sensors.push_back(
-      BuildSensorInformation(*info_copy, "left_rectified", ColorImageTopic()));
+      BuildSensorInformation(info_copy.value(), "left_rectified", ColorImageTopic()));
   
   response.sensors.push_back(
-      BuildSensorInformation(*depth_info_copy, "depth", DepthImageTopic()));
+      BuildSensorInformation(depth_info_copy.value(), "depth", DepthImageTopic()));
 
   return response;
 }
@@ -266,16 +241,23 @@ AdapterNode::BuildSnapshotResponse() {
     return capture_data.status();
   }
 
+  if (!capture_data->left_image.has_value() || !capture_data->left_camera_info.has_value()) {
+    return absl::InternalError("Ensenso capture succeeded but returned missing left image/info.");
+  }
+  if (!capture_data->depth_image.has_value() || !capture_data->depth_camera_info.has_value()) {
+    return absl::InternalError("Ensenso capture succeeded but returned missing depth image/info.");
+  }
+
   snapshot_interfaces::msg::ImageSnapshot left_snapshot;
   left_snapshot.topic_name = ColorImageTopic();
-  left_snapshot.camera_info = std::move(*capture_data->left_camera_info);
-  left_snapshot.image = std::move(*capture_data->left_image);
+  left_snapshot.camera_info = std::move(capture_data->left_camera_info.value());
+  left_snapshot.image = std::move(capture_data->left_image.value());
   response.images.push_back(std::move(left_snapshot));
 
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
   depth_snapshot.topic_name = DepthImageTopic();
-  depth_snapshot.camera_info = std::move(*capture_data->depth_camera_info);
-  depth_snapshot.image = std::move(*capture_data->depth_image);
+  depth_snapshot.camera_info = std::move(capture_data->depth_camera_info.value());
+  depth_snapshot.image = std::move(capture_data->depth_image.value());
   response.images.push_back(std::move(depth_snapshot));
 
   return response;
