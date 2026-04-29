@@ -16,6 +16,7 @@
 #include "snapshot_interfaces/srv/describe.hpp"
 #include "snapshot_interfaces/srv/snapshot.hpp"
 #include "ensenso_camera_msgs/action/request_data.hpp"
+#include "ensenso_camera_msgs/action/set_parameter.hpp"
 
 namespace flowstate_ensenso {
 
@@ -66,7 +67,6 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   std::unique_ptr<rclcpp::Node> ensenso_node_;
 
-  // Ensenso uses an Action instead of a Service to trigger data
   rclcpp_action::Client<ensenso_camera_msgs::action::RequestData>::SharedPtr request_data_client_;
   rclcpp_action::Client<ensenso_camera_msgs::action::SetParameter>::SharedPtr set_parameter_client_;
 

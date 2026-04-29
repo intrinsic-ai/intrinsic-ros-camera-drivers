@@ -9,4 +9,4 @@ set -o verbose
 
 src/sdk-ros/scripts/setup_docker.sh
 src/sdk-ros/scripts/build_container.sh --service_name ensenso_driver --service_package flowstate_ensenso --dockerfile src/flowstate-ros-camera-drivers/flowstate_ensenso/flowstate/Dockerfile.service
-src/sdk-ros/scripts/build_bundle.sh --service_name ensenso_driver --service_package flowstate_ensenso
+src/sdk-ros/scripts/build_bundle.sh --service_name ensenso_driver --service_package flowstate_ensenso --manifest_path src/flowstate-ros-camera-drivers/flowstate_ensenso/flowstate/ensenso_driver.manifest.textproto

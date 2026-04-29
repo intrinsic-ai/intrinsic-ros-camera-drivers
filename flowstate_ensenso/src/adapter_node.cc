@@ -3,6 +3,7 @@
 #include "absl/strings/str_format.h"
 #include "rclcpp/rclcpp.hpp"
 #include "ensenso_camera/stereo_camera_node.h"
+#include "ensenso_camera_msgs/msg/parameter.hpp"
 
 namespace flowstate_ensenso {
 
@@ -19,8 +20,6 @@ AdapterNode::AdapterNode(const std::string& serial,
   ensenso_options.arguments({"--ros-args", "-r", "__ns:=" + camera_ns});
   
   ensenso_node_ = std::make_unique<ensenso_camera::StereoCameraNode>(ensenso_options);
-
-
 
   InitializeParameters();
   set_parameters_callback_handle_ =
@@ -43,19 +42,9 @@ AdapterNode::AdapterNode(const std::string& serial,
 void AdapterNode::InitializeParameters() {
   absl::MutexLock lock(&capture_params_mutex_);
   declare_parameter<double>("exposure_time", capture_params_.exposure_time);
-  declare_parameter<double>("ExposureTime", capture_params_.exposure_time);
   declare_parameter<double>("gain", capture_params_.gain);
-  declare_parameter<double>("Gain", capture_params_.gain);
   declare_parameter<double>("gamma", capture_params_.gamma);
-  declare_parameter<double>("Gamma", capture_params_.gamma);
   declare_parameter<double>("projector_brightness", capture_params_.projector_brightness);
-  declare_parameter<double>("brightness", capture_params_.projector_brightness);
-  declare_parameter<double>("Brightness", capture_params_.projector_brightness);
-  declare_parameter<double>("aperture", capture_params_.aperture);
-  declare_parameter<double>("Aperture", capture_params_.aperture);
-
-  declare_parameter<bool>("outlier_removal_enabled", capture_params_.outlier_removal_enabled);
-  declare_parameter<double>("outlier_removal_threshold", capture_params_.outlier_removal_threshold);
 }
 
 rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
@@ -64,30 +53,76 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
   result.successful = true;
   
   absl::MutexLock lock(&capture_params_mutex_);
+  
+  auto goal_msg = ensenso_camera_msgs::action::SetParameter::Goal();
+  bool requires_camera_update = false;
+
   for (const auto& param : parameters) {
     RCLCPP_INFO_STREAM(get_logger(), "AdapterNode: Setting parameter '"
-                                         << param.get_name() << "' ("
-                                         << param.get_type_name() << ") to '"
+                                         << param.get_name() << "' to '"
                                          << param.value_to_string() << "'");
 
-    if (param.get_name() == "exposure_time" || param.get_name() == "ExposureTime") {
+    ensenso_camera_msgs::msg::Parameter ensenso_param;
+    ensenso_camera_msgs::msg::Parameter auto_toggle_param;
+
+    if (param.get_name() == "exposure_time") {
       capture_params_.exposure_time = param.as_double();
-    } else if (param.get_name() == "gain" || param.get_name() == "Gain") {
+      
+      auto_toggle_param.key = ensenso_camera_msgs::msg::Parameter::AUTO_EXPOSURE;
+      auto_toggle_param.bool_value = false;
+      goal_msg.parameters.push_back(auto_toggle_param);
+
+      ensenso_param.key = ensenso_camera_msgs::msg::Parameter::EXPOSURE;
+      ensenso_param.float_value = capture_params_.exposure_time;
+      goal_msg.parameters.push_back(ensenso_param);
+      
+      requires_camera_update = true;
+
+    } else if (param.get_name() == "gain") {
       capture_params_.gain = param.as_double();
-    } else if (param.get_name() == "gamma" || param.get_name() == "Gamma") {
+      
+      auto_toggle_param.key = ensenso_camera_msgs::msg::Parameter::AUTO_GAIN;
+      auto_toggle_param.bool_value = false;
+      goal_msg.parameters.push_back(auto_toggle_param);
+
+      ensenso_param.key = ensenso_camera_msgs::msg::Parameter::GAIN;
+      ensenso_param.float_value = capture_params_.gain;
+      goal_msg.parameters.push_back(ensenso_param);
+      
+      requires_camera_update = true;
+
+    } else if (param.get_name() == "gamma") {
       capture_params_.gamma = param.as_double();
-    } else if (param.get_name() == "projector_brightness" ||
-               param.get_name() == "brightness" ||
-               param.get_name() == "Brightness") {
+      
+      ensenso_param.key = "Gamma"; 
+      ensenso_param.float_value = capture_params_.gamma;
+      goal_msg.parameters.push_back(ensenso_param);
+      
+      requires_camera_update = true;
+
+    } else if (param.get_name() == "projector_brightness") {
       capture_params_.projector_brightness = param.as_double();
-    } else if (param.get_name() == "aperture" || param.get_name() == "Aperture") {
-      capture_params_.aperture = param.as_double();
-    } else if (param.get_name() == "outlier_removal_enabled") {
-      capture_params_.outlier_removal_enabled = param.as_bool();
-    } else if (param.get_name() == "outlier_removal_threshold") {
-      capture_params_.outlier_removal_threshold = param.as_double();
+      
+      ensenso_param.key = ensenso_camera_msgs::msg::Parameter::PROJECTOR;
+      ensenso_param.bool_value = (capture_params_.projector_brightness > 0.0);
+      goal_msg.parameters.push_back(ensenso_param);
+      
+      requires_camera_update = true;
     }
   }
+
+  if (requires_camera_update) {
+    if (!set_parameter_client_->action_server_is_ready()) {
+      RCLCPP_WARN(get_logger(), "Ensenso set_parameter action server not ready! Settings cached but not applied.");
+      result.successful = false;
+      result.reason = "Action server not ready";
+      return result;
+    }
+
+    auto send_goal_options = rclcpp_action::Client<ensenso_camera_msgs::action::SetParameter>::SendGoalOptions();
+    set_parameter_client_->async_send_goal(goal_msg, send_goal_options);
+  }
+
   return result;
 }
 
