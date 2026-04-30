@@ -99,7 +99,7 @@ These drivers are designed to be compatible with the Intrinsic Platform. Use of 
 
 # Ensenso details
 
-To build and run the Ensenso driver locally follow these steps:
+To build and run the Ensenso driver locally follow these steps inside of the distrobox container:
 
 1. **Clone the Ensenso ROS 2 Driver**:
    Clone the official Ensenso ROS driver repository into your workspace `src` directory.
@@ -141,6 +141,15 @@ To build and run the Ensenso driver locally follow these steps:
    ```bash
    sudo apt install -y ros-jazzy-joint-state-publisher-gui
    sudo apt install -y ros-jazzy-xacro
+   ```
+
+   **Step 3.C: Install remaining ROS dependencies**
+   After installing the SDK, navigate back to the workspace root and run `rosdep` to install all missing ROS packages automatically. 
+   *Note: Make sure you ran Step 2 first, so `rosdep` knows to ignore the source folders.*
+   ```bash
+   cd ~/ros_cameras_ws
+   rosdep update
+   rosdep install --from-paths src --ignore-src -y --skip-keys "OrbbecSDK"
    ```
 
 4. **Build the Packages**:
