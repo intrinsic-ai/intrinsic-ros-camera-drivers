@@ -14,6 +14,8 @@ find_package(absl REQUIRED)
 find_package(flowstate_camera_common REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
+# The following dependencies are not used directly in our code, but are required
+# by the headers of ensenso_camera which does not export them properly.
 find_package(pcl_conversions REQUIRED)
 find_package(common_interfaces REQUIRED)
 find_package(cv_bridge REQUIRED)
@@ -21,16 +23,18 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(image_geometry REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(pcl_ros REQUIRED)
-find_package(rclcpp_action REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(rclcpp_action REQUIRED)
+
 find_package(rcl_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(snapshot_interfaces REQUIRED)
-find_package(geometry_msgs REQUIRED)
+
 find_package(ensenso_camera REQUIRED)
 find_package(intrinsic_sdk_ros QUIET)
 
@@ -48,6 +52,9 @@ add_library(flowstate_ensenso SHARED
 
 target_include_directories(flowstate_ensenso PUBLIC
   include
+  # Workaround: ensenso_camera doesn't export its include directories properly.
+  # We point directly to its source headers in the workspace.
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../ros_driver/ensenso_camera2/include
 )
 
 target_include_directories(flowstate_ensenso PRIVATE
@@ -67,13 +74,14 @@ target_link_libraries(flowstate_ensenso
   absl::synchronization
   absl::strings
   ${NXLIB_LIBRARY}
-  ${ENSENSO_CAMERA_LIB} # <--- Links the absolute path of the .so file
+  ${ENSENSO_CAMERA_LIB}
 )
 
 ament_target_dependencies(flowstate_ensenso
   flowstate_camera_common
   ensenso_camera
   rclcpp_components
+# Required transitively by ensenso_camera headers
   pcl_conversions
   common_interfaces
   cv_bridge
@@ -81,13 +89,13 @@ ament_target_dependencies(flowstate_ensenso
   image_geometry
   image_transport
   pcl_ros
-  rclcpp_action
   std_msgs
   tf2
   tf2_geometry_msgs
   tf2_ros
   visualization_msgs
   geometry_msgs
+  rclcpp_action
   rcl_interfaces
   rclcpp
   sensor_msgs
