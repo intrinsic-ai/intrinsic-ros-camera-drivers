@@ -99,6 +99,8 @@ These drivers are designed to be compatible with the Intrinsic Platform. Use of 
 
 # Ensenso details
 
+**This camera is still experimental!**
+
 To build and run the Ensenso driver locally follow these steps inside of the distrobox container:
 
 1. **Clone the Ensenso ROS 2 Driver**:
