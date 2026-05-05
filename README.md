@@ -105,9 +105,10 @@ To build and run the Ensenso driver locally follow these steps inside of the dis
 
 1. **Clone the Ensenso ROS 2 Driver**:
    Clone the official Ensenso ROS driver repository into your workspace `src` directory.
+   *Note: The `-c filter.lfs...` flags are used to disable Git LFS filters during the clone, ensuring that the checkout succeeds even if `git-lfs` is not installed.*
    ```bash
    cd ~/ros_cameras_ws/src
-   git clone https://github.com/ensenso/ros_driver
+   git clone -c filter.lfs.smudge= -c filter.lfs.clean= -c filter.lfs.process= -c filter.lfs.required=false https://github.com/ensenso/ros_driver
    ```
 
 2. **Prepare the ROS 2 Build**:
