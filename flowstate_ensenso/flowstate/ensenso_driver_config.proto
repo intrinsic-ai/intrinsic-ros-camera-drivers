@@ -3,5 +3,5 @@ syntax = "proto3";
 package ensenso_driver;
 
 message EnsensoDriverConfig {
-  repeated string serial = 1;
+  repeated string serials = 1;
 }

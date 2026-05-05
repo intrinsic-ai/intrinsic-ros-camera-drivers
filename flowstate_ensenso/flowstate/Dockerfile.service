@@ -45,7 +45,6 @@ RUN cd /opt/ros/underlay/src/ \
     && cd ros_driver \
     && export ROS_VERSION=2 && ./.github/scripts/prepare_ros2_build.sh
 
-# FIXED: Added 'retrying' to the pip install
 RUN pip3 install transforms3d retrying --break-system-packages || true
 
 RUN cd /opt/ros/underlay/src/ \
@@ -78,7 +77,10 @@ RUN . /opt/ros/jazzy/setup.sh \
         --packages-up-to flowstate_camera_common ensenso_camera intrinsic_sdk_ros\
         --cmake-args -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-Wno-error=invalid-constexpr -Wno-invalid-constexpr -Wno-deprecated-declarations"
 
-# Apply hacks for upstream CMake install bugs
+# Workaround: Upstream Ensenso ROS driver does not export its C++ headers, 
+# and ROS vendored packages (Abseil, Protobuf) do not install compiled .so 
+# libraries to the install directory. We manually copy them so they are 
+# available in the final minimal runtime stage.
 RUN echo "Applying post-build install patches..." \
     && cp -r /opt/ros/underlay/src/ros_driver/ensenso_camera2/include/* /opt/ros/underlay/install/include/ \
     && find /opt/ros/underlay/build -name "libprotobuf.so.29.0.0" -exec cp {} /opt/ros/underlay/install/lib/ \; || true \
