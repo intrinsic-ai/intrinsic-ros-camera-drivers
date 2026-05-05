@@ -81,41 +81,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fetch and Alias Core Underlay
-        run: |
-          REMOTE_IMAGE="ghcr.io/intrinsic-dev/core-underlay:latest"
-          LOCAL_TAG="intrinsic-dev-core-underlay:latest"
-          
-          echo "Pulling $REMOTE_IMAGE..."
-          docker pull $REMOTE_IMAGE
-          
-          echo "Aliasing to $LOCAL_TAG..."
-          docker tag $REMOTE_IMAGE $LOCAL_TAG
-
-      - name: Fetch and Alias Underlay
-        run: |
-          # The daily build pushes to ghcr.io/intrinsic-dev/camera_underlay
-          if [ "${{ matrix.camera }}" == "orbbec_gemini" ]; then
-            REMOTE_CAMERA="orbbec"
-          else
-            REMOTE_CAMERA="${{ matrix.camera }}"
-          fi
-          REMOTE_IMAGE="ghcr.io/intrinsic-dev/${REMOTE_CAMERA}-underlay:latest"
-          
-          LOCAL_TAG="intrinsic-dev-${{ matrix.camera }}_driver-underlay:latest"
-          
-          echo "Pulling $REMOTE_IMAGE..."
-          docker pull $REMOTE_IMAGE
-          
-          echo "Aliasing to $LOCAL_TAG..."
-          docker tag $REMOTE_IMAGE $LOCAL_TAG
-
       - name: Build Service Bundle
         working-directory: workspace
         run: |
-          chmod +x src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh
-          TARGET_SERVICE="${{ matrix.camera }}_driver"
-          
           # Map matrix name to folder name for Orbbec
           if [ "${{ matrix.camera }}" == "orbbec_gemini" ]; then
             FOLDER_NAME="flowstate_orbbec"
@@ -123,4 +91,5 @@ jobs:
             FOLDER_NAME="flowstate_${{ matrix.camera }}"
           fi
           
-          ./src/flowstate-ros-camera-drivers/ci_scripts/test_ci_build.sh $TARGET_SERVICE $FOLDER_NAME
+          chmod +x src/flowstate-ros-camera-drivers/${FOLDER_NAME}/flowstate/build_service_bundle.sh
+          ./src/flowstate-ros-camera-drivers/${FOLDER_NAME}/flowstate/build_service_bundle.sh

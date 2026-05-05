@@ -46,7 +46,9 @@ src/flowstate-ros-camera-drivers/ci_scripts/build_container.sh \
   --dockerfile "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/Dockerfile.flowstate_service" \
   "${CONTEXT_ARGS[@]}"
 
-src/sdk-ros/scripts/build_bundle.sh \
-  --service_name "$SERVICE_NAME" \
-  --service_package "$SERVICE_PACKAGE" \
-  --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto"
+if [[ -z "$CI" && "$PRESUBMIT" != "true" ]]; then
+  src/sdk-ros/scripts/build_bundle.sh \
+    --service_name "$SERVICE_NAME" \
+    --service_package "$SERVICE_PACKAGE" \
+    --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto"
+fi
