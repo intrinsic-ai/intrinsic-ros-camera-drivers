@@ -110,9 +110,6 @@ RUN . /opt/ros/jazzy/setup.sh \
       --cmake-args -DCMAKE_BUILD_TYPE=Release \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /root/.cache
 
-# ==========================================
-# STAGE 5: result
-# ==========================================
 FROM base
 
 ARG SERVICE_PACKAGE

@@ -115,9 +115,6 @@ RUN . /opt/ros/jazzy/setup.sh \
       --cmake-args -DBUILD_SHARED_LIBS=ON -DDEPTHAI_BOOTSTRAP_VCPKG=ON \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /root/.cache
 
-# ==========================================
-# STAGE 5: result
-# ==========================================
 FROM base
 
 ARG SERVICE_PACKAGE
