@@ -64,6 +64,7 @@ ADD src/OrbbecSDK /opt/ros/underlay/src/OrbbecSDK
 ADD src/OrbbecSDK_ROS2 /opt/ros/underlay/src/OrbbecSDK_ROS2
 
 RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/underlay \
     && colcon build \
       --merge-install \

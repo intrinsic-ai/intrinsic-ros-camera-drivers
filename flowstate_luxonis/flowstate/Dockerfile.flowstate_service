@@ -76,6 +76,7 @@ RUN sed -i '/<\/license>/a \  <maintainer email="support@luxonis.com">Luxonis Su
     /opt/ros/underlay/src/depthai-core/package.xml
 
 RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/underlay \
     && colcon build \
       --event-handlers=console_direct+ \

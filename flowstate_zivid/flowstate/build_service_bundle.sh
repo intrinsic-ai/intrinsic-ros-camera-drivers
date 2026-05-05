@@ -26,13 +26,13 @@ CAMERA_TYPE="zivid"
 SERVICE_NAME="zivid_driver"
 SERVICE_PACKAGE="flowstate_zivid"
 
-# GITHUB_OWNER defaults to 'intrinsic-dev' unless overridden as an environment variable
+# GITHUB_OWNER defaults to 'intrinsic-dev'
 GITHUB_OWNER="${GITHUB_OWNER:-intrinsic-dev}"
 
 # Detect if running in CI/presubmit
 CONTEXT_ARGS=()
 if [[ -n "$CI" || "$PRESUBMIT" == "true" ]]; then
-  echo "Presubmit detected. Skipping slow underlay build stages, using ghcr.io images..."
+  echo "Presubmit detected. Using pre-built underlay images from ghcr.io..."
   CONTEXT_ARGS+=(
     --build-context "core_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/core-underlay:latest"
     --build-context "zivid_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/${CAMERA_TYPE}-underlay:latest"
