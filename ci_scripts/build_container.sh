@@ -14,7 +14,7 @@
 # limitations under the License.
 
 IMAGES_DIR=./images
-BUILDER_NAME=default
+BUILDER_NAME=container-builder
 ROS_DISTRO=jazzy
 BUILD_CONTEXTS=()
 
@@ -87,16 +87,10 @@ if [[ -n "$SERVICE_NAME" && -n "$SERVICE_PACKAGE" ]]; then
     DOCKERFILE="$SCRIPT_DIR/../resources/Dockerfile.service"
   fi
 
-  if [[ "$BUILDER_NAME" == "default" ]]; then
-    OUTPUT_ARGS=(--load)
-  else
-    OUTPUT_ARGS=(--output="type=docker,dest=$IMAGES_DIR/$SERVICE_NAME/$SERVICE_NAME.tar,compression=zstd,push=false,name=$SERVICE_PACKAGE:$SERVICE_NAME")
-  fi
-
   BUILD_ARGS=(
     -t "$SERVICE_PACKAGE:$SERVICE_NAME"
     --builder="$BUILDER_NAME"
-    "${OUTPUT_ARGS[@]}"
+    --output="type=docker,dest=$IMAGES_DIR/$SERVICE_NAME/$SERVICE_NAME.tar,compression=zstd,push=false,name=$SERVICE_PACKAGE:$SERVICE_NAME"
     --file "$DOCKERFILE"
     --build-arg="SERVICE_PACKAGE=$SERVICE_PACKAGE"
     --build-arg="SERVICE_NAME=$SERVICE_NAME"
@@ -115,11 +109,6 @@ if [[ -n "$SERVICE_NAME" && -n "$SERVICE_PACKAGE" ]]; then
 
   docker buildx build "${BUILD_ARGS[@]}" .
 
-  if [[ "$BUILDER_NAME" == "default" ]]; then
-    echo "Exporting image to $IMAGES_DIR/$SERVICE_NAME/$SERVICE_NAME.tar..."
-    docker save -o "$IMAGES_DIR/$SERVICE_NAME/$SERVICE_NAME.tar" "$SERVICE_PACKAGE:$SERVICE_NAME"
-  fi
-
 elif [[ -n "$SKILL_NAME" && -n "$SKILL_PACKAGE" ]]; then
   mkdir -p "$IMAGES_DIR/$SKILL_NAME"
 
@@ -129,16 +118,10 @@ elif [[ -n "$SKILL_NAME" && -n "$SKILL_PACKAGE" ]]; then
     DOCKERFILE="$SCRIPT_DIR/../resources/Dockerfile.skill"
   fi
 
-  if [[ "$BUILDER_NAME" == "default" ]]; then
-    OUTPUT_ARGS=(--load)
-  else
-    OUTPUT_ARGS=(--output="type=docker,dest=$IMAGES_DIR/$SKILL_NAME/$SKILL_NAME.tar,compression=zstd,push=false,name=$SKILL_PACKAGE:$SKILL_NAME")
-  fi
-
   BUILD_ARGS=(
     -t "$SKILL_PACKAGE:$SKILL_NAME"
     --builder="$BUILDER_NAME"
-    "${OUTPUT_ARGS[@]}"
+    --output="type=docker,dest=$IMAGES_DIR/$SKILL_NAME/$SKILL_NAME.tar,compression=zstd,push=false,name=$SKILL_PACKAGE:$SKILL_NAME"
     --file "$DOCKERFILE"
     --build-arg="SKILL_PACKAGE=$SKILL_PACKAGE"
     --build-arg="SKILL_NAME=$SKILL_NAME"
@@ -157,8 +140,5 @@ elif [[ -n "$SKILL_NAME" && -n "$SKILL_PACKAGE" ]]; then
 
   docker buildx build "${BUILD_ARGS[@]}" .
 
-  if [[ "$BUILDER_NAME" == "default" ]]; then
-    echo "Exporting image to $IMAGES_DIR/$SKILL_NAME/$SKILL_NAME.tar..."
-    docker save -o "$IMAGES_DIR/$SKILL_NAME/$SKILL_NAME.tar" "$SKILL_PACKAGE:$SKILL_NAME"
-  fi
+
 fi

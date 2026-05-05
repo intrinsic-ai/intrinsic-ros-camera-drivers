@@ -59,7 +59,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: workspace
-          file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay
+          file: workspace/src/flowstate-ros-camera-drivers/flowstate_luxonis/flowstate/Dockerfile.flowstate_service
+          target: core_underlay
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/core-underlay:latest
 
@@ -76,11 +77,14 @@ jobs:
       matrix:
         include:
           - camera: orbbec
-            file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.orbbec_underlay
+            file: workspace/src/flowstate-ros-camera-drivers/flowstate_orbbec/flowstate/Dockerfile.flowstate_service
+            target: "orbbec_underlay"
           - camera: luxonis
-            file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.luxonis_underlay
+            file: workspace/src/flowstate-ros-camera-drivers/flowstate_luxonis/flowstate/Dockerfile.flowstate_service
+            target: "luxonis_underlay"
           - camera: zivid
-            file: workspace/src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.zivid_underlay
+            file: workspace/src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/Dockerfile.flowstate_service
+            target: "zivid_underlay"
 
     steps:
       - name: Free Disk Space
@@ -126,5 +130,8 @@ jobs:
         with:
           context: workspace
           file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          build-contexts: |
+            core_underlay=docker-image://ghcr.io/${{ github.repository_owner }}/core-underlay:latest
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.camera }}-underlay:latest

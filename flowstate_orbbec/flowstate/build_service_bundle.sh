@@ -25,24 +25,26 @@ src/sdk-ros/scripts/setup_docker.sh
 CAMERA_TYPE="orbbec"
 SERVICE_NAME="orbbec_gemini_driver"
 SERVICE_PACKAGE="flowstate_orbbec"
-LOCAL_TAG="intrinsic-dev-${SERVICE_NAME}-underlay:latest"
 
-echo "Building local core underlay..."
-docker buildx build --load -t "intrinsic-dev-core-underlay:latest" \
-  -f "src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.core_underlay" .
-
-echo "Building local underlay for $CAMERA_TYPE..."
-docker buildx build --load \
-  -t "$LOCAL_TAG" \
-  -f "src/flowstate-ros-camera-drivers/ci_scripts/Dockerfile.${CAMERA_TYPE}_underlay" .
+# Detect if running in CI/presubmit
+CONTEXT_ARGS=()
+if [[ -n "$CI" || "$PRESUBMIT" == "true" ]]; then
+  echo "Presubmit detected. Skipping slow underlay build stages, using ghcr.io images..."
+  CONTEXT_ARGS+=(
+    --build-context "core_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/core-underlay:latest"
+    --build-context "orbbec_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/${CAMERA_TYPE}-underlay:latest"
+  )
+else
+  echo "Running locally. Resolving and building all stages locally..."
+fi
 
 set -o verbose
 src/flowstate-ros-camera-drivers/ci_scripts/build_container.sh \
-  --builder_name default \
+  --builder_name container-builder \
   --service_name "$SERVICE_NAME" \
   --service_package "$SERVICE_PACKAGE" \
   --dockerfile "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/Dockerfile.flowstate_service" \
-  --underlay_tag "$LOCAL_TAG"
+  "${CONTEXT_ARGS[@]}"
 
 src/sdk-ros/scripts/build_bundle.sh \
   --service_name "$SERVICE_NAME" \
