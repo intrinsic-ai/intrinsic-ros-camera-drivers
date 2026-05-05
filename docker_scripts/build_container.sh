@@ -56,10 +56,6 @@ while [[ $# -gt 0 ]]; do
       ROS_DISTRO="$2"
       shift 2
       ;;
-    --underlay_tag)
-      UNDERLAY_TAG="$2"
-      shift 2
-      ;;
     --build-context)
       BUILD_CONTEXTS+=("$2")
       shift 2
@@ -72,11 +68,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
-if [[ -n "$UNDERLAY_TAG" ]]; then
-  # Automatically map the underlay tag to the local docker image
-  BUILD_CONTEXTS+=("${UNDERLAY_TAG}=docker-image://${UNDERLAY_TAG}")
-fi
 
 if [[ -n "$SERVICE_NAME" && -n "$SERVICE_PACKAGE" ]]; then
   mkdir -p "$IMAGES_DIR/$SERVICE_NAME"
@@ -98,10 +89,6 @@ if [[ -n "$SERVICE_NAME" && -n "$SERVICE_PACKAGE" ]]; then
     --build-arg="SERVICE_EXECUTABLE_NAME=${SERVICE_NAME}_main"
     --build-arg="ROS_DISTRO=$ROS_DISTRO"
   )
-
-  if [[ -n "$UNDERLAY_TAG" ]]; then
-    BUILD_ARGS+=(--build-arg="UNDERLAY_TAG=$UNDERLAY_TAG")
-  fi
 
   for context in "${BUILD_CONTEXTS[@]}"; do
     BUILD_ARGS+=(--build-context "$context")
@@ -129,10 +116,6 @@ elif [[ -n "$SKILL_NAME" && -n "$SKILL_PACKAGE" ]]; then
     --build-arg="ROS_DISTRO=$ROS_DISTRO"
     --build-arg="DEPENDENCIES=$DEPENDENCIES"
   )
-
-  if [[ -n "$UNDERLAY_TAG" ]]; then
-    BUILD_ARGS+=(--build-arg="UNDERLAY_TAG=$UNDERLAY_TAG")
-  fi
 
   for context in "${BUILD_CONTEXTS[@]}"; do
     BUILD_ARGS+=(--build-context "$context")

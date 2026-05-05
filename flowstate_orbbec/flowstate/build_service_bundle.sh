@@ -42,7 +42,7 @@ else
 fi
 
 set -o verbose
-src/flowstate-ros-camera-drivers/ci_scripts/build_container.sh \
+src/flowstate-ros-camera-drivers/docker_scripts/build_container.sh \
   --builder_name container-builder \
   --service_name "$SERVICE_NAME" \
   --service_package "$SERVICE_PACKAGE" \
