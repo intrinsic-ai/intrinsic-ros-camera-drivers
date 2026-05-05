@@ -83,6 +83,8 @@ jobs:
 
       - name: Build Service Bundle
         working-directory: workspace
+        env:
+          GITHUB_OWNER: ${{ github.repository_owner }}
         run: |
           # Map matrix name to folder name for Orbbec
           if [ "${{ matrix.camera }}" == "orbbec_gemini" ]; then

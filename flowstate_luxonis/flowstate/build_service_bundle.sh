@@ -26,6 +26,9 @@ CAMERA_TYPE="luxonis"
 SERVICE_NAME="luxonis_driver"
 SERVICE_PACKAGE="flowstate_luxonis"
 
+# GITHUB_OWNER defaults to 'intrinsic-dev' unless overridden as an environment variable
+GITHUB_OWNER="${GITHUB_OWNER:-intrinsic-dev}"
+
 # Detect if running in CI/presubmit
 CONTEXT_ARGS=()
 if [[ -n "$CI" || "$PRESUBMIT" == "true" ]]; then

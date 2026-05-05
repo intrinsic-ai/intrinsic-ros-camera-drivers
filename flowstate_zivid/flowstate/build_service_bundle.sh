@@ -26,6 +26,9 @@ CAMERA_TYPE="zivid"
 SERVICE_NAME="zivid_driver"
 SERVICE_PACKAGE="flowstate_zivid"
 
+# GITHUB_OWNER defaults to 'intrinsic-dev' unless overridden as an environment variable
+GITHUB_OWNER="${GITHUB_OWNER:-intrinsic-dev}"
+
 # Detect if running in CI/presubmit
 CONTEXT_ARGS=()
 if [[ -n "$CI" || "$PRESUBMIT" == "true" ]]; then
