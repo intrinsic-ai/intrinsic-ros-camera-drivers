@@ -53,7 +53,8 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
         --merge-install \
         --packages-up-to intrinsic_sdk_ros snapshot_interfaces rmw_zenoh_cpp \
-        --cmake-args -DCMAKE_BUILD_TYPE=Release
+        --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
 
 # ==========================================
 # STAGE 2: base
