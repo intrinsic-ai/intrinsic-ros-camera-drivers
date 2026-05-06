@@ -19,8 +19,39 @@ if [ ! -d "src/sdk-ros" ] || [ ! -d "src/flowstate-ros-camera-drivers" ]; then
 fi
 
 set -o errexit
-set -o verbose
 
 src/sdk-ros/scripts/setup_docker.sh
-src/sdk-ros/scripts/build_container.sh --service_name zivid_driver --service_package flowstate_zivid --dockerfile src/flowstate-ros-camera-drivers/flowstate_zivid/flowstate/Dockerfile.service
-src/sdk-ros/scripts/build_bundle.sh --service_name zivid_driver --service_package flowstate_zivid
+
+CAMERA_TYPE="zivid"
+SERVICE_NAME="zivid_driver"
+SERVICE_PACKAGE="flowstate_zivid"
+
+# GITHUB_OWNER defaults to 'intrinsic-dev'
+GITHUB_OWNER="${GITHUB_OWNER:-intrinsic-dev}"
+
+# Detect if running in CI/presubmit
+CONTEXT_ARGS=()
+if [[ -n "$CI" || "$PRESUBMIT" == "true" ]]; then
+  echo "Presubmit detected. Using pre-built underlay images from ghcr.io..."
+  CONTEXT_ARGS+=(
+    --build-context "core_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/core-underlay:latest"
+    --build-context "zivid_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/${CAMERA_TYPE}-underlay:latest"
+  )
+else
+  echo "Running locally. Resolving and building all stages locally..."
+fi
+
+set -o verbose
+src/flowstate-ros-camera-drivers/docker_scripts/build_container.sh \
+  --builder_name container-builder \
+  --service_name "$SERVICE_NAME" \
+  --service_package "$SERVICE_PACKAGE" \
+  --dockerfile "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/Dockerfile.flowstate_service" \
+  "${CONTEXT_ARGS[@]}"
+
+if [[ -z "$CI" && "$PRESUBMIT" != "true" ]]; then
+  src/sdk-ros/scripts/build_bundle.sh \
+    --service_name "$SERVICE_NAME" \
+    --service_package "$SERVICE_PACKAGE" \
+    --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto"
+fi
