@@ -4,9 +4,6 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'flowstate_luxonis/flowstate/Dockerfile.flowstate_service'
-      - 'flowstate_zivid/flowstate/Dockerfile.flowstate_service'
-      - 'flowstate_orbbec/flowstate/Dockerfile.flowstate_service'
       - '.github/workflows/build-underlays.yml'
   schedule:
     - cron: "0 4 * * *"
