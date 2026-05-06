@@ -46,7 +46,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
     double exposure_time = 0.01;
     double gain = 1.0;
     double gamma = 1.0;
-    double projector_brightness = 1.0;
+    bool projector = true;
   };
 
   struct CaptureData {

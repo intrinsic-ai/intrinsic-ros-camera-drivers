@@ -22,9 +22,8 @@ AdapterNode::AdapterNode(const std::string& serial,
   ensenso_node_ = std::make_unique<ensenso_camera::StereoCameraNode>(ensenso_options);
 
   InitializeParameters();
-  set_parameters_callback_handle_ =
-      this->add_on_set_parameters_callback(std::bind(
-          &AdapterNode::SetParametersCallback, this, std::placeholders::_1));
+  set_parameters_callback_handle_ = this->add_on_set_parameters_callback(
+      std::bind_front(&AdapterNode::SetParametersCallback, this));
 
   CreateFlowstateServices();
   
@@ -44,7 +43,7 @@ void AdapterNode::InitializeParameters() {
   declare_parameter<double>("exposure_time", capture_params_.exposure_time);
   declare_parameter<double>("gain", capture_params_.gain);
   declare_parameter<double>("gamma", capture_params_.gamma);
-  declare_parameter<double>("projector_brightness", capture_params_.projector_brightness);
+  declare_parameter<bool>("projector", capture_params_.projector);
 }
 
 rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
@@ -84,11 +83,11 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
     } else if (param.get_name() == "gamma") {
       capture_params_.gamma = param.as_double();
       add_param("Gamma", capture_params_.gamma);
-    } else if (param.get_name() == "projector_brightness") {
-      capture_params_.projector_brightness = param.as_double();
+    } else if (param.get_name() == "projector") {
+      capture_params_.projector = param.as_bool();
       ensenso_camera_msgs::msg::Parameter projector_param;
       projector_param.key = ensenso_camera_msgs::msg::Parameter::PROJECTOR;
-      projector_param.bool_value = (capture_params_.projector_brightness > 0.0);
+      projector_param.bool_value = capture_params_.projector;
       goal_msg.parameters.push_back(projector_param);
       requires_camera_update = true;
     }
@@ -138,7 +137,7 @@ absl::Status AdapterNode::Main() {
 }
 
 absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture(bool only_info_needed) {
-  RCLCPP_INFO(get_logger(), "Triggering Ensenso %s...", only_info_needed ? "for CameraInfo" : "Snapshot");
+  RCLCPP_INFO(get_logger(), "Triggering Ensenso for %s...", only_info_needed ? "CameraInfo" : "Snapshot");
 
   if (!request_data_client_->action_server_is_ready()) {
     if (!request_data_client_->wait_for_action_server(std::chrono::seconds(2))) {
