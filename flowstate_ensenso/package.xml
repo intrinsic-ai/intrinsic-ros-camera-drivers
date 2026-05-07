@@ -4,7 +4,7 @@
   <name>flowstate_ensenso</name>
   <version>0.0.1</version>
   <description>Flowstate Ensenso driver adapter</description>
-  <maintainer email="morganquigley@intrinsic.ai">morganquigley</maintainer>
+  <maintainer email="sprivas@intrinsic.ai">sprivas</maintainer>
   <license>Apache-2.0</license>
 
   <depend>abseil_cpp_vendor</depend>

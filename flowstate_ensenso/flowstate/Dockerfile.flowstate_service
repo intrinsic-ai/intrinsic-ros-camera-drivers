@@ -1,19 +1,67 @@
 # Build up the service with these stages:
-#   - base (ros:jazzy + settings + ensenso SDK) ->
-#   - underlay (dependencies) ->
-#   - overlay (user code) ->
-#   - result (base + copied install folder of underlay and overlay)
+#   - core_underlay (compiles standard SDKs) ->
+#   - ensenso_underlay (compiles ensenso SDKs) ->
+#   - base (ros:jazzy + settings) ->
+#   - overlay (user code built on top of underlay) ->
+#   - result (base + copied install folders)
 
-# base stage: ros:jazzy + configs + Ensenso SDK
-FROM ros:jazzy-ros-core AS base
-
-ARG ENSENSO_VERSION=4.3.905
+# ==========================================
+# STAGE 1: core_underlay
+# ==========================================
+FROM ros:jazzy-ros-core AS core_underlay
 
 WORKDIR /opt/ros/underlay
-
 ENV ROS_DISTRO=jazzy
 ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+ENV COMMON_SKIP_PACKAGES="intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake gz_msgs_vendor grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor gz_make_vendor gz_utils_vendor intrinsic_pybind11_vendor gz_math_vendor prometheus_cpp_vendor bazelisk_vendor flatbuffers_vendor opencensus_cpp_vendor pybind11_abseil_vendor pybind11_protobuf_vendor gz_cmake_vendor gz_transport_vendor"
+
+RUN apt-get update && apt install -y \
+    clang ros-jazzy-ament-cmake-vendor-package ros-dev-tools git wget \
+    python3-protobuf \
+    libopencv-dev \
+    nlohmann-json3-dev \
+    ros-jazzy-tf2-ros \
+    ros-jazzy-tf2-geometry-msgs \
+    libgl1-mesa-dev \
+    ros-jazzy-cv-bridge \
+    ros-jazzy-backward-ros \
+    ros-jazzy-camera-info-manager \
+    ros-jazzy-image-transport \
+    ros-jazzy-image-publisher \
+    ros-jazzy-tf2-eigen \
+    ros-jazzy-tf2-sensor-msgs \
+    ros-jazzy-diagnostic-updater \
+    curl zip unzip tar libusb-1.0-0-dev \
+    ros-jazzy-vision-msgs \
+    ros-jazzy-ffmpeg-image-transport-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rosdep init && rosdep update
+ADD src/sdk-ros /opt/ros/underlay/src/intrinsic_sdk_ros
+
+RUN cd /opt/ros/underlay/src/ \
+    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format \
+    && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4
+
+RUN apt-get update \
+    && . /opt/ros/jazzy/setup.sh \
+    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN . /opt/ros/jazzy/setup.sh \
+    && colcon build \
+        --merge-install \
+        --packages-up-to intrinsic_sdk_ros snapshot_interfaces rmw_zenoh_cpp \
+        --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
+
+# ==========================================
+# STAGE 2: ensenso_underlay
+# ==========================================
+FROM core_underlay AS ensenso_underlay
+
+ARG ENSENSO_VERSION=4.3.905
 ENV ENSENSO_INSTALL=/opt/ensenso
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -23,102 +71,95 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm ensenso.deb \
     && rm -rf /var/lib/apt/lists/*
 
-# underlay stage: base + dependencies built
-FROM base AS underlay
-
-COPY src/flowstate-ros-camera-drivers/flowstate_common /opt/ros/underlay/src/flowstate-ros-camera-drivers/flowstate_common
-COPY src/sdk-ros /opt/ros/underlay/src/sdk-ros
-
-# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-rosdep \
+    build-essential \
     python3-colcon-common-extensions \
+    ros-dev-tools \
     ros-jazzy-ament-cmake-vendor-package \
     git \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN rosdep init || true && rosdep update
+RUN pip3 install transforms3d retrying --break-system-packages || true
 
-RUN cd /opt/ros/underlay/src/ \
+RUN mkdir -p /opt/ros/underlay/src \
+    && cd /opt/ros/underlay/src/ \
     && git clone https://github.com/ensenso/ros_driver \
     && cd ros_driver \
     && export ROS_VERSION=2 && ./.github/scripts/prepare_ros2_build.sh
 
-RUN pip3 install transforms3d retrying --break-system-packages || true
-
-RUN cd /opt/ros/underlay/src/ \
-    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format \
-    && cd rmw_zenoh \
-    && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4
-
-RUN cd /opt/ros/underlay \
-    && . /opt/ros/jazzy/setup.sh \
+RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
     && apt-get update \
     && rosdep install --from-paths src --ignore-src --rosdistro jazzy -y \
        --skip-keys "snapshot_interfaces OrbbecSDK roscpp message_runtime catkin tf rostest nodelet message_generation actionlib rospy roslint ensenso_camera retrying python3-retrying" \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /root/.ros/rosdep
 
-# Build rmw_zenoh
-RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build \
-        --event-handlers=console_direct+ \
-        --merge-install \
-        --packages-up-to=rmw_zenoh_cpp
-
-# Build underlay packages
 RUN . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/underlay \
     && colcon build \
         --event-handlers=console_direct+ \
         --merge-install \
-        --packages-up-to flowstate_camera_common ensenso_camera intrinsic_sdk_ros\
-        --cmake-args -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-Wno-error=invalid-constexpr -Wno-invalid-constexpr -Wno-deprecated-declarations"
+        --packages-up-to ensenso_camera \
+        --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-Wno-error=invalid-constexpr -Wno-invalid-constexpr -Wno-deprecated-declarations"
 
 # Workaround: Upstream Ensenso ROS driver does not export its C++ headers, 
 # and ROS vendored packages (Abseil, Protobuf) do not install compiled .so 
 # libraries to the install directory. We manually copy them so they are 
 # available in the final minimal runtime stage.
-# For more context: https://github.com/intrinsic-dev/flowstate-ros-camera-drivers/pull/38#discussion_r3187219446
 RUN echo "Applying post-build install patches..." \
     && cp -r /opt/ros/underlay/src/ros_driver/ensenso_camera2/include/* /opt/ros/underlay/install/include/ \
     && find /opt/ros/underlay/build -name "libprotobuf.so.29.0.0" -exec cp {} /opt/ros/underlay/install/lib/ \; || true \
     && find /opt/ros/underlay/build/abseil_cpp_vendor -name "libabsl*.so*" -exec cp -d {} /opt/ros/underlay/install/lib/ \; || true \
-    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /root/.cache
 
-# overlay stage: underlay + service code built
-FROM underlay AS overlay
+# ==========================================
+# STAGE 3: base
+# ==========================================
+FROM ros:jazzy-ros-core AS base
 
-ARG SERVICE_PACKAGE=flowstate_ensenso
-ARG DEPENDENCIES
+WORKDIR /opt/ros/underlay
+
+ENV ROS_HOME=/tmp
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+
+# ==========================================
+# STAGE 4: overlay
+# ==========================================
+FROM ensenso_underlay AS overlay
+
+ARG SERVICE_PACKAGE
 
 RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
     python3-protobuf \
     libopencv-dev \
     nlohmann-json3-dev \
-    ${DEPENDENCIES} \
     && rm -rf /var/lib/apt/lists/*
 
-COPY src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE} /opt/ros/overlay/src/${SERVICE_PACKAGE}
+ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
 
-RUN . /opt/ros/jazzy/setup.sh \
+RUN cp -r /opt/ros/underlay/src/ros_driver /opt/ros/overlay/src/ros_driver \
+    && . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/overlay \
     && colcon build \
       --event-handlers=console_direct+ \
       --merge-install \
-      --packages-above-and-dependencies=${SERVICE_PACKAGE} \
-      --cmake-args -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-Wno-error=invalid-constexpr -Wno-invalid-constexpr -Wno-deprecated-declarations" \
-    && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/underlay/src
+      --packages-up-to=${SERVICE_PACKAGE} \
+      --packages-skip $COMMON_SKIP_PACKAGES \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-Wno-error=invalid-constexpr -Wno-invalid-constexpr -Wno-deprecated-declarations" \
+    && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /opt/ros/underlay/src /root/.cache
 
-# result stage: base + copied installs
+# ==========================================
+# STAGE 5: result
+# ==========================================
 FROM base
 
-ARG SERVICE_PACKAGE=flowstate_ensenso
-ARG SERVICE_NAME=ensenso_driver
-ARG DEPENDENCIES
+ARG SERVICE_PACKAGE
+ARG SERVICE_NAME
+ARG ENSENSO_VERSION=4.3.905
 
 RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
     ros-jazzy-image-transport \
@@ -135,6 +176,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
     ros-jazzy-tf2-geometry-msgs \
     ros-jazzy-tf2-ros \
     ros-jazzy-visualization-msgs \
+    wget \
+    && wget -O ensenso.deb "https://download.optonic.com/s/ensensosdk/download?files=ensenso-sdk-${ENSENSO_VERSION}-x64.deb" \
+    && apt-get install -y --no-install-recommends ./ensenso.deb \
+    && rm ensenso.deb \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=overlay /opt/ros/underlay/install /opt/ros/underlay/install
@@ -142,10 +187,18 @@ COPY --from=overlay /opt/ros/overlay/install /opt/ros/overlay/install
 
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/local.conf && ldconfig
 
-RUN cp /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/service_manifest.binarypb /service_manifest.binarypb \
-    && cp /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/default_config.binarypb /default_config.binarypb \
-    && cp /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/ensenso_driver_protos.desc /parameter-descriptor-set.proto.bin \
-    && sed --in-place --expression '$isource "/opt/ros/overlay/install/setup.bash"' /ros_entrypoint.sh
+RUN cp \
+        /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/service_manifest.binarypb \
+        /service_manifest.binarypb \
+    && cp \
+        /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/default_config.binarypb \
+        /default_config.binarypb \
+    && cp \
+        /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/${SERVICE_NAME}_protos.desc \
+        /parameter-descriptor-set.proto.bin \
+    && sed --in-place \
+        --expression '$isource "/opt/ros/overlay/install/setup.bash"' \
+        /ros_entrypoint.sh
 
 ENTRYPOINT ["/ros_entrypoint.sh"]
 
