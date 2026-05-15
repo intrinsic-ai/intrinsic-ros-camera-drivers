@@ -16,7 +16,7 @@ name: Build and Push Underlays
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     paths:
       - '.github/workflows/build-underlays.yml'
   schedule:
