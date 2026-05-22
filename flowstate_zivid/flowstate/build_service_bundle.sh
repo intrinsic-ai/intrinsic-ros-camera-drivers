@@ -53,5 +53,6 @@ if [[ -z "$CI" && "$PRESUBMIT" != "true" ]]; then
   src/sdk-ros/scripts/build_bundle.sh \
     --service_name "$SERVICE_NAME" \
     --service_package "$SERVICE_PACKAGE" \
-    --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto"
+    --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto" \
+    --default_config "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}_default_config.textproto"
 fi
