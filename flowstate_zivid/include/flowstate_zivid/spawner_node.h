@@ -1,17 +1,33 @@
+/*
+ * Copyright 2026 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_SPAWNER_NODE_H_
 #define FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_SPAWNER_NODE_H_
 
-#include <absl/status/status.h>
+#include <Zivid/Application.h>
 #include <absl/status/statusor.h>
-#include <absl/strings/str_cat.h>
-#include <absl/synchronization/mutex.h>
 
-#include <rclcpp/rclcpp.hpp>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "adapter_node.h"
-#include "snapshot_interfaces/msg/discovered_camera.hpp"
-#include "snapshot_interfaces/srv/discover.hpp"
-#include "zivid_camera/zivid_camera.hpp"
+#include "absl/status/statusor.h"
+#include "flowstate_common/base_spawner_node.h"
+#include "flowstate_zivid/adapter_node.h"
+#include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_zivid {
 /**
@@ -37,33 +53,21 @@ namespace flowstate_zivid {
  *     Flowstate that allows to query for a list of available cameras with their
  *     serial numbers.
  */
-class SpawnerNode : public rclcpp::Node {
+class SpawnerNode : public flowstate_common::BaseSpawnerNode {
  public:
   SpawnerNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
-  static absl::StatusOr<std::shared_ptr<SpawnerNode>> Create();
-  virtual ~SpawnerNode();
+  ~SpawnerNode() override;
 
-  // Get the generated camera node names
-  std::vector<std::string> GetCameraNodeNames() const;
+  static absl::StatusOr<std::shared_ptr<SpawnerNode>> Create();
+
+ protected:
+  std::vector<std::string> GetSerials() override;
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> SpawnNodes(
+      const std::vector<std::string>& serials) override;
 
  private:
-  mutable absl::Mutex cameras_mutex_;
-
-  rclcpp::TimerBase::SharedPtr timer_;
-
-  void RefreshCameraList();
-  void ShutdownCameraNodes();
-
-  std::vector<std::shared_ptr<flowstate_zivid::AdapterNode>> spawned_nodes_;
-  std::vector<std::shared_ptr<Zivid::Camera>> zivid_cameras_
-      ABSL_GUARDED_BY(cameras_mutex_);
-
   std::shared_ptr<Zivid::Application> zivid_app_;
-  std::vector<snapshot_interfaces::msg::DiscoveredCamera>
-      discovered_camera_msgs_ ABSL_GUARDED_BY(cameras_mutex_);
-  rclcpp::Service<snapshot_interfaces::srv::Discover>::SharedPtr
-      discover_service_;
 };
 }  // namespace flowstate_zivid
 

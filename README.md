@@ -19,8 +19,8 @@ cd ros_cameras_ws/src
 git clone ssh://git@github.com/intrinsic-dev/flowstate-ros-camera-drivers
 git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ..
-git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch building_without_usb_on_linux
-git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon
+git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install
+git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
 git clone https://github.com/codebot/depthai-core --branch kilted && cd depthai-core && git submodule update --init --recursive && cd ..
 git clone https://github.com/codebot/depthai-ros --branch mq/adjust_export_dependencies
 git clone https://github.com/zivid/zivid-ros.git
@@ -200,3 +200,11 @@ export INTRINSIC_CONTEXT=<cluster id>
 
 inctl service install --org $INTRINSIC_ORGANIZATION --cluster $INTRINSIC_CONTEXT $SERVICE_BUNDLE
 ```
+
+# Disclaimer
+
+This is not an officially supported Google product. This project is not
+eligible for the [Google Open Source Software Vulnerability Rewards
+Program](https://bughunters.google.com/open-source-security).
+
+These drivers are designed to be compatible with the Intrinsic Platform. Use of the Intrinsic Platform is subject to the Intrinsic Terms of Service. Please review them here: [Intrinsic Platform Terms of Service URL](https://www.intrinsic.ai/legal/platform-terms)

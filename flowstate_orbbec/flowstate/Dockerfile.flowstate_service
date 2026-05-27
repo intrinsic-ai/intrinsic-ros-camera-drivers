@@ -1,10 +1,81 @@
 # Build up the service with these stages:
+#   - core_underlay (compiles standard SDKs) ->
+#   - orbbec_underlay (compiles orbbec SDKs) ->
 #   - base (ros:jazzy + settings) ->
-#   - underlay (dependencies) ->
-#   - overlay (user code) ->
-#   - result (base + copied install folder of underlay and overlay)
+#   - overlay (user code built on top of underlay) ->
+#   - result (base + copied install folders)
 
-# base stage: ros:jazzy + configs
+# ==========================================
+# STAGE 1: core_underlay
+# ==========================================
+FROM ros:jazzy-ros-core AS core_underlay
+
+WORKDIR /opt/ros/underlay
+ENV ROS_DISTRO=jazzy
+ENV ROS_HOME=/tmp
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+ENV COMMON_SKIP_PACKAGES="intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake gz_msgs_vendor grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor gz_make_vendor gz_utils_vendor intrinsic_pybind11_vendor gz_math_vendor prometheus_cpp_vendor bazelisk_vendor flatbuffers_vendor opencensus_cpp_vendor pybind11_abseil_vendor pybind11_protobuf_vendor gz_cmake_vendor gz_transport_vendor"
+
+RUN apt-get update && apt install -y \
+    clang ros-jazzy-ament-cmake-vendor-package ros-dev-tools git wget \
+    python3-protobuf \
+    libopencv-dev \
+    nlohmann-json3-dev \
+    ros-jazzy-tf2-ros \
+    ros-jazzy-tf2-geometry-msgs \
+    libgl1-mesa-dev \
+    ros-jazzy-cv-bridge \
+    ros-jazzy-backward-ros \
+    ros-jazzy-camera-info-manager \
+    ros-jazzy-image-transport \
+    ros-jazzy-image-publisher \
+    ros-jazzy-tf2-eigen \
+    ros-jazzy-tf2-sensor-msgs \
+    ros-jazzy-diagnostic-updater \
+    curl zip unzip tar libusb-1.0-0-dev \
+    ros-jazzy-vision-msgs \
+    ros-jazzy-ffmpeg-image-transport-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rosdep init && rosdep update
+ADD src/sdk-ros /opt/ros/underlay/src/intrinsic_sdk_ros
+
+RUN cd /opt/ros/underlay/src/ \
+    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format \
+    && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4
+
+RUN apt-get update \
+    && . /opt/ros/jazzy/setup.sh \
+    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN . /opt/ros/jazzy/setup.sh \
+    && colcon build \
+        --merge-install \
+        --packages-up-to intrinsic_sdk_ros snapshot_interfaces rmw_zenoh_cpp \
+        --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
+
+# ==========================================
+# STAGE 2: orbbec_underlay
+# ==========================================
+FROM core_underlay AS orbbec_underlay
+
+ADD src/OrbbecSDK /opt/ros/underlay/src/OrbbecSDK
+ADD src/OrbbecSDK_ROS2 /opt/ros/underlay/src/OrbbecSDK_ROS2
+
+RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
+    && cd /opt/ros/underlay \
+    && colcon build \
+      --merge-install \
+      --executor sequential \
+      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
+
+# ==========================================
+# STAGE 3: base
+# ==========================================
 FROM ros:jazzy-ros-core AS base
 
 WORKDIR /opt/ros/underlay
@@ -12,75 +83,56 @@ WORKDIR /opt/ros/underlay
 ENV ROS_HOME=/tmp
 ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 
-# underlay stage: base + dependencies built
-FROM base AS underlay
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && apt-get update \
-    && apt install -y clang ros-jazzy-ament-cmake-vendor-package ros-dev-tools \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN rosdep init
-
-ADD src/sdk-ros /opt/ros/underlay/src/intrinsic_sdk_ros
-
-# Install a compatible fork of rmw_zenoh
-RUN cd /opt/ros/underlay/src/ \
-    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ../..
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && apt-get update \
-    && rosdep update \
-    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build \
-        --event-handlers=console_direct+ \
-        --merge-install \
-        --packages-up-to intrinsic_sdk_ros snapshot_interfaces
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build \
-        --event-handlers=console_direct+ \
-        --merge-install \
-        --packages-up-to=rmw_zenoh_cpp
-
-# overlay stage: underlay + service code built
-FROM underlay AS overlay
+# ==========================================
+# STAGE 4: overlay
+# ==========================================
+FROM orbbec_underlay AS overlay
 
 ARG SERVICE_PACKAGE
-ARG DEPENDENCIES
-
-RUN apt-get update \
-    && apt install -y python3-protobuf libopencv-dev nlohmann-json3-dev ${DEPENDENCIES} ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs libgl1-mesa-dev ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater \
-    && rm -rf /var/lib/apt/lists/*
 
 ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
-ADD src/OrbbecSDK /opt/ros/overlay/src/OrbbecSDK
-ADD src/OrbbecSDK_ROS2 /opt/ros/overlay/src/OrbbecSDK_ROS2
 
-# skip a few packages that are already built, and are somewhat slow to process
 RUN . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/overlay \
     && colcon build \
       --event-handlers=console_direct+ \
       --merge-install \
-      --executor sequential \
-      --packages-up-to=${SERVICE_PACKAGE} \
-      --packages-skip intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor \
-      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF
+      --packages-select OrbbecSDK \
+      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DOB_BUILD_EXAMPLES=OFF -DOB_BUILD_TOOLS=OFF -DOB_BUILD_DOCS=OFF -DCMAKE_BUILD_TYPE=Release
 
-# result stage: base + copied install folders from the overlay + service setup
+RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
+    && cd /opt/ros/overlay \
+    && colcon build \
+      --merge-install \
+      --executor parallel \
+      --packages-up-to=${SERVICE_PACKAGE} \
+      --packages-skip $COMMON_SKIP_PACKAGES \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /root/.cache
+
 FROM base
 
 ARG SERVICE_PACKAGE
 ARG SERVICE_NAME
-ARG DEPENDENCIES
 
 RUN apt-get update \
-    && apt-get install -y python3-protobuf libopencv-core-dev ${DEPENDENCIES} iputils-ping net-tools ros-jazzy-tf2-ros ros-jazzy-tf2-geometry-msgs ros-jazzy-cv-bridge ros-jazzy-backward-ros ros-jazzy-camera-info-manager ros-jazzy-image-transport ros-jazzy-image-publisher ros-jazzy-tf2-eigen ros-jazzy-tf2-sensor-msgs ros-jazzy-diagnostic-updater \
+    && apt-get install -y \
+        python3-protobuf \
+        libopencv-core-dev \
+        iputils-ping \
+        net-tools \
+        ros-jazzy-tf2-ros \
+        ros-jazzy-tf2-geometry-msgs \
+        ros-jazzy-cv-bridge \
+        ros-jazzy-backward-ros \
+        ros-jazzy-camera-info-manager \
+        ros-jazzy-image-transport \
+        ros-jazzy-image-publisher \
+        ros-jazzy-tf2-eigen \
+        ros-jazzy-tf2-sensor-msgs \
+        ros-jazzy-diagnostic-updater \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=overlay /opt/ros/underlay/install /opt/ros/underlay/install
@@ -99,15 +151,10 @@ RUN cp \
         --expression '$isource "/opt/ros/overlay/install/setup.bash"' \
         /ros_entrypoint.sh
 
-# Build arguments are not substituted in the CMD command and hence we set environment variables
-# which can be substituted instead.
 ENV SERVICE_PACKAGE=${SERVICE_PACKAGE}
 ENV SERVICE_NAME=${SERVICE_NAME}
 ENV RUST_LOG=info
 
-# This zenoh_config is the same as the default, other than it connects to the
-# kubernetes-provided port which forwards to the zenoh-router:
 ENV ZENOH_CONFIG_OVERRIDE='connect/endpoints=["tcp/localhost:17447"]'
 
 CMD exec /opt/ros/overlay/install/lib/${SERVICE_PACKAGE}/flowstate_service
-# CMD ["/bin/bash", "-c", "echo 'Sleeping...'; sleep infinity"]

@@ -1,81 +1,74 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "flowstate_orbbec/spawner_node.h"
 
+#include <chrono>
+#include <cstddef>
 #include <memory>
+#include <string>
+#include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "flowstate_orbbec/adapter_node.h"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "rclcpp/rclcpp.hpp"
-#include "snapshot_interfaces/msg/discovered_camera.hpp"
-#include "snapshot_interfaces/srv/discover.hpp"
 
 namespace flowstate_orbbec {
 
-using snapshot_interfaces::srv::Discover;
+ABSL_CONST_INIT absl::Mutex SpawnerNode::s_discovery_mutex(absl::kConstInit);
 
 SpawnerNode::SpawnerNode()
-    : Node(std::string("orbbec_spawner")) {
-  discover_service_ = create_service<Discover>(
-      std::string("/cameras/discover"),
-      [this](const std::shared_ptr<rmw_request_id_t>,
-             const std::shared_ptr<Discover::Request>,
-             const std::shared_ptr<Discover::Response> response) {
-        RCLCPP_INFO(get_logger(), "Discover service called");
-        absl::MutexLock lock(&this->serials_mutex_);
-        for (const std::string& serial : serials_) {
-          snapshot_interfaces::msg::DiscoveredCamera camera;
-          camera.driver_type = "orbbec";
-          camera.camera_id = serial;
-          response->cameras.push_back(camera);
-        }
-        response->success = true;
-      });
-  timer_ = create_wall_timer(std::chrono::seconds(10),
-                             [this]() { this->UpdateCameras(); });
-  UpdateCameras();
+    : flowstate_common::BaseSpawnerNode("orbbec_spawner", "orbbec",
+                                        std::chrono::seconds(10)) {
 }
 
-void SpawnerNode::UpdateCameras() {
-  // ob::Context::setLoggerSeverity(OBLogSeverity::OB_LOG_SEVERITY_OFF);
+std::vector<std::string> SpawnerNode::GetSerials() {
+  absl::MutexLock lock(&s_discovery_mutex);
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();
-  absl::MutexLock lock(&this->serials_mutex_);
-  serials_.clear();
+  std::vector<std::string> serials;
+  
   for (size_t i = 0; i < list->deviceCount(); i++) {
-    if (std::string(list->getConnectionType(i)) != std::string("Ethernet")) {
-      continue;
-    }
-    std::string serial = list->serialNumber(i);
-    std::string ip_address = list->getIpAddress(i);
-    RCLCPP_INFO(get_logger(), "Found Orbbec device: %s at %s", serial.c_str(),
-                ip_address.c_str());
-    serials_.push_back(serial);
-    if (IsAlreadySpawned(serial)) continue;
-    RCLCPP_INFO(get_logger(), "Spawning it...");
-
-    spawned_nodes_.push_back(std::make_unique<AdapterNode>(serial, ip_address));
-  }
-
-  // See if any camera nodes have crashed. If so, close them so we can respawn
-  for (auto node_it = spawned_nodes_.begin();
-       node_it != spawned_nodes_.end();) {
-    if ((*node_it)->HasExitedThread()) {
-      RCLCPP_INFO(get_logger(), "Camera %s has exited. Removing it.",
-                  (*node_it)->GetSerial().c_str());
-      node_it = spawned_nodes_.erase(node_it);
-    } else {
-      ++node_it;
+    if (std::string(list->getConnectionType(i)) == "Ethernet") {
+      serials.push_back(list->serialNumber(i));
     }
   }
+  return serials;
 }
 
-bool SpawnerNode::IsAlreadySpawned(const std::string& serial) const {
-  for (const auto& spawned_node : spawned_nodes_) {
-    if (spawned_node->HasSerial(serial)) {
-      return true;
+std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> 
+SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
+  RCLCPP_INFO(get_logger(), "flowstate_orbbec::SpawnerNode::SpawnNodes()");
+  std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> new_nodes;
+  auto context = std::make_unique<ob::Context>();
+  auto list = context->queryDeviceList();
+  
+  std::unordered_set<std::string> serials_to_spawn(serials.begin(), serials.end());
+  
+  for (size_t i = 0; i < list->deviceCount(); i++) {
+    std::string current_serial = list->serialNumber(i);
+    
+    if (serials_to_spawn.count(current_serial)) {
+      std::string ip_address = list->getIpAddress(i);
+      RCLCPP_INFO(get_logger(), "Spawning Orbbec node: %s at %s", 
+                  current_serial.c_str(), ip_address.c_str());
+                  
+      new_nodes.push_back(std::make_shared<AdapterNode>(
+          current_serial, std::vector<std::string>{ip_address}));
     }
   }
-  return false;
+  return new_nodes;
 }
-
 }  // namespace flowstate_orbbec
-

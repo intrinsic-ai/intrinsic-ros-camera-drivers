@@ -1,3 +1,17 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 cmake_minimum_required(VERSION 3.8)
 project(flowstate_luxonis)
 
@@ -8,9 +22,9 @@ add_compile_options(-g -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 
 find_package(abseil_cpp_vendor REQUIRED)
 find_package(ament_cmake REQUIRED)
-find_package(cv_bridge REQUIRED)
 find_package(depthai REQUIRED VERBOSE)
 find_package(depthai_ros_driver REQUIRED VERBOSE)
+find_package(flowstate_camera_common REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -25,7 +39,9 @@ add_library(flowstate_luxonis
   src/spawner_node.cc
 )
 target_link_libraries(flowstate_luxonis
+  ${flowstate_camera_common_LIBRARIES}
   absl::status
+  absl::statusor
   absl::synchronization
   rclcpp::rclcpp
   depthai::core
@@ -33,9 +49,9 @@ target_link_libraries(flowstate_luxonis
   ${snapshot_interfaces_TARGETS}
 )
 ament_target_dependencies(flowstate_luxonis
-  cv_bridge
   depthai
   depthai_ros_driver
+  flowstate_camera_common
   OpenCV
 )
 install(TARGETS flowstate_luxonis
