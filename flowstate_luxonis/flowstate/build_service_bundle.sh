@@ -22,9 +22,9 @@ set -o errexit
 
 src/sdk-ros/scripts/setup_docker.sh
 
-CAMERA_TYPE="zivid"
-SERVICE_NAME="zivid_driver"
-SERVICE_PACKAGE="flowstate_zivid"
+CAMERA_TYPE="luxonis"
+SERVICE_NAME="luxonis_driver"
+SERVICE_PACKAGE="flowstate_luxonis"
 
 # GITHUB_OWNER defaults to 'intrinsic-dev'
 GITHUB_OWNER="${GITHUB_OWNER:-intrinsic-dev}"
@@ -35,7 +35,7 @@ if [[ -n "$CI" || "$PRESUBMIT" == "true" ]]; then
   echo "Presubmit detected. Using pre-built underlay images from ghcr.io..."
   CONTEXT_ARGS+=(
     --build-context "core_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/core-underlay:latest"
-    --build-context "zivid_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/${CAMERA_TYPE}-underlay:latest"
+    --build-context "luxonis_underlay=docker-image://ghcr.io/${GITHUB_OWNER}/${CAMERA_TYPE}-underlay:latest"
   )
 else
   echo "Running locally. Resolving and building all stages locally..."

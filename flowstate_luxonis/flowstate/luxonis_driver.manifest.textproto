@@ -1,0 +1,33 @@
+metadata {
+  id {
+    package: "ai.intrinsic"
+    name: "luxonis_driver"
+  }
+  vendor {
+    display_name: "Intrinsic"
+  }
+  documentation {
+    description: "Low-level ROS driver for the Luxonis camera family."
+  }
+  display_name: "Luxonis Driver"
+}
+service_def {
+  real_spec {
+    image {
+      archive_filename: "luxonis_driver.tar"
+    }
+    settings {
+      host_network: true
+    }
+  }
+  sim_spec {
+    image {
+      archive_filename: "luxonis_driver.tar"
+    }
+  }
+}
+assets {
+  default_configuration_filename: "default_config.binarypb",
+  parameter_descriptor_filename: "parameter-descriptor-set.proto.bin",
+  image_filenames: ["luxonis_driver.tar"]
+}

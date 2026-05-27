@@ -1,14 +1,30 @@
+/*
+ * Copyright 2026 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_
 #define FLOWSTATE_ZIVID_FLOWSTATE_ZIVID_ADAPTER_NODE_H_
 
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/synchronization/notification.h"
+#include "flowstate_common/base_adapter_node.h"
 #include "image_transport/image_transport.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
@@ -21,28 +37,6 @@
 #include "zivid_camera/zivid_camera.hpp"
 
 namespace flowstate_zivid {
-
-struct ZividCaptureParameters {
-  double exposure_time;
-  double gain;
-  double gamma;
-  double projector_brightness;
-  double aperture;
-  bool outlier_removal_enabled;
-  double outlier_removal_threshold;
-
-  static ZividCaptureParameters boot_defaults() {
-    return {
-        8333,  // exposure_time (8333us)
-        1.0,   // gain
-        1.0,   // gamma
-        1.0,   // projector_brightness
-        5.66,  // aperture
-        true,  // outlier_removal_enabled
-        5.0    // outlier_removal_threshold
-    };
-  };
-};
 
 /**
  * @class AdapterNode
@@ -74,110 +68,91 @@ struct ZividCaptureParameters {
  *     - "~/describe": Provides a structured description of the camera's
  *       available sensors and their properties.
  */
-class AdapterNode : public rclcpp::Node {
+class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
   AdapterNode(const std::string& serial, const rclcpp::NodeOptions& options,
               std::shared_ptr<Zivid::Application> zivid_app);
 
-  std::string get_serial() const { return serial_; }
-
  private:
-  rcl_interfaces::msg::SetParametersResult setParametersCallback(
-      const std::vector<rclcpp::Parameter>& parameters);
+  absl::Status Main() override;
+  std::string ColorImageTopic() const override;
+  absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+  BuildDescribeResponse() override ABSL_LOCKS_EXCLUDED(data_mutex_);
+  absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+  BuildSnapshotResponse() override;
+
+  // --- Zivid Specific Implementations ---
+  std::string DepthImageTopic() const;
+  std::string NormalTopic() const;
+
+  void InitializeParameters();
+  rcl_interfaces::msg::SetParametersResult SetParametersCallback(
+      const std::vector<rclcpp::Parameter>& parameters)
+      ABSL_LOCKS_EXCLUDED(capture_params_mutex_);
   /**
    * @brief Generates a Zivid settings string in YAML format.
    * @return A string containing the Zivid settings in YAML format.
    */
   std::string GenerateZividSettings() const;
 
-  void DescribeCallback(
-      const std::shared_ptr<rmw_request_id_t> request_header,
-      const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>
-          request,
-      const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
-          response);
+  struct CaptureParameters {
+    double exposure_time;
+    double gain;
+    double gamma;
+    double projector_brightness;
+    double aperture;
+    bool outlier_removal_enabled;
+    double outlier_removal_threshold;
 
-  void SnapshotCallback(
-      const std::shared_ptr<rmw_request_id_t> request_header,
-      const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>
-          request,
-      const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
-          response);
+    static CaptureParameters boot_defaults() {
+      return {
+          8333,  // exposure_time (8333us)
+          1.0,   // gain
+          1.0,   // gamma
+          1.0,   // projector_brightness
+          5.66,  // aperture
+          true,  // outlier_removal_enabled
+          5.0    // outlier_removal_threshold
+      };
+    };
+  };
+
+  struct CaptureData {
+    sensor_msgs::msg::Image::ConstSharedPtr color_image;
+    sensor_msgs::msg::Image::UniquePtr depth_image;
+    sensor_msgs::msg::PointCloud2::UniquePtr normal_pc;
+    sensor_msgs::msg::CameraInfo::ConstSharedPtr camera_info;
+
+    bool AllAvailable() const {
+      return color_image != nullptr && depth_image != nullptr &&
+             normal_pc != nullptr && camera_info != nullptr;
+    }
+  };
 
   /**
-   * @brief Triggers an on-demand capture.
-   * @return absl::OkStatus() if capture succeeded, error status with message otherwise.
+   * @brief Triggers a capture and returns the captured data.
+   * @return CaptureData on success, or error status on failure.
    */
-  absl::Status TriggerOnDemandCapture();
-
-  /**
-   * @brief Callback for FPS parameter changes to start/stop continuous capture.
-   * @param fps The desired capture rate in Hz. If <= 0, continuous capture is disabled.
-   */
-  void onCaptureTimer(double fps);
-
-  /**
-   * @brief Waits for an ongoing capture to complete.
-   * @return absl::OkStatus() if capture completed successfully, error status otherwise.
-   */
-  absl::Status WaitForOngoingCapture();
-
-  /**
-   * @brief Checks if all capture data is available and clears the in-progress flag if so.
-   * @note Must be called with data_mutex_ already locked.
-   */
-  void CheckAndClearCaptureFlag() ABSL_EXCLUSIVE_LOCKS_REQUIRED(data_mutex_);
-
-  absl::Status Main();
-
-  std::string ColorImageTopic() const;
-
-  std::string DepthImageTopic() const;
-
-  std::string NormalTopic() const;
-
-  std::string serial_;
-
-  // ROS Services
-  rclcpp::CallbackGroup::SharedPtr callback_group_;
-  rclcpp::Service<snapshot_interfaces::srv::Describe>::SharedPtr
-      describe_service_;
-  rclcpp::Service<snapshot_interfaces::srv::Snapshot>::SharedPtr
-      snapshot_service_;
-
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
+  absl::StatusOr<CaptureData> Capture() ABSL_LOCKS_EXCLUDED(data_mutex_);
 
   std::unique_ptr<zivid_camera::ZividCamera> zivid_node_;
 
-  mutable absl::Mutex camera_info_mutex_;
-  sensor_msgs::msg::CameraInfo::UniquePtr color_camera_info_
-      ABSL_GUARDED_BY(camera_info_mutex_);
-  sensor_msgs::msg::CameraInfo::UniquePtr depth_camera_info_
-      ABSL_GUARDED_BY(camera_info_mutex_);
+  // Internal client to trigger the Zivid driver
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr capture_client_;
+  rclcpp::CallbackGroup::SharedPtr client_cb_group_;
 
   mutable absl::Mutex data_mutex_;
-  sensor_msgs::msg::Image::UniquePtr color_image_ ABSL_GUARDED_BY(data_mutex_);
-  sensor_msgs::msg::Image::UniquePtr depth_image_ ABSL_GUARDED_BY(data_mutex_);
-  sensor_msgs::msg::PointCloud2::UniquePtr normal_pc_
-      ABSL_GUARDED_BY(data_mutex_);
-  
-  // Flag to track if a capture is currently being processed from the timer
-  bool capture_in_progress_ ABSL_GUARDED_BY(data_mutex_) = false;
-  
-  image_transport::CameraSubscriber color_image_sub_;
-  image_transport::CameraSubscriber depth_image_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr normal_sub_;
+  CaptureData data_ ABSL_GUARDED_BY(data_mutex_);
 
-  // Timer for continuous capture
-  rclcpp::TimerBase::SharedPtr capture_timer_;
+  image_transport::CameraSubscriber color_image_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr normal_sub_;
 
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
       set_parameters_callback_handle_;
   mutable absl::Mutex capture_params_mutex_;
-  ZividCaptureParameters capture_params_ ABSL_GUARDED_BY(capture_params_mutex_);
+  CaptureParameters capture_params_ ABSL_GUARDED_BY(capture_params_mutex_);
   std::shared_ptr<rclcpp::AsyncParametersClient> zivid_camera_param_client_;
-
-  std::thread thread_;
 };
 
 }  // namespace flowstate_zivid

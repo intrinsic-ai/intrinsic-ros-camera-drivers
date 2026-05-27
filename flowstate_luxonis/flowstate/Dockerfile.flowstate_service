@@ -1,6 +1,6 @@
 # Build up the service with these stages:
 #   - core_underlay (compiles standard SDKs) ->
-#   - orbbec_underlay (compiles orbbec SDKs) ->
+#   - luxonis_underlay (compiles depthai SDKs) ->
 #   - base (ros:jazzy + settings) ->
 #   - overlay (user code built on top of underlay) ->
 #   - result (base + copied install folders)
@@ -57,20 +57,33 @@ RUN . /opt/ros/jazzy/setup.sh \
     && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
 
 # ==========================================
-# STAGE 2: orbbec_underlay
+# STAGE 2: luxonis_underlay
 # ==========================================
-FROM core_underlay AS orbbec_underlay
+FROM core_underlay AS luxonis_underlay
 
-ADD src/OrbbecSDK /opt/ros/underlay/src/OrbbecSDK
-ADD src/OrbbecSDK_ROS2 /opt/ros/underlay/src/OrbbecSDK_ROS2
+RUN apt-get update \
+    && apt-get install -y \
+        build-essential \
+        ninja-build \
+        ca-certificates \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD src/depthai-core /opt/ros/underlay/src/depthai-core
+ADD src/depthai-ros /opt/ros/underlay/src/depthai-ros
+
+# TODO: remove if package.xml is updated to contain maintainer tag.
+RUN sed -i '/<\/license>/a \  <maintainer email="support@luxonis.com">Luxonis Support</maintainer>' \
+    /opt/ros/underlay/src/depthai-core/package.xml
 
 RUN . /opt/ros/jazzy/setup.sh \
     && . /opt/ros/underlay/install/setup.sh \
     && cd /opt/ros/underlay \
     && colcon build \
+      --event-handlers=console_direct+ \
       --merge-install \
       --executor sequential \
-      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DCMAKE_BUILD_TYPE=Release \
+      --cmake-args -DBUILD_SHARED_LIBS=ON -DDEPTHAI_BOOTSTRAP_VCPKG=ON \
     && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
 
 # ==========================================
@@ -86,7 +99,7 @@ ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
 # ==========================================
 # STAGE 4: overlay
 # ==========================================
-FROM orbbec_underlay AS overlay
+FROM luxonis_underlay AS overlay
 
 ARG SERVICE_PACKAGE
 
@@ -98,18 +111,10 @@ RUN . /opt/ros/jazzy/setup.sh \
     && colcon build \
       --event-handlers=console_direct+ \
       --merge-install \
-      --packages-select OrbbecSDK \
-      --cmake-args -DOB_BUILD_USB_PAL=OFF -DOB_BUILD_GMSL_PAL=OFF -DOB_BUILD_EXAMPLES=OFF -DOB_BUILD_TOOLS=OFF -DOB_BUILD_DOCS=OFF -DCMAKE_BUILD_TYPE=Release
-
-RUN . /opt/ros/jazzy/setup.sh \
-    && . /opt/ros/underlay/install/setup.sh \
-    && cd /opt/ros/overlay \
-    && colcon build \
-      --merge-install \
-      --executor parallel \
+      --executor sequential \
       --packages-up-to=${SERVICE_PACKAGE} \
       --packages-skip $COMMON_SKIP_PACKAGES \
-      --cmake-args -DCMAKE_BUILD_TYPE=Release \
+      --cmake-args -DBUILD_SHARED_LIBS=ON -DDEPTHAI_BOOTSTRAP_VCPKG=ON \
     && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /root/.cache
 
 FROM base
@@ -133,6 +138,9 @@ RUN apt-get update \
         ros-jazzy-tf2-eigen \
         ros-jazzy-tf2-sensor-msgs \
         ros-jazzy-diagnostic-updater \
+        curl zip unzip tar libusb-1.0-0-dev \
+        ros-jazzy-vision-msgs \
+        ros-jazzy-ffmpeg-image-transport-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=overlay /opt/ros/underlay/install /opt/ros/underlay/install

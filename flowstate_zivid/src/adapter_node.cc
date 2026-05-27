@@ -1,10 +1,26 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "flowstate_zivid/adapter_node.h"
 
 #include <Zivid/Settings.h>
 
+#include <memory>
 #include <string>
 
 #include "absl/algorithm/container.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
@@ -14,12 +30,7 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "snapshot_interfaces/msg/image_snapshot.hpp"
 #include "yaml-cpp/yaml.h"
-#include "zivid_camera/capture_settings_controller.hpp"
-#include "zivid_camera/utility.hpp"
 #include "zivid_camera/zivid_camera.hpp"
-namespace zivid_camera {
-class ZividCamera;
-}
 
 namespace flowstate_zivid {
 
@@ -29,44 +40,11 @@ using snapshot_interfaces::srv::Snapshot;
 AdapterNode::AdapterNode(const std::string& serial,
                          const rclcpp::NodeOptions& options,
                          std::shared_ptr<Zivid::Application> zivid_app)
-    : Node(std::string("zivid_") + serial, options),
-      serial_(serial),
-      capture_params_(ZividCaptureParameters::boot_defaults()) {
-  // Declare parameters for AdapterNode
-  declare_parameter<double>("exposure_time", capture_params_.exposure_time);
-  declare_parameter<double>("ExposureTime",
-                            capture_params_.exposure_time);  // Alias
-  declare_parameter<double>("gain", capture_params_.gain);
-  declare_parameter<double>("Gain", capture_params_.gain);  // Alias
-  declare_parameter<double>("gamma", capture_params_.gamma);
-  declare_parameter<double>("Gamma", capture_params_.gamma);  // Alias
-  declare_parameter<double>("projector_brightness",
-                            capture_params_.projector_brightness);
-  declare_parameter<double>("brightness", capture_params_.projector_brightness);
-  declare_parameter<double>("Brightness",
-                            capture_params_.projector_brightness);  // Alias
-
-  declare_parameter<double>("aperture", capture_params_.aperture);
-  declare_parameter<double>("Aperture", capture_params_.aperture);  // Alias
-
-  declare_parameter<bool>("outlier_removal_enabled",
-                          capture_params_.outlier_removal_enabled);
-  declare_parameter<double>("outlier_removal_threshold",
-                            capture_params_.outlier_removal_threshold);
-
-  // Declare FPS parameter for continuous capture
-  declare_parameter<double>("fps", 0.0);
-
-  // Declare parameters that will be passed through to zivid_camera node
+    : flowstate_common::BaseAdapterNode(serial, {}, "zivid"),
+      capture_params_(CaptureParameters::boot_defaults()) {
+  InitializeParameters();
   const std::string zivid_node_name = std::string("camera_") + serial;
   const std::string zivid_ns = "zivid/" + zivid_node_name;
-  this->declare_parameter<std::string>("settings_yaml",
-                                       "");  // For zivid_camera node
-
-  this->declare_parameter<std::string>("settings_2d_yaml", "");
-  this->declare_parameter<std::string>("settings_2d_file_path", "");
-  this->declare_parameter<std::string>("color_space", "srgb");
-  this->declare_parameter<std::string>("intrinsics_source", "camera");
 
   rclcpp::NodeOptions zivid_node_options = options;
   zivid_node_options.append_parameter_override("serial_number", serial)
@@ -95,95 +73,72 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   set_parameters_callback_handle_ =
       this->add_on_set_parameters_callback(std::bind(
-          &AdapterNode::setParametersCallback, this, std::placeholders::_1));
+          &AdapterNode::SetParametersCallback, this, std::placeholders::_1));
 
   // Subscribe to color image + camera_info pair
   color_image_sub_ = image_transport::create_camera_subscription(
       this, ColorImageTopic(),
       [this](const sensor_msgs::msg::Image::ConstSharedPtr& image,
              const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info) {
-        {
-          absl::MutexLock data_lock(&this->data_mutex_);
-          this->color_image_ =
-              std::make_unique<sensor_msgs::msg::Image>(*image);
-          this->CheckAndClearCaptureFlag();
-        }
-        {
-          absl::MutexLock info_lock(&this->camera_info_mutex_);
-          this->color_camera_info_ =
-              std::make_unique<sensor_msgs::msg::CameraInfo>(*camera_info);
-        }
+        absl::MutexLock data_lock(&this->data_mutex_);
+        data_.color_image = std::move(image);
+        data_.camera_info = std::move(camera_info);
       },
       "raw");
 
-  // Subscribe to depth image + camera_info pair
-  depth_image_sub_ = image_transport::create_camera_subscription(
-      this, DepthImageTopic(),
-      [this](const sensor_msgs::msg::Image::ConstSharedPtr& image,
-             const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info) {
-        {
-          absl::MutexLock data_lock(&this->data_mutex_);
-          this->depth_image_ =
-              std::make_unique<sensor_msgs::msg::Image>(*image);
-          this->CheckAndClearCaptureFlag();
-        }
-        {
-          absl::MutexLock info_lock(&this->camera_info_mutex_);
-          this->depth_camera_info_ =
-              std::make_unique<sensor_msgs::msg::CameraInfo>(*camera_info);
-        }
-      },
-      "raw");
+  // In the zivid camera node, camera_info is the same for color and depth,
+  // so we only need to subscribe to depth image here.
+  depth_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      DepthImageTopic(), 2, [this](sensor_msgs::msg::Image::UniquePtr msg) {
+        absl::MutexLock data_lock(&this->data_mutex_);
+        data_.depth_image = std::move(msg);
+      });
 
   // Subscribe to normals point cloud
   normal_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       NormalTopic(), 2, [this](sensor_msgs::msg::PointCloud2::UniquePtr msg) {
-        {
-          absl::MutexLock data_lock(&this->data_mutex_);
-          this->normal_pc_ = std::move(msg);
-          this->CheckAndClearCaptureFlag();
-        }
+        absl::MutexLock data_lock(&this->data_mutex_);
+        this->data_.normal_pc = std::move(msg);
       });
 
-  callback_group_ =
-      this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-
-  describe_service_ = create_service<Describe>(
-      "~/describe",
-      [this](const std::shared_ptr<rmw_request_id_t> request_header,
-             const std::shared_ptr<Describe::Request> request,
-             const std::shared_ptr<Describe::Response> response) {
-        this->DescribeCallback(request_header, request, response);
-      },
-      rclcpp::ServicesQoS(), callback_group_);
-
-  snapshot_service_ = create_service<Snapshot>(
-      "~/snapshot",
-      [this](const std::shared_ptr<rmw_request_id_t> request_header,
-             const std::shared_ptr<Snapshot::Request> request,
-             const std::shared_ptr<Snapshot::Response> response) {
-        this->SnapshotCallback(request_header, request, response);
-      },
-      rclcpp::ServicesQoS(), callback_group_);
+  CreateFlowstateServices();
   RCLCPP_INFO(this->get_logger(), "zivid_node_ = %s",
               zivid_node_->get_fully_qualified_name());
-
   capture_client_ = this->create_client<std_srvs::srv::Trigger>(
-      absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()));
-
-  thread_ = std::thread([this]() {
-    const absl::Status status = this->Main();
-    if (!status.ok()) {
-      RCLCPP_ERROR_STREAM(this->get_logger(),
-                          "Adapter node thread error: " << status);
-    }
-    RCLCPP_INFO(this->get_logger(), "Destroying zivid_camera_node...");
-    zivid_node_.reset();
-    RCLCPP_INFO(this->get_logger(), "Done destroying zivid_camera_node.");
-  });
+      absl::StrFormat("/zivid/camera_%s/capture", serial_.c_str()),
+      rclcpp::ServicesQoS(), callback_group_);
+  StartExecutorThread();
 }
 
-rcl_interfaces::msg::SetParametersResult AdapterNode::setParametersCallback(
+void AdapterNode::InitializeParameters() {
+  declare_parameter<double>("exposure_time", capture_params_.exposure_time);
+  declare_parameter<double>("ExposureTime",
+                            capture_params_.exposure_time);  // Alias
+  declare_parameter<double>("gain", capture_params_.gain);
+  declare_parameter<double>("Gain", capture_params_.gain);  // Alias
+  declare_parameter<double>("gamma", capture_params_.gamma);
+  declare_parameter<double>("Gamma", capture_params_.gamma);  // Alias
+  declare_parameter<double>("projector_brightness",
+                            capture_params_.projector_brightness);
+  declare_parameter<double>("brightness", capture_params_.projector_brightness);
+  declare_parameter<double>("Brightness",
+                            capture_params_.projector_brightness);  // Alias
+  declare_parameter<double>("aperture", capture_params_.aperture);
+  declare_parameter<double>("Aperture", capture_params_.aperture);  // Alias
+
+  declare_parameter<bool>("outlier_removal_enabled",
+                          capture_params_.outlier_removal_enabled);
+  declare_parameter<double>("outlier_removal_threshold",
+                            capture_params_.outlier_removal_threshold);
+
+  declare_parameter<std::string>("settings_yaml", "");  // For zivid_camera node
+  declare_parameter<std::string>("settings_2d_yaml", "");
+  declare_parameter<std::string>("settings_2d_file_path", "");
+  declare_parameter<std::string>("color_space", "srgb");
+  declare_parameter<std::string>("intrinsics_source", "camera");
+}
+
+rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
     const std::vector<rclcpp::Parameter>& parameters) {
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
@@ -232,10 +187,6 @@ rcl_interfaces::msg::SetParametersResult AdapterNode::setParametersCallback(
                param.get_name() == "OutlierRemovalThreshold") {
       capture_params_.outlier_removal_threshold = param.as_double();
       individual_param_changed = true;
-    } else if (param.get_name() == "fps") {
-      const double fps = param.as_double();
-      RCLCPP_INFO(get_logger(), "FPS parameter changed to: %.2f", fps);
-      onCaptureTimer(fps);
     } else if (param.get_name() == "color_space" ||
                param.get_name() == "intrinsics_source") {
       RCLCPP_INFO_STREAM(get_logger(), "Passing through '"
@@ -327,8 +278,8 @@ absl::Status AdapterNode::Main() {
   return absl::OkStatus();
 }
 
-absl::Status AdapterNode::TriggerOnDemandCapture() {
-  RCLCPP_INFO(get_logger(), "Triggering on-demand capture...");
+absl::StatusOr<AdapterNode::CaptureData> AdapterNode::Capture() {
+  RCLCPP_INFO(get_logger(), "Triggering a capture...");
 
   if (!capture_client_->service_is_ready()) {
     const std::string error_msg = "Capture service is not ready.";
@@ -336,34 +287,18 @@ absl::Status AdapterNode::TriggerOnDemandCapture() {
     return absl::UnavailableError(error_msg);
   }
 
-  // Define lambda to check if all callbacks have completed
-  auto all_callbacks_completed = [this]() {
-    data_mutex_.AssertReaderHeld();
-    return color_image_ != nullptr && depth_image_ != nullptr &&
-           normal_pc_ != nullptr;
-  };
-
-  // Reset all data pointers to nullptr before triggering capture
-  {
-    absl::MutexLock lock(&data_mutex_);
-    color_image_ = nullptr;
-    depth_image_ = nullptr;
-    normal_pc_ = nullptr;
-    capture_in_progress_ = true;
-  }
-
   RCLCPP_INFO(get_logger(), "Sending capture request...");
   auto capture_request = std::make_shared<std_srvs::srv::Trigger::Request>();
-  auto capture_result = capture_client_->async_send_request(capture_request);
+  auto capture_data = capture_client_->async_send_request(capture_request);
 
-  auto future_status = capture_result.wait_for(std::chrono::seconds(10));
+  auto future_status = capture_data.wait_for(std::chrono::seconds(10));
   if (future_status != std::future_status::ready) {
     const std::string error_msg = "Capture request timed out after 10 seconds.";
     RCLCPP_ERROR(get_logger(), "%s", error_msg.c_str());
     return absl::DeadlineExceededError(error_msg);
   }
 
-  auto capture_response = capture_result.get();
+  auto capture_response = capture_data.get();
   RCLCPP_INFO(get_logger(), "Capture request completed");
 
   if (!capture_response->success) {
@@ -375,230 +310,72 @@ absl::Status AdapterNode::TriggerOnDemandCapture() {
 
   // Wait for all callbacks to complete with timeout
   constexpr absl::Duration timeout = absl::Seconds(10);
-  bool all_data_received = false;
-  {
-    absl::MutexLock lock(&data_mutex_);
-    all_data_received = data_mutex_.AwaitWithTimeout(
-        absl::Condition(&all_callbacks_completed), timeout);
+  absl::MutexLock lock(&data_mutex_);
+  if (data_mutex_.AwaitWithTimeout(
+          absl::Condition(&data_, &CaptureData::AllAvailable), timeout)) {
+    RCLCPP_INFO(get_logger(), "Capture succeeded.");
+    // Move all data out and cache only camera_info for future describe() calls
+    CaptureData result{.color_image = std::move(data_.color_image),
+                       .depth_image = std::move(data_.depth_image),
+                       .normal_pc = std::move(data_.normal_pc),
+                       .camera_info = data_.camera_info};
+    return result;
   }
 
-  if (!all_data_received) {
-    std::vector<std::string> missing_items;
-    {
-      absl::MutexLock lock(&data_mutex_);
-      capture_in_progress_ = false;
-      if (!color_image_) missing_items.push_back("color image");
-      if (!depth_image_) missing_items.push_back("depth image");
-      if (!normal_pc_) missing_items.push_back("normals point cloud");
-    }
+  std::vector<std::string> missing_items;
+  if (!data_.color_image) missing_items.push_back("color image");
+  if (!data_.depth_image) missing_items.push_back("depth image");
+  if (!data_.normal_pc) missing_items.push_back("normals point cloud");
+  if (!data_.camera_info) missing_items.push_back("camera info");
 
-    const std::string error_msg = absl::StrCat(
-        "Did not receive ", absl::StrJoin(missing_items, ", "),
-        " from camera within timeout while waiting for capture data.");
-    RCLCPP_ERROR(get_logger(), "%s", error_msg.c_str());
-    return absl::DeadlineExceededError(error_msg);
-  }
-
-  {
-    absl::MutexLock lock(&data_mutex_);
-    capture_in_progress_ = false;
-  }
-
-  RCLCPP_INFO(get_logger(), "On-demand capture succeeded.");
-  return absl::OkStatus();
+  const std::string error_msg = absl::StrCat(
+      "Did not receive ", absl::StrJoin(missing_items, ", "),
+      " from camera within timeout while waiting for capture data.");
+  RCLCPP_ERROR(get_logger(), "%s", error_msg.c_str());
+  return absl::DeadlineExceededError(error_msg);
 }
 
-void AdapterNode::onCaptureTimer(double fps) {
-  RCLCPP_INFO_STREAM(get_logger(), "FPS parameter is set to " << fps);
+absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
+AdapterNode::BuildDescribeResponse() {
 
-  // Always stop the existing timer if it's running before potentially starting
-  // a new one.
-  if (capture_timer_) {
+  snapshot_interfaces::srv::Describe::Response response;
+  sensor_msgs::msg::CameraInfo::ConstSharedPtr info_copy;
+
+  {
+    absl::MutexLock lock(&data_mutex_);
+    info_copy = data_.camera_info;
+  }
+
+  if (info_copy == nullptr) {
     RCLCPP_INFO(get_logger(),
-                "Stopping current continuous capture before (re)starting.");
-    capture_timer_->cancel();
-    capture_timer_.reset();
-  }
-
-  if (fps > 0.0) {
-    const auto period = std::chrono::duration<double>(1.0 / fps);
-    RCLCPP_INFO(get_logger(),
-                "Starting continuous capture with a period of %.3f s (%.1f Hz)",
-                period.count(), fps);
-
-    capture_timer_ = this->create_wall_timer(period, [this]() {
-      if (!capture_client_->service_is_ready()) {
-        RCLCPP_WARN_THROTTLE(get_logger(), *this->get_clock(), 5000,
-                             "Capture service is not ready.");
-        return;
-      }
-
-      {
-        absl::MutexLock lock(&data_mutex_);
-        color_image_ = nullptr;
-        depth_image_ = nullptr;
-        normal_pc_ = nullptr;
-        capture_in_progress_ = true;
-      }
-
-      capture_client_->async_send_request(
-          std::make_shared<std_srvs::srv::Trigger::Request>());
-    });
-  } else {
-    RCLCPP_INFO(get_logger(), "Continuous capture is disabled (fps <= 0.0).");
-  }
-}
-
-absl::Status AdapterNode::WaitForOngoingCapture() {
-  RCLCPP_INFO(get_logger(), "Waiting for ongoing capture to complete...");
-
-  auto capture_completed = [this]() {
-    data_mutex_.AssertReaderHeld();
-    return !capture_in_progress_;
-  };
-
-  constexpr absl::Duration timeout = absl::Seconds(10);
-  bool completed = false;
-  {
-    absl::MutexLock lock(&data_mutex_);
-    completed = data_mutex_.AwaitWithTimeout(
-        absl::Condition(&capture_completed), timeout);
-  }
-
-  if (!completed) {
-    const std::string error_msg =
-        "Timeout waiting for ongoing capture to complete.";
-    RCLCPP_ERROR(get_logger(), "%s", error_msg.c_str());
-    return absl::DeadlineExceededError(error_msg);
-  }
-
-  RCLCPP_INFO(get_logger(), "Ongoing capture completed.");
-  return absl::OkStatus();
-}
-
-void AdapterNode::CheckAndClearCaptureFlag() {
-  // Check if all data is now available and clear the flag
-  if (color_image_ && depth_image_ && normal_pc_) {
-    capture_in_progress_ = false;
-  }
-}
-
-void AdapterNode::DescribeCallback(
-    const std::shared_ptr<rmw_request_id_t>,
-    const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
-    const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
-        response) {
-  RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
-
-  // Check if a capture is already in progress
-  bool capture_ongoing = false;
-  {
-    absl::MutexLock lock(&data_mutex_);
-    capture_ongoing = capture_in_progress_;
-  }
-
-  if (capture_ongoing) {
-    // Wait for the ongoing capture to complete
-    RCLCPP_INFO(get_logger(),
-                "Capture already in progress, waiting for it to complete...");
-    const absl::Status status = WaitForOngoingCapture();
-    if (!status.ok()) {
-      response->error_message = std::string(status.message());
-      response->success = false;
-      return;
+                "No cached camera_info available, triggering capture");
+    auto capture_data = Capture();
+    if (!capture_data.ok()) {
+      return capture_data.status();
     }
-  } else {
-    // Check if camera_info is available, if not trigger a capture
-    bool need_capture = false;
-    {
-      absl::MutexLock lock(&camera_info_mutex_);
-      need_capture = !color_camera_info_ || !depth_camera_info_;
-    }
-
-    if (need_capture) {
-      RCLCPP_WARN(get_logger(),
-                  "CameraInfo not yet received, triggering a capture...");
-      const absl::Status status = TriggerOnDemandCapture();
-      if (!status.ok()) {
-        response->error_message = std::string(status.message());
-        response->success = false;
-        return;
-      }
-    }
+    info_copy = capture_data->camera_info;
   }
 
   // Color sensor info
-  snapshot_interfaces::msg::SensorInfo color_info;
-  color_info.sensor_name = "color";
-  color_info.topic_name = ColorImageTopic();
-  color_info.sensor_type = snapshot_interfaces::msg::SensorInfo::IMAGE;
-  color_info.camera_t_sensor.transform.rotation.w = 1.0;
-  {
-    absl::MutexLock lock(&camera_info_mutex_);
-    color_info.info.push_back(*color_camera_info_);
-  }
-  response->sensors.push_back(color_info);
-
+  response.sensors.push_back(
+      BuildSensorInformation(*info_copy, "rgb", ColorImageTopic()));
   // Depth sensor info
-  snapshot_interfaces::msg::SensorInfo depth_info;
-  depth_info.sensor_name = "depth";
-  depth_info.topic_name = DepthImageTopic();
-  depth_info.sensor_type = snapshot_interfaces::msg::SensorInfo::DEPTH;
-  depth_info.camera_t_sensor.transform.rotation.w = 1.0;
-  {
-    absl::MutexLock lock(&camera_info_mutex_);
-    depth_info.info.push_back(*depth_camera_info_);
-  }
-  response->sensors.push_back(depth_info);
+  response.sensors.push_back(
+      BuildSensorInformation(*info_copy, "depth", DepthImageTopic()));
+  response.sensors.push_back(
+      BuildSensorInformation(*info_copy, "normal", NormalTopic()));
 
-  snapshot_interfaces::msg::SensorInfo normal_info;
-  normal_info.sensor_name = "normal";
-  normal_info.topic_name = NormalTopic();
-  normal_info.sensor_type = snapshot_interfaces::msg::SensorInfo::NORMAL;
-  normal_info.camera_t_sensor.transform.rotation.w = 1.0;
-  {
-    absl::MutexLock lock(&camera_info_mutex_);
-    normal_info.info.push_back(*depth_camera_info_);
-  }
-  response->sensors.push_back(normal_info);
-
-  response->success = true;
+  return response;
 }
 
-void AdapterNode::SnapshotCallback(
-    const std::shared_ptr<rmw_request_id_t>,
-    const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Request>,
-    const std::shared_ptr<snapshot_interfaces::srv::Snapshot::Response>
-        response) {
-  RCLCPP_INFO(get_logger(), "=== SNAPSHOT SERVICE ===");
-
-  // Check if a capture is already in progress
-  bool capture_ongoing = false;
-  {
-    absl::MutexLock lock(&data_mutex_);
-    capture_ongoing = capture_in_progress_;
+absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
+AdapterNode::BuildSnapshotResponse() {
+  snapshot_interfaces::srv::Snapshot::Response response;
+  // Trigger a capture
+  auto capture_data = Capture();
+  if (!capture_data.ok()) {
+    return capture_data.status();
   }
-
-  if (capture_ongoing) {
-    // Wait for the ongoing capture to complete
-    RCLCPP_INFO(get_logger(),
-                "Capture already in progress, waiting for it to complete...");
-    const absl::Status status = WaitForOngoingCapture();
-    if (!status.ok()) {
-      response->error_message = std::string(status.message());
-      response->success = false;
-      return;
-    }
-  } else {
-    // Trigger an on-demand capture
-    const absl::Status status = TriggerOnDemandCapture();
-    if (!status.ok()) {
-      response->error_message = std::string(status.message());
-      response->success = false;
-      return;
-    }
-  }
-
   snapshot_interfaces::msg::ImageSnapshot color_snapshot;
   snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
   snapshot_interfaces::msg::PointCloud2Snapshot normal_snapshot;
@@ -607,22 +384,17 @@ void AdapterNode::SnapshotCallback(
   depth_snapshot.topic_name = DepthImageTopic();
   normal_snapshot.topic_name = NormalTopic();
 
-  {
-    absl::MutexLock info_lock(&camera_info_mutex_);
-    absl::MutexLock data_lock(&data_mutex_);
+  color_snapshot.camera_info = *capture_data->camera_info;
+  depth_snapshot.camera_info = std::move(*capture_data->camera_info);
 
-    color_snapshot.camera_info = *color_camera_info_;
-    depth_snapshot.camera_info = *depth_camera_info_;
+  color_snapshot.image = std::move(*capture_data->color_image);
+  depth_snapshot.image = std::move(*capture_data->depth_image);
+  normal_snapshot.point_cloud = std::move(*capture_data->normal_pc);
 
-    color_snapshot.image = *color_image_;
-    depth_snapshot.image = *depth_image_;
-    normal_snapshot.point_cloud = *normal_pc_;
-  }
+  response.images.push_back(std::move(color_snapshot));
+  response.images.push_back(std::move(depth_snapshot));
+  response.point_clouds.push_back(std::move(normal_snapshot));
 
-  response->images.push_back(std::move(color_snapshot));
-  response->images.push_back(std::move(depth_snapshot));
-  response->point_clouds.push_back(std::move(normal_snapshot));
-
-  response->success = true;
+  return response;
 }
 }  // namespace flowstate_zivid

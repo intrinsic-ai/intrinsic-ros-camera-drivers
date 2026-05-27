@@ -15,8 +15,8 @@
 #include <fstream>
 #include <string>
 
-#include "flowstate/orbbec_gemini_driver_config.pb.h"
-#include "flowstate_orbbec/spawner_node.h"
+#include "flowstate/luxonis_driver_config.pb.h"
+#include "flowstate_luxonis/spawner_node.h"
 #include "intrinsic/resources/proto/runtime_context.pb.h"
 #include "rclcpp/rclcpp.hpp"
 
@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     std::cerr << "Unable to parse runtime context file" << std::endl;
     return EXIT_FAILURE;
   }
-  orbbec_gemini_driver::OrbbecGeminiDriverConfig config;
+  luxonis_driver::LuxonisDriverConfig config;
   if (!runtime_context.config().UnpackTo(&config)) {
     std::cerr << "Unable to parse config proto" << std::endl;
     return EXIT_FAILURE;
@@ -38,8 +38,8 @@ int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
 
   std::cout << "Creating spawner node..." << std::endl;
-  std::shared_ptr<flowstate_orbbec::SpawnerNode> spawner_node =
-      std::make_shared<flowstate_orbbec::SpawnerNode>();
+  std::shared_ptr<flowstate_luxonis::SpawnerNode> spawner_node =
+      std::make_shared<flowstate_luxonis::SpawnerNode>();
   spawner_node->UpdateCameras();
 
   // In the future, we should set the ip_address parameter with what we

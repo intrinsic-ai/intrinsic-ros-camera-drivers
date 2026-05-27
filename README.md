@@ -28,18 +28,19 @@ The resulting directory structure should look like this:
 ```
 ros_cameras_ws/
 └── src
+    ├── depthai-core
+    ├── depthai-ros
     ├── flowstate-ros-camera-drivers
     ├── OrbbecSDK
     ├── OrbbecSDK_ROS2
     ├── rmw_zenoh
+    ├── zivid-ros
     ├── zivid-ros
     └── sdk-ros
 ```
 
 ROS Jazzy expects to run on Ubuntu 24.04 LTS.
 This can run conveniently on `gLinux` using `distrobox`.
-Assuming the distrobox is named `ubuntu-24-04` and that the typical [desktop ROS Jazzy instructions](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) have been followed, here are some packages to add:
-
 ```
 # distrobox setup
 sudo apt install distrobox
@@ -79,6 +80,32 @@ gz sim ../src/flowstate-ros-camera-drivers/flowstate_orbbec/model/minimal_world.
 That will produce `orbec_gemini_335le/meshes/orbbec_gemini_335le.dae` which is great, but has incredible detail, and is 44 MB.
 To reduce this size drastically, load it into Blender 4.5, select "node 1", then Mesh..CleanUp..MergeByDistance, using something like 0.5mm, and export just "node 1" as a `.dae`.
 The resulting size of this operation is around 1.9 MB.
+
+# Luxonis
+
+Although Luxonis releases a binary build of their software for ROS Jazzy, we
+need a newer version (v3) to correctly handle undistortion of their wide-angle
+cameras. This is released as binary for Kilted, but we will build it from
+source on Jazzy.
+
+```
+colcon build --packages-up-to flowstate_luxonis --merge-install --cmake-args -DBUILD_SHARED_LIBS=ON
+```
+
+## Firmware updates
+
+To update the firmware:
+```
+mkdir ~/luxonis
+cd ~/luxonis
+git clone https://github.com/luxonis/depthai-python.git
+virtualenv venv
+source venv/bin/activate
+cd depthai-python/utilities
+python3 install_requirements.py
+python3 device_manager.py
+```
+Then click "Specify IP", and type an IP address on the local network, such as `192.168.1.203`
 
 # Debugging builds
 
