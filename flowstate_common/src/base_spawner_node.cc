@@ -1,3 +1,17 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "flowstate_common/base_spawner_node.h"
 
 #include <chrono>
@@ -65,7 +79,7 @@ BaseSpawnerNode::~BaseSpawnerNode() {
   RCLCPP_INFO(get_logger(), "Camera SpawnerNode shutdown complete");
 }
 
-bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
+bool BaseSpawnerNode::IsAlreadySpawned(std::string_view serial) const {
   for (const auto& node : spawned_nodes_) {
     // Uses the helper from BaseAdapterNode
     if (node && serial == node->GetSerial()) {
@@ -75,14 +89,31 @@ bool BaseSpawnerNode::IsAlreadySpawned(const std::string& serial) const {
   return false;
 }
 
-void BaseSpawnerNode::CleanupExitedNodes() {
+void BaseSpawnerNode::CleanupDeadNodes(
+    const std::vector<std::string>& current_serials) {
   auto it = spawned_nodes_.begin();
   while (it != spawned_nodes_.end()) {
-    // Uses the helper from BaseAdapterNode
-    if ((*it)->HasExitedThread()) {
-      RCLCPP_INFO(get_logger(), "Camera %s has exited. Removing it.",
-                  (*it)->GetSerial().c_str());
+    const std::string& node_serial = (*it)->GetSerial();
+
+    bool has_exited = (*it)->HasExitedThread();
+    bool is_unplugged =
+        std::find(current_serials.begin(), current_serials.end(),
+                  node_serial) == current_serials.end();
+
+    if (has_exited || is_unplugged) {
+      if (has_exited) {
+        RCLCPP_INFO(get_logger(), "Camera %s thread exited. Removing node.",
+                    node_serial.c_str());
+      } else {
+        RCLCPP_WARN(get_logger(),
+                    "Camera %s physically disconnected. Removing node.",
+                    node_serial.c_str());
+      }
+
       it = spawned_nodes_.erase(it);
+      RCLCPP_INFO(get_logger(), "Waiting a few seconds after deleting node");
+      std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+      RCLCPP_INFO(get_logger(), "Done waiting after deleting node");
     } else {
       ++it;
     }
@@ -94,7 +125,7 @@ void BaseSpawnerNode::UpdateCameras() {
 
   absl::MutexLock lock(&nodes_mutex_);
 
-  CleanupExitedNodes();
+  CleanupDeadNodes(current_serials);
 
   std::vector<std::string> serials_to_spawn;
   for (const auto& serial : current_serials) {

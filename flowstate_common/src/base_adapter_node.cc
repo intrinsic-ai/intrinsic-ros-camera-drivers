@@ -1,3 +1,17 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "flowstate_common/base_adapter_node.h"
 
 #include <memory>
@@ -84,7 +98,7 @@ void BaseAdapterNode::DescribeCallback(
   response->success = true;
 }
 
-snapshot_interfaces::msg::SensorInfo BaseAdapterNode::SensorInformation(
+snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
     const sensor_msgs::msg::CameraInfo& camera_info,
     const std::string& sensor_name, const std::string& topic_name) {
   snapshot_interfaces::msg::SensorInfo sensor_info;
@@ -96,6 +110,16 @@ snapshot_interfaces::msg::SensorInfo BaseAdapterNode::SensorInformation(
       1.0;  // todo: get static transform
 
   sensor_info.info.push_back(camera_info);
+  return sensor_info;
+}
+
+snapshot_interfaces::msg::SensorInfo BaseAdapterNode::BuildSensorInformation(
+    const sensor_msgs::msg::CameraInfo& camera_info,
+    const std::string& sensor_name, const std::string& topic_name,
+    const geometry_msgs::msg::TransformStamped& camera_t_sensor) {
+  snapshot_interfaces::msg::SensorInfo sensor_info =
+      BuildSensorInformation(camera_info, sensor_name, topic_name);
+  sensor_info.camera_t_sensor = camera_t_sensor;
   return sensor_info;
 }
 

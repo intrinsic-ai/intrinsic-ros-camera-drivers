@@ -1,0 +1,6 @@
+# proto-file: google/protobuf/any.proto
+# proto-message: Any
+[type.googleapis.com/orbbec_gemini_driver.OrbbecGeminiDriverConfig] {
+  # If no addresses are provided, the service will automatically discover
+  # and use any Orbbec Gemini cameras that it finds.
+}

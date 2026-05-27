@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef FLOWSTATE_COMMON_CAMERA_ADAPTER_NODE_H_
 #define FLOWSTATE_COMMON_CAMERA_ADAPTER_NODE_H_
 
@@ -10,6 +26,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
@@ -42,6 +59,13 @@ namespace flowstate_common {
  * information for the describe service
  * 5. Override BuildSnapshotResponse to build the snapshot response with image
  * data for the snapshot service
+ *
+ * Driver Initialization Note:
+ * Derived classes have full control over their setup. Driver authors may introduce
+ * custom helpers (e.g., `InitializeParameters()`) to handle ROS 2 parameters,
+ * compile pipelines, or wrap SDK connections as needed. This heavy lifting
+ * should generally be executed within the `Main()` background thread to avoid
+ * blocking the SpawnerNode.
  */
 class BaseAdapterNode : public rclcpp::Node {
  public:
@@ -50,7 +74,8 @@ class BaseAdapterNode : public rclcpp::Node {
    * @param serial Camera serial number
    * @param locators Camera locators (IP addresses should come first after that,
    * USB paths)
-   * @param node_name ROS node name prefix (will be prefixed with camera type)
+   * @param node_name_prefix ROS node name prefix (will be prefixed with camera
+   * type)
    */
   BaseAdapterNode(const std::string& serial,
                   const std::vector<std::string>& locators,
@@ -62,7 +87,7 @@ class BaseAdapterNode : public rclcpp::Node {
    * @brief Check if the background thread has exited.
    * @return true if thread has exited, false otherwise
    */
-  bool HasExitedThread() const { return exited_thread_; }
+  bool HasExitedThread() const { return exited_thread_.load(); }
 
   /**
    * @brief Get the camera serial number.
@@ -142,19 +167,33 @@ class BaseAdapterNode : public rclcpp::Node {
   /**
    * @brief Helper to pack CameraInfo into the Response.
    * Call this from BuildDescribeResponse() in derived classes to add a sensor
-   * description for the color camera.
+   * description. This form populates camera_t_sensor with a unity transform.
    * @param camera_info CameraInfo message to extract sensor parameters from
    * @param sensor_name Logical name for the sensor (e.g., "rgb")
    * @param topic_name ROS topic name for the sensor's image stream
    * @return SensorInfo message populated with the provided info and parameters
    */
-  snapshot_interfaces::msg::SensorInfo SensorInformation(
+  snapshot_interfaces::msg::SensorInfo BuildSensorInformation(
       const sensor_msgs::msg::CameraInfo& camera_info,
       const std::string& sensor_name, const std::string& topic_name);
 
+  /**
+   * @brief Helper to pack CameraInfo into the Response.
+   * Call this from BuildDescribeResponse() in derived classes to add a sensor
+   * description. This form accepts a camera_t_sensor transform.
+   * @param camera_info CameraInfo message to extract sensor parameters from
+   * @param sensor_name Logical name for the sensor (e.g., "rgb")
+   * @param topic_name ROS topic name for the sensor's image stream
+   * @return SensorInfo message populated with the provided info and parameters
+   */
+  snapshot_interfaces::msg::SensorInfo BuildSensorInformation(
+      const sensor_msgs::msg::CameraInfo& camera_info,
+      const std::string& sensor_name, const std::string& topic_name,
+      const geometry_msgs::msg::TransformStamped& camera_t_sensor);
+
   // Thread management
   std::thread thread_;
-  bool exited_thread_ = false;
+  std::atomic<bool> exited_thread_{false};
 
   // Camera identification
   std::string serial_;

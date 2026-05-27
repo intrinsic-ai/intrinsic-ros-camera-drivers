@@ -1,20 +1,20 @@
 metadata {
   id {
     package: "ai.intrinsic"
-    name: "orbbec_driver"
+    name: "orbbec_gemini_driver"
   }
   vendor {
     display_name: "Intrinsic"
   }
   documentation {
-    description: "Low-level ROS driver for the Orbbec camera family."
+    description: "Low-level ROS driver for the Orbbec Gemini camera."
   }
-  display_name: "Orbbec Driver"
+  display_name: "Orbbec Gemini Driver"
 }
 service_def {
   real_spec {
     image {
-      archive_filename: "orbbec_driver.tar"
+      archive_filename: "orbbec_gemini_driver.tar"
     }
     settings {
       host_network: true
@@ -22,12 +22,12 @@ service_def {
   }
   sim_spec {
     image {
-      archive_filename: "orbbec_driver.tar"
+      archive_filename: "orbbec_gemini_driver.tar"
     }
   }
 }
 assets {
   default_configuration_filename: "default_config.binarypb",
   parameter_descriptor_filename: "parameter-descriptor-set.proto.bin",
-  image_filenames: ["orbbec_driver.tar"]
+  image_filenames: ["orbbec_gemini_driver.tar"]
 }

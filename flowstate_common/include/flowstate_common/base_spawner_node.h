@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef FLOWSTATE_COMMON_CAMERA_SPAWNER_NODE_H_
 #define FLOWSTATE_COMMON_CAMERA_SPAWNER_NODE_H_
 
@@ -32,9 +48,9 @@ namespace flowstate_common {
  * To create a new camera spawner:
  * 1. Inherit from BaseSpawnerNode.
  * 2. Implement `GetSerials()` to query the SDK and return all connected
- * serials.
+ *    serials.
  * 3. Implement `SpawnNodes()` to instantiate AdapterNodes for a requested list.
- * 4. Call `UpdateCameras()` at the very end of your derived class constructor
+ * 4. Call `UpdateCameras()` from your `main()` function after instantiation
  *    to trigger the initial hardware scan.
  */
 class BaseSpawnerNode : public rclcpp::Node {
@@ -52,14 +68,15 @@ class BaseSpawnerNode : public rclcpp::Node {
 
   virtual ~BaseSpawnerNode();
 
- protected:
   /**
    * @brief The main execution loop. It queries GetSerials(), cleans up crashed
    * or disconnected nodes, and calls SpawnNodes() for newly discovered
-   * hardware. Should be called at the end of the derived class constructor.
+   * hardware. Must be called manually from main() after the object is fully
+   * constructed.
    */
   void UpdateCameras() ABSL_LOCKS_EXCLUDED(nodes_mutex_);
 
+ protected:
   /**
    * @brief Queries the manufacturer SDK for all currently connected hardware.
    * @return A vector of serial numbers for physically connected cameras.
@@ -74,16 +91,27 @@ class BaseSpawnerNode : public rclcpp::Node {
   virtual std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
   SpawnNodes(const std::vector<std::string>& serials) = 0;
 
+  void ClearSpawnedNodes() {
+    std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
+        nodes_to_delete;
+    {
+      absl::MutexLock lock(&nodes_mutex_);
+      nodes_to_delete = std::move(spawned_nodes_);
+    }
+    nodes_to_delete.clear();
+  }
+
+ private:
   // Protected mutex and vector so derived classes (like Zivid) can safely
   // access and manually shut down nodes if required by their SDK.
   mutable absl::Mutex nodes_mutex_;
   std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> spawned_nodes_
       ABSL_GUARDED_BY(nodes_mutex_);
 
- private:
-  bool IsAlreadySpawned(const std::string& serial) const
+  bool IsAlreadySpawned(std::string_view serial) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
-  void CleanupExitedNodes() ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
+  void CleanupDeadNodes(const std::vector<std::string>& current_serials)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(nodes_mutex_);
 
   const std::string driver_type_;
   rclcpp::Subscription<snapshot_interfaces::msg::DiscoveryRequest>::SharedPtr

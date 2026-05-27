@@ -1,3 +1,17 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "flowstate_orbbec/spawner_node.h"
 
 #include <chrono>
@@ -6,19 +20,22 @@
 #include <string>
 #include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "flowstate_orbbec/adapter_node.h"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "rclcpp/rclcpp.hpp"
 
 namespace flowstate_orbbec {
 
+ABSL_CONST_INIT absl::Mutex SpawnerNode::s_discovery_mutex(absl::kConstInit);
+
 SpawnerNode::SpawnerNode()
     : flowstate_common::BaseSpawnerNode("orbbec_spawner", "orbbec",
                                         std::chrono::seconds(10)) {
-  UpdateCameras();
 }
 
 std::vector<std::string> SpawnerNode::GetSerials() {
+  absl::MutexLock lock(&s_discovery_mutex);
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();
   std::vector<std::string> serials;
@@ -33,6 +50,7 @@ std::vector<std::string> SpawnerNode::GetSerials() {
 
 std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> 
 SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
+  RCLCPP_INFO(get_logger(), "flowstate_orbbec::SpawnerNode::SpawnNodes()");
   std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> new_nodes;
   auto context = std::make_unique<ob::Context>();
   auto list = context->queryDeviceList();

@@ -1,3 +1,17 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "flowstate_zivid/spawner_node.h"
 
 #include <absl/algorithm/container.h>
@@ -31,13 +45,12 @@ absl::StatusOr<std::shared_ptr<SpawnerNode>> SpawnerNode::Create() {
 SpawnerNode::SpawnerNode(const rclcpp::NodeOptions& options)
     : flowstate_common::BaseSpawnerNode("zivid_spawner", "zivid",
                                         std::chrono::seconds(30), options),
-      zivid_app_(std::make_shared<Zivid::Application>()) {
-  RCLCPP_INFO(get_logger(), "Starting Zivid SpawnerNode...");
-  UpdateCameras();
-  RCLCPP_INFO(get_logger(), "Zivid SpawnerNode is ready!");
-}
+      zivid_app_(std::make_shared<Zivid::Application>()) {}
 
-SpawnerNode::~SpawnerNode() { ShutdownCameraNodes(); }
+SpawnerNode::~SpawnerNode() {
+  RCLCPP_INFO(get_logger(), "Shutting down all Zivid camera node(s)...");
+  ClearSpawnedNodes();
+}
 
 std::vector<std::string> SpawnerNode::GetSerials() {
   std::vector<std::string> serials;
@@ -70,22 +83,4 @@ SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
   return new_nodes;
 }
 
-void SpawnerNode::ShutdownCameraNodes() {
-  if (spawned_nodes_.empty()) {
-    return;
-  }
-  RCLCPP_INFO(get_logger(), "Shutting down %zu camera node(s)...",
-              spawned_nodes_.size());
-
-  // Request nodes to shut down.
-  for (auto& node : spawned_nodes_) {
-    // The node might be null if creation failed but was still added to the
-    // list.
-    if (node) {
-      rclcpp::shutdown(node->get_node_base_interface()->get_context());
-    }
-  }
-
-  spawned_nodes_.clear();
-}
 }  // namespace flowstate_zivid

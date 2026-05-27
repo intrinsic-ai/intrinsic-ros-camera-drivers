@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef FLOWSTATE_ORBBEC_FLOWSTATE_ORBBEC_ADAPTER_NODE_H_
 #define FLOWSTATE_ORBBEC_FLOWSTATE_ORBBEC_ADAPTER_NODE_H_
 
@@ -8,6 +24,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "flowstate_common/base_adapter_node.h"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "orbbec_camera/ob_camera_node_driver.h"
 #include "orbbec_camera_msgs/srv/set_int32.hpp"
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
@@ -17,6 +34,8 @@
 #include "snapshot_interfaces/srv/describe.hpp"
 #include "snapshot_interfaces/srv/snapshot.hpp"
 #include "std_srvs/srv/set_bool.hpp"
+#include "tf2_ros/buffer.hpp"
+#include "tf2_ros/transform_listener.hpp"
 
 namespace flowstate_orbbec {
 
@@ -24,6 +43,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
  public:
   AdapterNode(const std::string& serial,
               const std::vector<std::string>& locators);
+  virtual ~AdapterNode();
 
  private:
   absl::Status Main() override ABSL_LOCKS_EXCLUDED(timeout_mutex_);
@@ -33,10 +53,17 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
   BuildSnapshotResponse() override;
 
-  std::string IrImageTopic() const;
+  std::string LeftIrImageTopic() const;
+  std::string RightIrImageTopic() const;
   std::string DepthImageTopic() const;
 
   void InitializeParameters();
+  rclcpp::NodeOptions CreateOrbbecNodeOptions(const std::string& serial);
+
+  bool IsRgbEnabled() const;
+  bool IsDepthEnabled() const;
+  bool IsLeftIrEnabled() const;
+  bool IsRightIrEnabled() const;
 
   rclcpp::node_interfaces::PreSetParametersCallbackHandle::SharedPtr
       pre_set_parameters_callback_handle_;
@@ -84,16 +111,29 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
         });
   }
 
+  absl::Status PopulateExtrinsicsIfNeeded();
+
+  std::string OrbbecNodeNamespace();
+
   bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
   // IR Data
-  std::unique_ptr<sensor_msgs::msg::CameraInfo> ir_camera_info_
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> left_ir_camera_info_
       ABSL_GUARDED_BY(camera_info_mutex_);
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr ir_info_sub_;
-  std::unique_ptr<sensor_msgs::msg::Image> ir_image_
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      left_ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> left_ir_image_
       ABSL_GUARDED_BY(image_mutex_);
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr ir_image_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr left_ir_image_sub_;
+
+  std::unique_ptr<sensor_msgs::msg::CameraInfo> right_ir_camera_info_
+      ABSL_GUARDED_BY(camera_info_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      right_ir_info_sub_;
+  std::unique_ptr<sensor_msgs::msg::Image> right_ir_image_
+      ABSL_GUARDED_BY(image_mutex_);
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr right_ir_image_sub_;
 
   // Depth Data
   std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_
@@ -111,6 +151,22 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_white_balance_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr set_gain_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_color_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_depth_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_left_ir_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_right_ir_client_;
+
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  std::unique_ptr<geometry_msgs::msg::TransformStamped> color_transform_;
+  std::unique_ptr<geometry_msgs::msg::TransformStamped> left_ir_transform_;
+  std::unique_ptr<geometry_msgs::msg::TransformStamped> right_ir_transform_;
+
+  rclcpp::Time t_last_right_ir_image_ ABSL_GUARDED_BY(timeout_mutex_);
+  rclcpp::Time t_last_left_ir_image_ ABSL_GUARDED_BY(timeout_mutex_);
+  rclcpp::Time t_last_depth_image_ ABSL_GUARDED_BY(timeout_mutex_);
+
+  int reboot_count_ = 0;
 };
 
 }  // namespace flowstate_orbbec

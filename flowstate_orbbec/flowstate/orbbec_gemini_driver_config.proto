@@ -12,25 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
+syntax = "proto3";
 
-#include "flowstate_zivid/spawner_node.h"
-#include "rclcpp/rclcpp.hpp"
+package orbbec_gemini_driver;
 
-int main(int argc, char** argv) {
-  rclcpp::init(argc, argv);
-
-  auto node_status = flowstate_zivid::SpawnerNode::Create();
-  if (!node_status.ok()) {
-    RCLCPP_ERROR_STREAM(
-        rclcpp::get_logger("main"),
-        "Failed to create SpawnerNode: " << node_status.status());
-    return EXIT_FAILURE;
-  }
-
-  std::shared_ptr<flowstate_zivid::SpawnerNode> spawner = node_status.value();
-
-  spawner->UpdateCameras();
-  rclcpp::spin(spawner);
-  rclcpp::shutdown();
+message OrbbecGeminiDriverConfig {
+  repeated string ip_address = 1;
 }

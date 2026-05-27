@@ -1,0 +1,207 @@
+# Build up the service with these stages:
+#   - core_underlay (compiles standard SDKs) ->
+#   - base (NVIDIA CUDA + ROS Jazzy) ->
+#   - zivid_underlay (compiles zivid SDKs on top of core_underlay install) ->
+#   - overlay (user code built on top of underlay) ->
+#   - result (base + copied install folders)
+
+# ==========================================
+# STAGE 1: core_underlay
+# ==========================================
+FROM ros:jazzy-ros-core AS core_underlay
+
+WORKDIR /opt/ros/underlay
+ENV ROS_DISTRO=jazzy
+ENV ROS_HOME=/tmp
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+ENV COMMON_SKIP_PACKAGES="intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake gz_msgs_vendor grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor gz_make_vendor gz_utils_vendor intrinsic_pybind11_vendor gz_math_vendor prometheus_cpp_vendor bazelisk_vendor flatbuffers_vendor opencensus_cpp_vendor pybind11_abseil_vendor pybind11_protobuf_vendor gz_cmake_vendor gz_transport_vendor"
+
+RUN apt-get update && apt install -y \
+    clang ros-jazzy-ament-cmake-vendor-package ros-dev-tools git wget \
+    python3-protobuf \
+    libopencv-dev \
+    nlohmann-json3-dev \
+    ros-jazzy-tf2-ros \
+    ros-jazzy-tf2-geometry-msgs \
+    libgl1-mesa-dev \
+    ros-jazzy-cv-bridge \
+    ros-jazzy-backward-ros \
+    ros-jazzy-camera-info-manager \
+    ros-jazzy-image-transport \
+    ros-jazzy-image-publisher \
+    ros-jazzy-tf2-eigen \
+    ros-jazzy-tf2-sensor-msgs \
+    ros-jazzy-diagnostic-updater \
+    curl zip unzip tar libusb-1.0-0-dev \
+    ros-jazzy-vision-msgs \
+    ros-jazzy-ffmpeg-image-transport-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rosdep init && rosdep update
+ADD src/sdk-ros /opt/ros/underlay/src/intrinsic_sdk_ros
+
+RUN cd /opt/ros/underlay/src/ \
+    && git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format \
+    && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4
+
+RUN apt-get update \
+    && . /opt/ros/jazzy/setup.sh \
+    && rosdep install --from-paths src --ignore-src --rosdistro jazzy -yr \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN . /opt/ros/jazzy/setup.sh \
+    && colcon build \
+        --merge-install \
+        --packages-up-to intrinsic_sdk_ros snapshot_interfaces rmw_zenoh_cpp \
+        --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
+
+# ==========================================
+# STAGE 2: base
+# ==========================================
+FROM nvidia/cuda:12.5.1-base-ubuntu24.04 AS base
+
+ARG ZIVID_VERSION=2.17.0+5fc9f05e-1
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg2 \
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+RUN apt-get clean && apt-get update && apt-get install -y --fix-missing \
+    ros-jazzy-ros-base \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/ros/underlay
+ENV ROS_DISTRO=jazzy
+ENV ROS_HOME=/tmp
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+ENV COMMON_SKIP_PACKAGES="intrinsic_sdk intrinsic_sdk_ros intrinsic_sdk_cmake gz_msgs_vendor grpc_vendor abseil_cpp_vendor re2_vendor rmw_zenoh_cpp ortools_vendor eigen_vendor gz_make_vendor gz_utils_vendor intrinsic_pybind11_vendor gz_math_vendor prometheus_cpp_vendor bazelisk_vendor flatbuffers_vendor opencensus_cpp_vendor pybind11_abseil_vendor pybind11_protobuf_vendor gz_cmake_vendor gz_transport_vendor"
+
+# ==========================================
+# STAGE 3: zivid_underlay
+# ==========================================
+FROM base AS zivid_underlay
+
+RUN mkdir -p /etc/OpenCL/vendors && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+COPY --from=core_underlay /opt/ros/underlay/install /opt/ros/underlay/install
+
+RUN apt-get update && apt-get install -y wget && \
+    wget https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid_${ZIVID_VERSION}_amd64.deb \
+         https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-studio_${ZIVID_VERSION}_amd64.deb \
+         https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-tools_${ZIVID_VERSION}_amd64.deb \
+         https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-genicam_${ZIVID_VERSION}_amd64.deb && \
+    apt-get install -y ./*.deb && rm ./*.deb && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+
+RUN apt-get update \
+    && apt-get install -y \
+        build-essential \
+        python3-colcon-common-extensions \
+        ros-dev-tools \
+        ros-jazzy-ament-cmake-vendor-package \
+        ros-jazzy-cv-bridge \
+        ros-jazzy-image-transport \
+        ros-jazzy-image-transport-plugins \
+        ros-jazzy-camera-info-manager \
+        ros-jazzy-diagnostic-updater \
+        ros-jazzy-sensor-msgs \
+        ros-jazzy-geometry-msgs \
+        ros-jazzy-std-srvs \
+        python3-protobuf \
+        libopencv-dev \
+        nlohmann-json3-dev \
+        libzmq3-dev \
+        cppzmq-dev \
+        libbz2-dev \
+        zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD src/zivid-ros /opt/ros/underlay/src/zivid-ros
+
+RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
+    && cd /opt/ros/underlay \
+    && colcon build \
+      --merge-install \
+      --executor sequential \
+      --packages-skip zivid_rviz_plugin \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    && rm -rf /opt/ros/underlay/build /opt/ros/underlay/log /opt/ros/underlay/src /root/.cache
+
+# ==========================================
+# STAGE 4: overlay
+# ==========================================
+FROM zivid_underlay AS overlay
+
+ARG SERVICE_PACKAGE
+
+ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
+
+RUN . /opt/ros/jazzy/setup.sh \
+    && . /opt/ros/underlay/install/setup.sh \
+    && cd /opt/ros/overlay \
+    && colcon build \
+      --merge-install \
+      --packages-above-and-dependencies=${SERVICE_PACKAGE} \
+      --packages-skip $COMMON_SKIP_PACKAGES \
+      --parallel-workers 2 \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    && mkdir -p /opt/ros/overlay/install/share/flowstate_zivid/ \
+    && (cp /opt/ros/overlay/install/share/flowstate_zivid/zivid_driver/zivid_driver_protos.desc /opt/ros/overlay/install/share/flowstate_zivid/ 2>/dev/null || touch /opt/ros/overlay/install/share/flowstate_zivid/zivid_driver_protos.desc) \
+    && rm -rf /opt/ros/overlay/build /opt/ros/overlay/log /opt/ros/overlay/src /opt/ros/underlay/src \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
+
+FROM base
+
+ARG SERVICE_PACKAGE
+ARG SERVICE_NAME
+ARG ZIVID_VERSION
+
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+COPY --from=ros:jazzy /ros_entrypoint.sh /ros_entrypoint.sh
+RUN apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get update \
+    && apt-get install -y --fix-missing \
+    ros-jazzy-image-transport \
+    ros-jazzy-image-transport-plugins \
+    ocl-icd-libopencl1 \
+    ros-jazzy-std-srvs \
+    wget && \
+    # Download and install Zivid SDK runtime dependencies
+    wget -O zivid.deb https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid_${ZIVID_VERSION}_amd64.deb && \
+    wget -O zivid-tools.deb https://downloads.zivid.com/sdk/releases/${ZIVID_VERSION}/u24/amd64/zivid-tools_${ZIVID_VERSION}_amd64.deb && \
+    apt-get update && apt-get install -y ./*.deb && \
+    rm ./*.deb && rm -rf /var/lib/apt/lists/*
+
+COPY --from=overlay /opt/ros/underlay/install /opt/ros/underlay/install
+COPY --from=overlay /opt/ros/overlay/install /opt/ros/overlay/install
+COPY --from=overlay /etc/OpenCL/vendors /etc/OpenCL/vendors
+
+RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/local.conf && ldconfig
+RUN cp \
+        /opt/ros/overlay/install/share/${SERVICE_PACKAGE}/${SERVICE_NAME}/service_manifest.binarypb \
+        /service_manifest.binarypb \
+    && sed --in-place \
+        --expression '$isource "/opt/ros/overlay/install/setup.bash"' \
+        /ros_entrypoint.sh
+
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+ENTRYPOINT ["/ros_entrypoint.sh"]
+
+ENV SERVICE_PACKAGE=${SERVICE_PACKAGE}
+ENV SERVICE_NAME=${SERVICE_NAME}
+ENV RUST_LOG=info
+
+ENV ZENOH_CONFIG_OVERRIDE='connect/endpoints=["tcp/localhost:17447"]'
+
+CMD exec /opt/ros/overlay/install/lib/${SERVICE_PACKAGE}/zivid_driver_main

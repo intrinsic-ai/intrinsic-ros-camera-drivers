@@ -1,3 +1,17 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "flowstate_luxonis/adapter_node.h"
 
 #include <memory>
@@ -90,6 +104,9 @@ absl::Status AdapterNode::Main() {
       });
 
   executor.add_node(this->get_node_base_interface());
+  // luxonis_node_ is already a managed std::shared_ptr<rclcpp::Node>.
+  // The executor's overloaded add_node() natively accepts it, making
+  // an explicit ->get_node_base_interface() call redundant.
   executor.add_node(luxonis_node_);  //->get_node_base_interface());
   executor.spin();
   return absl::OkStatus();
@@ -104,7 +121,7 @@ AdapterNode::BuildDescribeResponse() {
   }
 
   response.sensors.push_back(
-      SensorInformation(*color_camera_info_, "color", ColorImageTopic()));
+      BuildSensorInformation(*color_camera_info_, "color", ColorImageTopic()));
   return response;
 }
 
