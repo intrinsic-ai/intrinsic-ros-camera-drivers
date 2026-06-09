@@ -17,7 +17,7 @@ Here is an example command sequence to create such a workspace:
 mkdir -p ros_cameras_ws/src
 cd ros_cameras_ws/src
 git clone ssh://git@github.com/intrinsic-dev/flowstate-ros-camera-drivers
-git clone ssh://git@github.com/intrinsic-ai/sdk-ros
+git clone ssh://git@github.com/intrinsic-ai/sdk-ros && cd sdk-ros && git checkout 46960b1593447ddfa2e6d1037b37d1dd228f3014 && cd ..
 git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ..
 git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install
 git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
@@ -190,7 +190,7 @@ cd ~/ros_cameras_ws
 
 Sideload and install the service container in flowstate:
 ```
-export SERVICE_BUNDLE=~/ros_cameras_ws/images/zivid_driver.bundle.tar 
+export SERVICE_BUNDLE=~/ros_cameras_ws/images/zivid_driver.bundle.tar
 
 export INTRINSIC_ORGANIZATION=<org name>
 
