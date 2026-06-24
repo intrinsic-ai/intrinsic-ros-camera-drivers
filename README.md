@@ -21,7 +21,7 @@ git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ..
 ```
 
-Note: You will also need to clone the dependencies for your specific camera driver. Please check the specific driver READMEs for their clone commands.
+Note: You will also need to clone the dependencies for your specific camera driver. Please check the specific driver READMEs for their clone commands, but first finish this guide here.
 
 The resulting directory structure should look like this:
 ```
