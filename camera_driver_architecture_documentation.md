@@ -121,59 +121,6 @@ Defines the service metadata and deployment configuration.
 
 -----
 
-## Building and Testing Locally
-
-**1. Build the ROS package:**
-
-```bash
-cd ~/ros_cameras_ws
-source /opt/ros/jazzy/setup.bash
-colcon build --packages-up-to flowstate_<vendor>
-```
-
-**2. Test locally:**
-
-```bash
-source install/setup.bash
-ros2 run flowstate_<vendor> <vendor>_driver_main
-```
-
-**3. Test services (in a separate terminal):**
-
-```bash
-source install/setup.bash
-
-# Discover cameras
-ros2 service call /cameras/discover snapshot_interfaces/srv/Discover
-
-# Describe camera (replace <camera_id> with actual ID from discover)
-ros2 service call /<vendor>_<camera_id>/describe snapshot_interfaces/srv/Describe
-
-# Capture snapshot
-ros2 service call /<vendor>_<camera_id>/snapshot snapshot_interfaces/srv/Snapshot
-```
-
-## Sideloading to Flowstate
-
-Deploy the built service container to your Flowstate cluster:
-
-```bash
-# Set environment variables
-export SERVICE_BUNDLE=~/ros_cameras_ws/images/<vendor>_driver.bundle.tar
-export INTRINSIC_ORGANIZATION=<your_org_name>
-
-# Set target cluster
-export INTRINSIC_CONTEXT=<cluster_id>
-
-# Install service
-inctl asset install \
-  --org $INTRINSIC_ORGANIZATION \
-  --cluster $INTRINSIC_CONTEXT \
-  $SERVICE_BUNDLE
-```
-
------
-
 ## Code Examples
 
 When creating a new integration, rely on the base classes and reference the existing production drivers for guidance:
