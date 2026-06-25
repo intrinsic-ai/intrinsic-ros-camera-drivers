@@ -27,7 +27,7 @@ Finally, let's build it!
 ```
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
-colcon build --packages-above-and-dependencies flowstate_zivid
+colcon build --packages-up-to flowstate_zivid
 ```
 
 ## Testing locally

@@ -40,7 +40,7 @@ To test the camera functions locally, use the following command to start the cam
 ```bash
 cd ~/ros_cameras_ws
 source /opt/ros/jazzy/setup.bash
-colcon build --packages-above-and-dependencies flowstate_luxonis
+colcon build --packages-up-to flowstate_luxonis
 
 source install/setup.bash
 ros2 run flowstate_luxonis spawner_node
