@@ -58,6 +58,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   std::string DepthImageTopic() const;
 
   void InitializeParameters();
+  void CreateOrbbecNode();
+  void DestroyOrbbecNode();
   rclcpp::NodeOptions CreateOrbbecNodeOptions(const std::string& serial);
 
   bool IsRgbEnabled() const;
@@ -167,6 +169,10 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Time t_last_depth_image_ ABSL_GUARDED_BY(timeout_mutex_);
 
   int reboot_count_ = 0;
+  double fps_ = 5.0;
+
+  std::unique_ptr<std::thread> orbbec_thread_;
+  std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> orbbec_executor_;
 };
 
 }  // namespace flowstate_orbbec
