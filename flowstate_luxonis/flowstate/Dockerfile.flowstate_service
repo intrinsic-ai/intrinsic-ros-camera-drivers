@@ -141,6 +141,7 @@ RUN apt-get update \
         curl zip unzip tar libusb-1.0-0-dev \
         ros-jazzy-vision-msgs \
         ros-jazzy-ffmpeg-image-transport-msgs \
+        ros-jazzy-xacro \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=overlay /opt/ros/underlay/install /opt/ros/underlay/install
