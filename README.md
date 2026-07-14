@@ -72,7 +72,7 @@ source /opt/ros/jazzy/setup.bash
 colcon build
 
 # if you want to skip building with other unused ros camera driver packages, you can use the following command:
-colcon build --packages-above-and-dependencies <camera driver package name>
+colcon build --packages-up-to <camera driver package name>
 ```
 
 # Supported Drivers
@@ -80,6 +80,7 @@ colcon build --packages-above-and-dependencies <camera driver package name>
 * [Orbbec](flowstate_orbbec/README.md)
 * [Luxonis](flowstate_luxonis/README.md)
 * [Zivid](flowstate_zivid/README.md)
+* [Ensenso](flowstate_ensenso/README.md)
 
 # Debugging builds
 
@@ -96,3 +97,5 @@ eligible for the [Google Open Source Software Vulnerability Rewards
 Program](https://bughunters.google.com/open-source-security).
 
 These drivers are designed to be compatible with the Intrinsic Platform. Use of the Intrinsic Platform is subject to the Intrinsic Terms of Service. Please review them here: [Intrinsic Platform Terms of Service URL](https://www.intrinsic.ai/legal/platform-terms)
+
+
