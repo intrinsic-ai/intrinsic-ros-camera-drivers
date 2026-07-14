@@ -1,0 +1,4 @@
+# proto-file: google/protobuf/any.proto
+# proto-message: Any
+[type.googleapis.com/ensenso_driver.EnsensoDriverConfig] {
+}
