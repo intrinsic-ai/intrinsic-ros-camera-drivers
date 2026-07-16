@@ -152,6 +152,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
       set_auto_white_balance_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr
       set_white_balance_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr set_laser_enable_client_;
   rclcpp::Client<orbbec_camera_msgs::srv::SetInt32>::SharedPtr set_gain_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_color_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_depth_client_;

@@ -155,6 +155,8 @@ void AdapterNode::InitializeParameters() {
       absl::StrFormat("/orbbec/camera_%s/set_auto_white_balance", serial_));
   set_white_balance_client_ = create_client<orbbec_camera_msgs::srv::SetInt32>(
       absl::StrFormat("/orbbec/camera_%s/set_white_balance", serial_));
+  set_laser_enable_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/set_laser_enable", serial_));
 
   set_gain_client_ = create_client<orbbec_camera_msgs::srv::SetInt32>(
       absl::StrFormat("/orbbec/camera_%s/set_color_gain", serial_));
@@ -223,6 +225,13 @@ void AdapterNode::InitializeParameters() {
   auto_exposure_descriptor.description = "Toggle auto_exposure.";
   auto_exposure_descriptor.read_only = false;
   declare_parameter("auto_exposure", true, auto_exposure_descriptor);
+
+  rcl_interfaces::msg::ParameterDescriptor enable_laser_descriptor;
+  enable_laser_descriptor.name = "enable_laser";
+  enable_laser_descriptor.type = rclcpp::ParameterType::PARAMETER_BOOL;
+  enable_laser_descriptor.description = "Toggle laser dot projector.";
+  enable_laser_descriptor.read_only = false;
+  declare_parameter("enable_laser", true, enable_laser_descriptor);
 
   rcl_interfaces::msg::FloatingPointRange exposure_range;
   exposure_range.from_value = 0.0001;
@@ -496,6 +505,8 @@ void AdapterNode::PostSetParametersCallback(
       absl::MutexLock timeout_lock(&timeout_mutex_);
       t_last_depth_image_ = get_clock()->now();
       CallAsyncSet(toggle_depth_client_, parameter.as_bool());
+    } else if (parameter.get_name() == "enable_laser") {
+      CallAsyncSet(set_laser_enable_client_, parameter.as_bool());
     }
   }
 }
@@ -877,6 +888,11 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
     options = options.append_parameter_override(
         rclcpp::Parameter("enable_right_ir", false));
   }
+
+  bool enable_laser = true;
+  get_parameter<bool>("enable_laser", enable_laser);
+  options = options.append_parameter_override(
+      rclcpp::Parameter("enable_laser", enable_laser));
 
   return options;
 }
