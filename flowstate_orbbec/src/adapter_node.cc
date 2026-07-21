@@ -769,10 +769,10 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
                                     tf2::TimePointZero));
     right_ir_transform_ =
         std::make_unique<geometry_msgs::msg::TransformStamped>(
-            tf_buffer_->lookupTransform(right_ir_frame, color_frame,
+            tf_buffer_->lookupTransform(color_frame, right_ir_frame,
                                         tf2::TimePointZero));
     left_ir_transform_ = std::make_unique<geometry_msgs::msg::TransformStamped>(
-        tf_buffer_->lookupTransform(left_ir_frame, color_frame,
+        tf_buffer_->lookupTransform(color_frame, left_ir_frame,
                                     tf2::TimePointZero));
   } catch (const tf2::TransformException& ex) {
     return absl::UnavailableError(
