@@ -158,6 +158,12 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_depth_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_left_ir_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_right_ir_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr software_trigger_client_;
+
+  uint64_t color_frame_count_ ABSL_GUARDED_BY(image_mutex_) = 0;
+  uint64_t left_ir_frame_count_ ABSL_GUARDED_BY(image_mutex_) = 0;
+  uint64_t right_ir_frame_count_ ABSL_GUARDED_BY(image_mutex_) = 0;
+  uint64_t depth_frame_count_ ABSL_GUARDED_BY(image_mutex_) = 0;
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -171,6 +177,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
 
   int reboot_count_ = 0;
   double fps_ = 5.0;
+  bool streaming_ = false;
+  rclcpp::TimerBase::SharedPtr streaming_timer_;
 
   std::unique_ptr<std::thread> orbbec_thread_;
   std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> orbbec_executor_;

@@ -77,9 +77,10 @@ class BaseAdapterNode : public rclcpp::Node {
    * @param node_name_prefix ROS node name prefix (will be prefixed with camera
    * type)
    */
-  BaseAdapterNode(const std::string& serial,
-                  const std::vector<std::string>& locators,
-                  const std::string& node_name_prefix);
+  BaseAdapterNode(
+      const std::string& serial, const std::vector<std::string>& locators,
+      const std::string& node_name_prefix,
+      const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
   virtual ~BaseAdapterNode();
 

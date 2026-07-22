@@ -39,7 +39,9 @@ constexpr std::string_view kOrbbecNodeNamespacePrefix = "orbbec/camera_";
 
 AdapterNode::AdapterNode(const std::string& serial,
                          const std::vector<std::string>& locators)
-    : flowstate_common::BaseAdapterNode(serial, locators, "orbbec") {
+    : flowstate_common::BaseAdapterNode(
+          serial, locators, "orbbec",
+          rclcpp::NodeOptions().use_intra_process_comms(true)) {
   InitializeParameters();
   CreateOrbbecNode();
 
@@ -53,6 +55,7 @@ AdapterNode::AdapterNode(const std::string& serial,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->color_camera_info_ = std::move(msg);
+        this->color_info_sub_.reset();
       });
 
   left_ir_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
@@ -60,6 +63,7 @@ AdapterNode::AdapterNode(const std::string& serial,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->left_ir_camera_info_ = std::move(msg);
+        this->left_ir_info_sub_.reset();
       });
 
   right_ir_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
@@ -67,6 +71,7 @@ AdapterNode::AdapterNode(const std::string& serial,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->right_ir_camera_info_ = std::move(msg);
+        this->right_ir_info_sub_.reset();
       });
 
   depth_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
@@ -74,6 +79,7 @@ AdapterNode::AdapterNode(const std::string& serial,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
         absl::MutexLock lock(&this->camera_info_mutex_);
         this->depth_camera_info_ = std::move(msg);
+        this->depth_info_sub_.reset();
       });
 
   // Subscribe to color image
@@ -85,6 +91,7 @@ AdapterNode::AdapterNode(const std::string& serial,
         }
         absl::MutexLock lock(&this->image_mutex_);
         this->color_image_ = std::move(msg);
+        this->color_frame_count_++;
       });
 
   // Subscribe to IR images
@@ -96,6 +103,7 @@ AdapterNode::AdapterNode(const std::string& serial,
         }
         absl::MutexLock lock(&this->image_mutex_);
         this->left_ir_image_ = std::move(msg);
+        this->left_ir_frame_count_++;
       });
 
   right_ir_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
@@ -106,6 +114,7 @@ AdapterNode::AdapterNode(const std::string& serial,
         }
         absl::MutexLock lock(&this->image_mutex_);
         this->right_ir_image_ = std::move(msg);
+        this->right_ir_frame_count_++;
       });
 
   depth_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
@@ -116,7 +125,23 @@ AdapterNode::AdapterNode(const std::string& serial,
         }
         absl::MutexLock lock(&this->image_mutex_);
         this->depth_image_ = std::move(msg);
+        this->depth_frame_count_++;
       });
+
+  software_trigger_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/send_software_trigger", serial_));
+
+  streaming_timer_ = create_wall_timer(
+      std::chrono::milliseconds(static_cast<int>(1000.0 / fps_)), [this]() {
+        if (streaming_ && software_trigger_client_) {
+          auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
+          trigger_req->data = true;
+          software_trigger_client_->async_send_request(trigger_req);
+        }
+      });
+  if (!streaming_) {
+    streaming_timer_->cancel();
+  }
 
   // Create Flowstate services
   CreateFlowstateServices();
@@ -275,6 +300,15 @@ void AdapterNode::InitializeParameters() {
   gain_descriptor.read_only = false;
   gain_descriptor.integer_range.push_back(gain_range);
   declare_parameter("gain", 0, gain_descriptor);
+
+  rcl_interfaces::msg::ParameterDescriptor streaming_descriptor;
+  streaming_descriptor.name = "streaming";
+  streaming_descriptor.type = rclcpp::ParameterType::PARAMETER_BOOL;
+  streaming_descriptor.description =
+      "Toggle continuous streaming (true) vs snapshot on-demand (false) mode.";
+  streaming_descriptor.read_only = false;
+  declare_parameter("streaming", false, streaming_descriptor);
+  streaming_ = get_parameter("streaming").as_bool();
 }
 
 // PreSetParametersCallback is used to add or adjust the parameter vector
@@ -507,6 +541,17 @@ void AdapterNode::PostSetParametersCallback(
       CallAsyncSet(toggle_depth_client_, parameter.as_bool());
     } else if (parameter.get_name() == "enable_laser") {
       CallAsyncSet(set_laser_enable_client_, parameter.as_bool());
+    } else if (parameter.get_name() == "streaming") {
+      streaming_ = parameter.as_bool();
+      RCLCPP_INFO(get_logger(), "Streaming parameter set to: %s",
+                  streaming_ ? "true" : "false");
+      if (streaming_timer_) {
+        if (streaming_) {
+          streaming_timer_->reset();
+        } else {
+          streaming_timer_->cancel();
+        }
+      }
     }
   }
 }
@@ -528,27 +573,29 @@ absl::Status AdapterNode::Main() {
           absl::MutexLock timeout_lock(&timeout_mutex_);
           const rclcpp::Time t = get_clock()->now();
 
-          if (IsRgbEnabled() && (t - t_last_color_image_).seconds() > 30.0) {
-            RCLCPP_ERROR(get_logger(),
-                         "No new color image arrived for 30 seconds");
-            should_reboot = true;
-          }
-          if (IsLeftIrEnabled() &&
-              (t - t_last_left_ir_image_).seconds() > 30.0) {
-            RCLCPP_ERROR(get_logger(),
-                         "No new left IR image arrived for 30 seconds");
-            should_reboot = true;
-          }
-          if (IsRightIrEnabled() &&
-              (t - t_last_right_ir_image_).seconds() > 30.0) {
-            RCLCPP_ERROR(get_logger(),
-                         "No new right IR image arrived for 30 seconds");
-            should_reboot = true;
-          }
-          if (IsDepthEnabled() && (t - t_last_depth_image_).seconds() > 30.0) {
-            RCLCPP_ERROR(get_logger(),
-                         "No new depth image arrived for 30 seconds");
-            should_reboot = true;
+          if (streaming_) {
+            if (IsRgbEnabled() && (t - t_last_color_image_).seconds() > 30.0) {
+              RCLCPP_ERROR(get_logger(),
+                           "No new color image arrived for 30 seconds");
+              should_reboot = true;
+            }
+            if (IsLeftIrEnabled() &&
+                (t - t_last_left_ir_image_).seconds() > 30.0) {
+              RCLCPP_ERROR(get_logger(),
+                           "No new left IR image arrived for 30 seconds");
+              should_reboot = true;
+            }
+            if (IsRightIrEnabled() &&
+                (t - t_last_right_ir_image_).seconds() > 30.0) {
+              RCLCPP_ERROR(get_logger(),
+                           "No new right IR image arrived for 30 seconds");
+              should_reboot = true;
+            }
+            if (IsDepthEnabled() && (t - t_last_depth_image_).seconds() > 30.0) {
+              RCLCPP_ERROR(get_logger(),
+                           "No new depth image arrived for 30 seconds");
+              should_reboot = true;
+            }
           }
         }
 
@@ -647,20 +694,51 @@ absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
 AdapterNode::BuildSnapshotResponse() {
   snapshot_interfaces::srv::Snapshot::Response response;
 
-  // Currently, Flowstate is querying this service much faster than
-  // images are being produced. In order to avoid sending the same
-  // image over and over (on average, it is sent as fast as every 50ms),
-  // as a temporary measure this manual sleep_for() will
-  // slow the response down to match the camera's actual fps.
-  // Because the iamge mutex is not locked until the following block,
-  // this does not increase latency, it only slows the response rate
-  // to prevent unnecessary immediate re-query of the same frame.
-  // This should be replaced in the future by a more sophisticated
-  // method.
-  double delay_seconds = 1.0 / fps_ - 0.05;
-  if (delay_seconds > 0.0) {
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(static_cast<int>(delay_seconds * 1000)));
+  if (!streaming_) {
+    uint64_t target_color_count = 0;
+    uint64_t target_left_ir_count = 0;
+    uint64_t target_right_ir_count = 0;
+    uint64_t target_depth_count = 0;
+    {
+      absl::MutexLock lock(&image_mutex_);
+      target_color_count = color_frame_count_;
+      target_left_ir_count = left_ir_frame_count_;
+      target_right_ir_count = right_ir_frame_count_;
+      target_depth_count = depth_frame_count_;
+    }
+
+    if (software_trigger_client_) {
+      auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
+      trigger_req->data = true;
+      software_trigger_client_->async_send_request(trigger_req);
+    }
+
+    {
+      absl::MutexLock lock(&image_mutex_);
+      auto all_new_frames_arrived = [this, target_color_count,
+                                     target_left_ir_count, target_right_ir_count,
+                                     target_depth_count]() {
+        if (this->IsRgbEnabled() &&
+            this->color_frame_count_ == target_color_count) {
+          return false;
+        }
+        if (this->IsLeftIrEnabled() &&
+            this->left_ir_frame_count_ == target_left_ir_count) {
+          return false;
+        }
+        if (this->IsRightIrEnabled() &&
+            this->right_ir_frame_count_ == target_right_ir_count) {
+          return false;
+        }
+        if (this->IsDepthEnabled() &&
+            this->depth_frame_count_ == target_depth_count) {
+          return false;
+        }
+        return true;
+      };
+      image_mutex_.AwaitWithTimeout(absl::Condition(&all_new_frames_arrived),
+                                    absl::Milliseconds(250));
+    }
   }
 
   // Lock and copy the most recent CameraInfo and Image messages
@@ -756,6 +834,17 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
     return absl::OkStatus();
   }
 
+  if (!tf_buffer_) {
+    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+  }
+
+  if (software_trigger_client_) {
+    auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
+    trigger_req->data = true;
+    software_trigger_client_->async_send_request(trigger_req);
+  }
+
   const std::string color_frame =
       absl::StrFormat("orbbec_%s_color_optical_frame", serial_);
   const std::string right_ir_frame =
@@ -766,14 +855,17 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
   try {
     color_transform_ = std::make_unique<geometry_msgs::msg::TransformStamped>(
         tf_buffer_->lookupTransform(color_frame, color_frame,
-                                    tf2::TimePointZero));
+                                    tf2::TimePointZero,
+                                    tf2::durationFromSec(0.5)));
     right_ir_transform_ =
         std::make_unique<geometry_msgs::msg::TransformStamped>(
             tf_buffer_->lookupTransform(color_frame, right_ir_frame,
-                                        tf2::TimePointZero));
+                                        tf2::TimePointZero,
+                                        tf2::durationFromSec(0.5)));
     left_ir_transform_ = std::make_unique<geometry_msgs::msg::TransformStamped>(
         tf_buffer_->lookupTransform(color_frame, left_ir_frame,
-                                    tf2::TimePointZero));
+                                    tf2::TimePointZero,
+                                    tf2::durationFromSec(0.5)));
   } catch (const tf2::TransformException& ex) {
     return absl::UnavailableError(
         absl::StrFormat("TF exception: %s", ex.what()));
@@ -811,6 +903,9 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
       left_ir_transform_->transform.rotation.z,
       left_ir_transform_->transform.rotation.w);
 
+  tf_listener_.reset();
+  tf_buffer_.reset();
+
   return absl::OkStatus();
 }
 
@@ -824,9 +919,16 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
 
   rclcpp::NodeOptions options =
       rclcpp::NodeOptions()
+          .use_intra_process_comms(true)
           .append_parameter_override(
               rclcpp::Parameter("camera_name", camera_name))
           .append_parameter_override(rclcpp::Parameter("serial_number", serial))
+          .append_parameter_override(
+              rclcpp::Parameter("sync_mode", "SOFTWARE_TRIGGERING"))
+          .append_parameter_override(
+              rclcpp::Parameter("software_trigger_enabled", false))
+          .append_parameter_override(
+              rclcpp::Parameter("diagnostic_period", -1.0))
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true));
 
