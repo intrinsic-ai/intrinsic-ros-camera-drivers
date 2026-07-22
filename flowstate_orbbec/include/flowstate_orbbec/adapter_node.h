@@ -176,7 +176,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Time t_last_depth_image_ ABSL_GUARDED_BY(timeout_mutex_);
 
   int reboot_count_ = 0;
-  double fps_ = 5.0;
+  double fps_ = 10.0;
   bool streaming_ = false;
   rclcpp::TimerBase::SharedPtr streaming_timer_;
 

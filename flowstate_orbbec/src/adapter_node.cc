@@ -131,18 +131,6 @@ AdapterNode::AdapterNode(const std::string& serial,
   software_trigger_client_ = create_client<std_srvs::srv::SetBool>(
       absl::StrFormat("/orbbec/camera_%s/send_software_trigger", serial_));
 
-  streaming_timer_ = create_wall_timer(
-      std::chrono::milliseconds(static_cast<int>(1000.0 / fps_)), [this]() {
-        if (streaming_ && software_trigger_client_) {
-          auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
-          trigger_req->data = true;
-          software_trigger_client_->async_send_request(trigger_req);
-        }
-      });
-  if (!streaming_) {
-    streaming_timer_->cancel();
-  }
-
   // Create Flowstate services
   CreateFlowstateServices();
 
@@ -214,7 +202,7 @@ void AdapterNode::InitializeParameters() {
   fps_descriptor.description = "FPS (framerate)";
   fps_descriptor.read_only = false;
   fps_descriptor.floating_point_range.push_back(fps_range);
-  declare_parameter("fps", 5.0, fps_descriptor);
+  declare_parameter("fps", 10.0, fps_descriptor);
 
   rcl_interfaces::msg::ParameterDescriptor enable_rgb_descriptor;
   enable_rgb_descriptor.name = "enable_rgb";
@@ -352,70 +340,6 @@ void AdapterNode::PreSetParametersCallback(
     parameters.insert(parameters.begin(),
                       rclcpp::Parameter("auto_white_balance", false));
   }
-
-  const auto fps_it = std::find_if(
-      parameters.begin(), parameters.end(),
-      [](const rclcpp::Parameter& param) { return param.get_name() == "fps"; });
-  const bool sets_fps = (fps_it != parameters.end());
-  const double requested_fps = sets_fps ? fps_it->as_double() : fps_;
-
-  if (requested_fps > 5.0) {
-    // if FPS is > 10.0, ensure that only one stream is enabled. Otherwise
-    // change or add the request to 5 fps
-    const auto enable_color_it =
-        std::find_if(parameters.begin(), parameters.end(),
-                     [](const rclcpp::Parameter& param) {
-                       return param.get_name() == "enable_color";
-                     });
-    const bool requested_color = (enable_color_it != parameters.end())
-                                     ? enable_color_it->as_bool()
-                                     : IsRgbEnabled();
-
-    const auto enable_left_ir_it =
-        std::find_if(parameters.begin(), parameters.end(),
-                     [](const rclcpp::Parameter& param) {
-                       return param.get_name() == "enable_left_ir";
-                     });
-    const bool requested_left_ir = (enable_left_ir_it != parameters.end())
-                                       ? enable_left_ir_it->as_bool()
-                                       : IsLeftIrEnabled();
-    const auto enable_right_ir_it =
-        std::find_if(parameters.begin(), parameters.end(),
-                     [](const rclcpp::Parameter& param) {
-                       return param.get_name() == "enable_right_ir";
-                     });
-    const bool requested_right_ir = (enable_right_ir_it != parameters.end())
-                                        ? enable_right_ir_it->as_bool()
-                                        : IsRightIrEnabled();
-
-    const auto enable_depth_it =
-        std::find_if(parameters.begin(), parameters.end(),
-                     [](const rclcpp::Parameter& param) {
-                       return param.get_name() == "enable_depth";
-                     });
-    const bool requested_depth = (enable_depth_it != parameters.end())
-                                     ? enable_depth_it->as_bool()
-                                     : IsDepthEnabled();
-
-    int num_streams = (requested_color ? 1 : 0) + (requested_left_ir ? 1 : 0) +
-                      (requested_right_ir ? 1 : 0) + (requested_depth ? 1 : 0);
-
-    RCLCPP_INFO(get_logger(), "number requested streams: %d", num_streams);
-    if (num_streams > 1) {
-      RCLCPP_ERROR(get_logger(),
-                   "requested >5 fps and >1 streams. Reducing fps to 5");
-      if (sets_fps) {
-        // overwrite the requested fps parameter in the vector with 5
-        for (size_t i = 0; i < parameters.size(); i++) {
-          if (parameters[i].get_name() == "fps") {
-            parameters[i] = rclcpp::Parameter("fps", 5.0);
-          }
-        }
-      } else {
-        parameters.insert(parameters.begin(), rclcpp::Parameter("fps", 5.0));
-      }
-    }
-  }
 }
 
 rcl_interfaces::msg::SetParametersResult AdapterNode::SetParametersCallback(
@@ -544,12 +468,13 @@ void AdapterNode::PostSetParametersCallback(
     } else if (parameter.get_name() == "streaming") {
       streaming_ = parameter.as_bool();
       RCLCPP_INFO(get_logger(), "Streaming parameter set to: %s",
-                  streaming_ ? "true" : "false");
-      if (streaming_timer_) {
-        if (streaming_) {
-          streaming_timer_->reset();
-        } else {
-          streaming_timer_->cancel();
+                  streaming_ ? "true (pipelined triggering)" : "false (snapshot on-demand)");
+      if (streaming_) {
+        absl::MutexLock lock(&image_mutex_);
+        if (software_trigger_client_) {
+          auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
+          trigger_req->data = true;
+          software_trigger_client_->async_send_request(trigger_req);
         }
       }
     }
@@ -739,6 +664,14 @@ AdapterNode::BuildSnapshotResponse() {
       image_mutex_.AwaitWithTimeout(absl::Condition(&all_new_frames_arrived),
                                     absl::Milliseconds(250));
     }
+  }
+
+  // In streaming mode, proactively trigger the NEXT frame right after
+  // AwaitWithTimeout() unblocks so the camera exposes the next frame in the background.
+  if (streaming_ && software_trigger_client_) {
+    auto next_trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
+    next_trigger_req->data = true;
+    software_trigger_client_->async_send_request(next_trigger_req);
   }
 
   // Lock and copy the most recent CameraInfo and Image messages

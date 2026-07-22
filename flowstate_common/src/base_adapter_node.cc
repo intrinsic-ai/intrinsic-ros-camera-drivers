@@ -83,8 +83,6 @@ void BaseAdapterNode::DescribeCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {
-  RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
-
   absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
       describe_response = BuildDescribeResponse();
 
