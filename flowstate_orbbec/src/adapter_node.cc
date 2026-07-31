@@ -609,7 +609,7 @@ AdapterNode::BuildDescribeResponse() {
           "CameraInfo not yet received (waiting for depth)");
     }
     response.sensors.push_back(BuildSensorInformation(
-        *depth_camera_info_, "depth", DepthImageTopic(), *left_ir_transform_));
+        *depth_camera_info_, "depth", DepthImageTopic(), *color_transform_));
   }
 
   return response;
@@ -783,7 +783,7 @@ absl::Status AdapterNode::PopulateExtrinsicsIfNeeded() {
   const std::string right_ir_frame =
       absl::StrFormat("orbbec_%s_right_ir_optical_frame", serial_);
   const std::string left_ir_frame =
-      absl::StrFormat("orbbec_%s_depth_optical_frame", serial_);
+      absl::StrFormat("orbbec_%s_left_ir_optical_frame", serial_);
 
   try {
     color_transform_ = std::make_unique<geometry_msgs::msg::TransformStamped>(
@@ -928,6 +928,21 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
   get_parameter<bool>("enable_laser", enable_laser);
   options = options.append_parameter_override(
       rclcpp::Parameter("enable_laser", enable_laser));
+
+  if (IsDepthEnabled() && IsRgbEnabled()) {
+    RCLCPP_INFO(get_logger(), "Enabling depth registration");
+    // The Gemini 335 hardware cannot handle 1280x800 registration in hardware
+    // so we need to explicitly ask it to do software depth registration.
+    options =
+        options
+            .append_parameter_override(
+                rclcpp::Parameter("depth_registration", true))
+            .append_parameter_override(rclcpp::Parameter("align_mode", "SW"));
+  } else {
+    RCLCPP_INFO(
+        get_logger(),
+        "Depth registration not enabled: requires depth and color at startup");
+  }
 
   return options;
 }
