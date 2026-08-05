@@ -40,7 +40,7 @@ To build the Ensenso driver, first ensure you have completed the core setup in t
    sudo apt update
    sudo apt install -y libopencv-dev python3-opencv
    sudo apt install -y ros-jazzy-tf-transformations
-   sudo pip3 install transforms3d --break-system-packages
+   sudo apt install -y python3-transforms3d python3-retrying
    ```
 
    For xacro-based launch files, install these additional dependencies:
