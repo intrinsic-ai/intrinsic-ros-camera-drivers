@@ -77,10 +77,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-dev-tools \
     ros-jazzy-ament-cmake-vendor-package \
     git \
-    python3-pip \
+    python3-transforms3d \
+    python3-retrying \
     && rm -rf /var/lib/apt/lists/*
-
-RUN pip3 install transforms3d retrying --break-system-packages || true
 
 RUN mkdir -p /opt/ros/underlay/src \
     && cd /opt/ros/underlay/src/ \
