@@ -36,6 +36,7 @@ namespace flowstate_orbbec {
 
 constexpr std::string_view kOrbbecNodeName = "orbbec_camera_node";
 constexpr std::string_view kOrbbecNodeNamespacePrefix = "orbbec/camera_";
+constexpr absl::Duration kImageDeadline = absl::Seconds(1);
 
 AdapterNode::AdapterNode(const std::string& serial,
                          const std::vector<std::string>& locators)
@@ -53,7 +54,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       absl::StrFormat("orbbec/camera_%s/color/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
-        absl::MutexLock lock(&this->camera_info_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->color_camera_info_ = std::move(msg);
         this->color_info_sub_.reset();
       });
@@ -61,7 +62,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   left_ir_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       absl::StrFormat("orbbec/camera_%s/left_ir/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
-        absl::MutexLock lock(&this->camera_info_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->left_ir_camera_info_ = std::move(msg);
         this->left_ir_info_sub_.reset();
       });
@@ -69,7 +70,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   right_ir_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       absl::StrFormat("orbbec/camera_%s/right_ir/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
-        absl::MutexLock lock(&this->camera_info_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->right_ir_camera_info_ = std::move(msg);
         this->right_ir_info_sub_.reset();
       });
@@ -77,7 +78,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   depth_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       absl::StrFormat("orbbec/camera_%s/depth/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
-        absl::MutexLock lock(&this->camera_info_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->depth_camera_info_ = std::move(msg);
         this->depth_info_sub_.reset();
       });
@@ -89,7 +90,7 @@ AdapterNode::AdapterNode(const std::string& serial,
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();
         }
-        absl::MutexLock lock(&this->image_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->color_image_ = std::move(msg);
         this->color_frame_count_++;
       });
@@ -101,7 +102,7 @@ AdapterNode::AdapterNode(const std::string& serial,
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_left_ir_image_ = this->get_clock()->now();
         }
-        absl::MutexLock lock(&this->image_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->left_ir_image_ = std::move(msg);
         this->left_ir_frame_count_++;
       });
@@ -112,7 +113,7 @@ AdapterNode::AdapterNode(const std::string& serial,
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_right_ir_image_ = this->get_clock()->now();
         }
-        absl::MutexLock lock(&this->image_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->right_ir_image_ = std::move(msg);
         this->right_ir_frame_count_++;
       });
@@ -123,7 +124,7 @@ AdapterNode::AdapterNode(const std::string& serial,
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_depth_image_ = this->get_clock()->now();
         }
-        absl::MutexLock lock(&this->image_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->depth_image_ = std::move(msg);
         this->depth_frame_count_++;
       });
@@ -470,7 +471,7 @@ void AdapterNode::PostSetParametersCallback(
       RCLCPP_INFO(get_logger(), "Streaming parameter set to: %s",
                   streaming_ ? "true (pipelined triggering)" : "false (snapshot on-demand)");
       if (streaming_) {
-        absl::MutexLock lock(&image_mutex_);
+        absl::MutexLock lock(&mutex_);
         if (software_trigger_client_) {
           auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
           trigger_req->data = true;
@@ -568,7 +569,7 @@ absl::Status AdapterNode::Main() {
 absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
 AdapterNode::BuildDescribeResponse() {
   snapshot_interfaces::srv::Describe::Response response;
-  absl::MutexLock lock(&camera_info_mutex_);
+  absl::MutexLock lock(&mutex_);
   absl::Status populate_status = PopulateExtrinsicsIfNeeded();
   if (!populate_status.ok()) {
     return populate_status;
@@ -625,7 +626,7 @@ AdapterNode::BuildSnapshotResponse() {
     uint64_t target_right_ir_count = 0;
     uint64_t target_depth_count = 0;
     {
-      absl::MutexLock lock(&image_mutex_);
+      absl::MutexLock lock(&mutex_);
       target_color_count = color_frame_count_;
       target_left_ir_count = left_ir_frame_count_;
       target_right_ir_count = right_ir_frame_count_;
@@ -639,30 +640,39 @@ AdapterNode::BuildSnapshotResponse() {
     }
 
     {
-      absl::MutexLock lock(&image_mutex_);
+      absl::MutexLock lock(&mutex_);
       auto all_new_frames_arrived = [this, target_color_count,
-                                     target_left_ir_count, target_right_ir_count,
+                                     target_left_ir_count,
+                                     target_right_ir_count,
                                      target_depth_count]() {
         if (this->IsRgbEnabled() &&
-            this->color_frame_count_ == target_color_count) {
+            (!this->color_camera_info_ ||
+             this->color_frame_count_ == target_color_count)) {
           return false;
         }
         if (this->IsLeftIrEnabled() &&
-            this->left_ir_frame_count_ == target_left_ir_count) {
+            (!this->left_ir_camera_info_ ||
+             this->left_ir_frame_count_ == target_left_ir_count)) {
           return false;
         }
         if (this->IsRightIrEnabled() &&
-            this->right_ir_frame_count_ == target_right_ir_count) {
+            (!this->right_ir_camera_info_ ||
+             this->right_ir_frame_count_ == target_right_ir_count)) {
           return false;
         }
         if (this->IsDepthEnabled() &&
-            this->depth_frame_count_ == target_depth_count) {
+            (!this->depth_camera_info_ ||
+             this->depth_frame_count_ == target_depth_count)) {
           return false;
         }
         return true;
       };
-      image_mutex_.AwaitWithTimeout(absl::Condition(&all_new_frames_arrived),
-                                    absl::Milliseconds(250));
+      if (!mutex_.AwaitWithTimeout(
+              absl::Condition(&all_new_frames_arrived), kImageDeadline)) {
+        return absl::DeadlineExceededError(
+            absl::StrFormat("Image(s) did not arrive within %s",
+                            absl::FormatDuration(kImageDeadline)));
+      }
     }
   }
 
@@ -676,8 +686,7 @@ AdapterNode::BuildSnapshotResponse() {
 
   // Lock and copy the most recent CameraInfo and Image messages
   {
-    absl::MutexLock camera_info_lock(&camera_info_mutex_);
-    absl::MutexLock image_lock(&image_mutex_);
+    absl::MutexLock lock(&mutex_);
 
     if (IsRgbEnabled()) {
       if (!color_camera_info_) {
