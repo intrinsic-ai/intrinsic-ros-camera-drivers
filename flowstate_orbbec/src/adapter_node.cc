@@ -44,6 +44,10 @@ AdapterNode::AdapterNode(const std::string& serial,
           serial, locators, "orbbec",
           rclcpp::NodeOptions().use_intra_process_comms(true)) {
   InitializeParameters();
+
+  software_trigger_client_ = create_client<std_srvs::srv::SetBool>(
+      absl::StrFormat("/orbbec/camera_%s/send_software_trigger", serial_));
+
   CreateOrbbecNode();
 
   // Create a TF Listener, which will be used to query extrinsics
@@ -128,9 +132,6 @@ AdapterNode::AdapterNode(const std::string& serial,
         this->depth_image_ = std::move(msg);
         this->depth_frame_count_++;
       });
-
-  software_trigger_client_ = create_client<std_srvs::srv::SetBool>(
-      absl::StrFormat("/orbbec/camera_%s/send_software_trigger", serial_));
 
   // Create Flowstate services
   CreateFlowstateServices();
@@ -946,7 +947,9 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
         options
             .append_parameter_override(
                 rclcpp::Parameter("depth_registration", true))
-            .append_parameter_override(rclcpp::Parameter("align_mode", "SW"));
+            .append_parameter_override(rclcpp::Parameter("align_mode", "SW"))
+            .append_parameter_override(
+                rclcpp::Parameter("align_target_stream", "DEPTH"));
   } else {
     RCLCPP_INFO(
         get_logger(),
@@ -1005,6 +1008,19 @@ void AdapterNode::CreateOrbbecNode() {
   });
   RCLCPP_INFO(get_logger(), "Sleeping a bit to allow Orbbec thread to start");
   rclcpp::sleep_for(std::chrono::seconds(2));
+  RCLCPP_INFO(get_logger(), "Scheduling initial snapshot in 5 seconds...");
+  initial_snapshot_timer_ =
+      create_wall_timer(std::chrono::seconds(5), [this]() {
+        absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response> response =
+            this->BuildSnapshotResponse();
+        if (!response.ok()) {
+          RCLCPP_ERROR(get_logger(), "Initial snapshot error: %s",
+                       std::string(response.status().message()).c_str());
+        } else {
+          RCLCPP_INFO(get_logger(), "Initial snapshot OK");
+        }
+        this->initial_snapshot_timer_->cancel();
+      });
 }
 
 void AdapterNode::DestroyOrbbecNode() {
