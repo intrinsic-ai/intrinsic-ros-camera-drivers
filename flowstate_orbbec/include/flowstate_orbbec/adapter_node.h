@@ -179,6 +179,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   double fps_ = 10.0;
   bool streaming_ = false;
   rclcpp::TimerBase::SharedPtr streaming_timer_;
+  rclcpp::TimerBase::SharedPtr initial_snapshot_timer_;
 
   std::unique_ptr<std::thread> orbbec_thread_;
   std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> orbbec_executor_;
