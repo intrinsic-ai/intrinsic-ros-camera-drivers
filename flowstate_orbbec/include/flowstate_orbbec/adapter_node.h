@@ -120,6 +120,8 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
+  rclcpp::CallbackGroup::SharedPtr subscription_cb_group_;
+
   // IR Data
   std::unique_ptr<sensor_msgs::msg::CameraInfo> left_ir_camera_info_
       ABSL_GUARDED_BY(data_mutex_);
@@ -178,6 +180,7 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   int reboot_count_ = 0;
   double fps_ = 10.0;
   bool streaming_ = false;
+  int warmup_snapshot_count_ = 0;
   rclcpp::TimerBase::SharedPtr streaming_timer_;
   rclcpp::TimerBase::SharedPtr initial_snapshot_timer_;
 
