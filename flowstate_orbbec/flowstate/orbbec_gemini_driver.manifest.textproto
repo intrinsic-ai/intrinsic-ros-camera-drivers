@@ -24,6 +24,9 @@ service_def {
     image {
       archive_filename: "orbbec_gemini_driver.tar"
     }
+    settings {
+      host_network: true
+    }
   }
 }
 assets {
