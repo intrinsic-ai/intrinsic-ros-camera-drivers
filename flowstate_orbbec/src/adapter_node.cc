@@ -94,7 +94,8 @@ AdapterNode::AdapterNode(const std::string& serial,
 
   // Subscribe to color image
   color_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-      ColorImageTopic(), 5, [this](sensor_msgs::msg::Image::UniquePtr msg) {
+      ColorImageTopic(), 5,
+      [this](sensor_msgs::msg::Image::UniquePtr msg) {
         {
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();
@@ -102,11 +103,13 @@ AdapterNode::AdapterNode(const std::string& serial,
         absl::MutexLock lock(&this->mutex_);
         this->color_image_ = std::move(msg);
         this->color_frame_count_++;
-      }, sub_options);
+      },
+      sub_options);
 
   // Subscribe to IR images
   left_ir_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-      LeftIrImageTopic(), 5, [this](sensor_msgs::msg::Image::UniquePtr msg) {
+      LeftIrImageTopic(), 5,
+      [this](sensor_msgs::msg::Image::UniquePtr msg) {
         {
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_left_ir_image_ = this->get_clock()->now();
@@ -114,7 +117,8 @@ AdapterNode::AdapterNode(const std::string& serial,
         absl::MutexLock lock(&this->mutex_);
         this->left_ir_image_ = std::move(msg);
         this->left_ir_frame_count_++;
-      }, sub_options);
+      },
+      sub_options);
 
   right_ir_image_sub_ = create_subscription<sensor_msgs::msg::Image>(
       RightIrImageTopic(), 5, [this](sensor_msgs::msg::Image::UniquePtr msg) {
@@ -294,7 +298,7 @@ void AdapterNode::InitializeParameters() {
   gain_descriptor.description = "Sensor gain";
   gain_descriptor.read_only = false;
   gain_descriptor.integer_range.push_back(gain_range);
-  declare_parameter("gain", 0, gain_descriptor);
+  declare_parameter("gain", 16, gain_descriptor);
 
   rcl_interfaces::msg::ParameterDescriptor streaming_descriptor;
   streaming_descriptor.name = "streaming";
@@ -625,166 +629,166 @@ AdapterNode::BuildDescribeResponse() {
 
 absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response>
 AdapterNode::BuildSnapshotResponse() {
-  for (int horrible = 0; horrible < 2; horrible++) {
-    snapshot_interfaces::srv::Snapshot::Response response;
+  snapshot_interfaces::srv::Snapshot::Response response;
 
-    if (!streaming_) {
-      uint64_t target_color_count = 0;
-      uint64_t target_left_ir_count = 0;
-      uint64_t target_right_ir_count = 0;
-      uint64_t target_depth_count = 0;
-      {
-        absl::MutexLock lock(&mutex_);
-        target_color_count = color_frame_count_;
-        target_left_ir_count = left_ir_frame_count_;
-        target_right_ir_count = right_ir_frame_count_;
-        target_depth_count = depth_frame_count_;
-      }
-
-      if (software_trigger_client_) {
-        auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
-        trigger_req->data = true;
-        software_trigger_client_->async_send_request(trigger_req);
-      }
-
-      {
-        absl::MutexLock lock(&mutex_);
-        auto all_new_frames_arrived = [this, target_color_count,
-                                       target_left_ir_count,
-                                       target_right_ir_count,
-                                       target_depth_count]() {
-          if (this->IsRgbEnabled() &&
-              (!this->color_camera_info_ ||
-               this->color_frame_count_ == target_color_count)) {
-            // RCLCPP_INFO(get_logger(), "no rgb image yet");
-            return false;
-          }
-          if (this->IsLeftIrEnabled() &&
-              (!this->left_ir_camera_info_ ||
-               this->left_ir_frame_count_ == target_left_ir_count)) {
-            // RCLCPP_INFO(get_logger(), "no left IR image yet");
-            return false;
-          }
-          if (this->IsRightIrEnabled() &&
-              (!this->right_ir_camera_info_ ||
-               this->right_ir_frame_count_ == target_right_ir_count)) {
-            // RCLCPP_INFO(get_logger(), "no right IR image yet");
-            return false;
-          }
-
-          // The depth image is registered to the color image, so it needs the
-          // color_camera_info here.
-          if (this->IsDepthEnabled() &&
-              (!this->color_camera_info_ ||
-               this->depth_frame_count_ == target_depth_count)) {
-            // RCLCPP_INFO(get_logger(), "no depth image yet");
-            return false;
-          }
-          return true;
-        };
-        if (!mutex_.AwaitWithTimeout(
-                absl::Condition(&all_new_frames_arrived), kImageDeadline)) {
-          return absl::DeadlineExceededError(
-              absl::StrFormat("Image(s) did not arrive within %s",
-                              absl::FormatDuration(kImageDeadline)));
-        }
-      }
-    }
-
-    // In streaming mode, proactively trigger the NEXT frame right after
-    // AwaitWithTimeout() unblocks so the camera exposes the next frame in the background.
-    if (streaming_ && software_trigger_client_) {
-      auto next_trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
-      next_trigger_req->data = true;
-      software_trigger_client_->async_send_request(next_trigger_req);
-    }
-
-    // Lock and copy the most recent CameraInfo and Image messages
+  if (!streaming_) {
+    uint64_t target_color_count = 0;
+    uint64_t target_left_ir_count = 0;
+    uint64_t target_right_ir_count = 0;
+    uint64_t target_depth_count = 0;
     {
       absl::MutexLock lock(&mutex_);
-
-      if (IsRgbEnabled()) {
-        if (!color_camera_info_) {
-          return absl::UnavailableError("Color CameraInfo not yet received");
-        }
-        if (!color_image_) {
-          return absl::UnavailableError("Color image not yet received");
-        }
-        snapshot_interfaces::msg::ImageSnapshot color_snapshot;
-        color_snapshot.topic_name = ColorImageTopic();
-        color_snapshot.camera_info = *color_camera_info_;
-        color_snapshot.image = *color_image_;
-        response.images.push_back(std::move(color_snapshot));
-      }
-
-      if (IsLeftIrEnabled()) {
-        if (!left_ir_camera_info_) {
-          return absl::UnavailableError("Left IR CameraInfo not yet received");
-        }
-        if (!left_ir_image_) {
-          return absl::UnavailableError("Left IR Image not yet received");
-        }
-        snapshot_interfaces::msg::ImageSnapshot left_ir_snapshot;
-        left_ir_snapshot.topic_name = LeftIrImageTopic();
-        left_ir_snapshot.camera_info = *left_ir_camera_info_;
-        left_ir_snapshot.image = *left_ir_image_;
-        response.images.push_back(std::move(left_ir_snapshot));
-      }
-
-      if (IsRightIrEnabled()) {
-        if (!right_ir_camera_info_) {
-          return absl::UnavailableError("Right IR CameraInfo not yet received");
-        }
-        if (!right_ir_image_) {
-          return absl::UnavailableError("Right IR Image not yet received");
-        }
-        snapshot_interfaces::msg::ImageSnapshot right_ir_snapshot;
-        right_ir_snapshot.topic_name = RightIrImageTopic();
-        right_ir_snapshot.camera_info = *right_ir_camera_info_;
-        right_ir_snapshot.image = *right_ir_image_;
-        response.images.push_back(std::move(right_ir_snapshot));
-      }
-
-      if (IsDepthEnabled()) {
-        if (!color_camera_info_) {
-          return absl::UnavailableError("Color CameraInfo not yet received.");
-        }
-        if (!depth_image_) {
-          return absl::UnavailableError("Depth image not yet received");
-        }
-        snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
-        depth_snapshot.topic_name = DepthImageTopic();
-        // The depth image is registered to the color image, so we copy it here.
-        depth_snapshot.camera_info = *color_camera_info_;
-        sensor_msgs::msg::Image depth_copy = *depth_image_;
-
-        // The Orbbec camera returns the depth image as 16-bit images in
-        // millimeters. We want to convert that to 32-bit float (meters) for
-        // Flowstate.
-        depth_snapshot.image.header = depth_copy.header;
-        depth_snapshot.image.height = depth_copy.height;
-        depth_snapshot.image.width = depth_copy.width;
-        depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-        depth_snapshot.image.is_bigendian = false;
-        depth_snapshot.image.step = 4 * depth_snapshot.image.width;
-        depth_snapshot.image.data.resize(depth_snapshot.image.step *
-                                         depth_snapshot.image.height);
-        // Use OpenCV's amazingly optimized implementation to do the conversion
-        const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width, CV_16U,
-                                     depth_copy.data.data());
-        cv::Mat depth_float(depth_snapshot.image.height,
-                            depth_snapshot.image.width, CV_32F,
-                            depth_snapshot.image.data.data());
-        depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
-
-        response.images.push_back(std::move(depth_snapshot));
-      }
+      target_color_count = color_frame_count_;
+      target_left_ir_count = left_ir_frame_count_;
+      target_right_ir_count = right_ir_frame_count_;
+      target_depth_count = depth_frame_count_;
     }
-    if (horrible > 0) {
-      return response;
+
+    if (software_trigger_client_) {
+      auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
+      trigger_req->data = true;
+      software_trigger_client_->async_send_request(trigger_req);
+      RCLCPP_INFO(get_logger(), "Sent trigger request async");
+    }
+
+    {
+      absl::MutexLock lock(&mutex_);
+      auto all_new_frames_arrived = [this, target_color_count,
+                                     target_left_ir_count,
+                                     target_right_ir_count,
+                                     target_depth_count]() {
+        if (this->IsRgbEnabled() &&
+            (!this->color_camera_info_ ||
+             this->color_frame_count_ == target_color_count)) {
+          // RCLCPP_INFO(get_logger(), "no rgb image yet");
+          return false;
+        }
+        if (this->IsLeftIrEnabled() &&
+            (!this->left_ir_camera_info_ ||
+             this->left_ir_frame_count_ == target_left_ir_count)) {
+          // RCLCPP_INFO(get_logger(), "no left IR image yet");
+          return false;
+        }
+        if (this->IsRightIrEnabled() &&
+            (!this->right_ir_camera_info_ ||
+             this->right_ir_frame_count_ == target_right_ir_count)) {
+          // RCLCPP_INFO(get_logger(), "no right IR image yet");
+          return false;
+        }
+
+        // The depth image is registered to the color image, so it needs the
+        // color_camera_info here.
+        if (this->IsDepthEnabled() &&
+            (!this->color_camera_info_ ||
+             this->depth_frame_count_ == target_depth_count)) {
+          // RCLCPP_INFO(get_logger(), "no depth image yet");
+          return false;
+        }
+        return true;
+      };
+      if (!mutex_.AwaitWithTimeout(
+              absl::Condition(&all_new_frames_arrived), kImageDeadline)) {
+        return absl::DeadlineExceededError(
+            absl::StrFormat("Image(s) did not arrive within %s",
+                            absl::FormatDuration(kImageDeadline)));
+      }
     }
   }
-  return absl::UnavailableError("This is totally inconceivable!");
+  RCLCPP_INFO(get_logger(), "got all frames");
+
+  // In streaming mode, proactively trigger the NEXT frame right after
+  // AwaitWithTimeout() unblocks so the camera exposes the next frame in the background.
+  if (streaming_ && software_trigger_client_) {
+    auto next_trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
+    next_trigger_req->data = true;
+    software_trigger_client_->async_send_request(next_trigger_req);
+  }
+
+  // Lock and copy the most recent CameraInfo and Image messages
+  {
+    absl::MutexLock lock(&mutex_);
+
+    if (IsRgbEnabled()) {
+      if (!color_camera_info_) {
+        return absl::UnavailableError("Color CameraInfo not yet received");
+      }
+      if (!color_image_) {
+        return absl::UnavailableError("Color image not yet received");
+      }
+      snapshot_interfaces::msg::ImageSnapshot color_snapshot;
+      color_snapshot.topic_name = ColorImageTopic();
+      color_snapshot.camera_info = *color_camera_info_;
+      color_snapshot.image = *color_image_;
+      response.images.push_back(std::move(color_snapshot));
+    }
+
+    if (IsLeftIrEnabled()) {
+      if (!left_ir_camera_info_) {
+        return absl::UnavailableError("Left IR CameraInfo not yet received");
+      }
+      if (!left_ir_image_) {
+        return absl::UnavailableError("Left IR Image not yet received");
+      }
+      snapshot_interfaces::msg::ImageSnapshot left_ir_snapshot;
+      left_ir_snapshot.topic_name = LeftIrImageTopic();
+      left_ir_snapshot.camera_info = *left_ir_camera_info_;
+      left_ir_snapshot.image = *left_ir_image_;
+      response.images.push_back(std::move(left_ir_snapshot));
+    }
+
+    if (IsRightIrEnabled()) {
+      if (!right_ir_camera_info_) {
+        return absl::UnavailableError("Right IR CameraInfo not yet received");
+      }
+      if (!right_ir_image_) {
+        return absl::UnavailableError("Right IR Image not yet received");
+      }
+      snapshot_interfaces::msg::ImageSnapshot right_ir_snapshot;
+      right_ir_snapshot.topic_name = RightIrImageTopic();
+      right_ir_snapshot.camera_info = *right_ir_camera_info_;
+      right_ir_snapshot.image = *right_ir_image_;
+      response.images.push_back(std::move(right_ir_snapshot));
+    }
+
+    if (IsDepthEnabled()) {
+      if (!color_camera_info_) {
+        return absl::UnavailableError("Color CameraInfo not yet received.");
+      }
+      if (!depth_image_) {
+        return absl::UnavailableError("Depth image not yet received");
+      }
+      snapshot_interfaces::msg::ImageSnapshot depth_snapshot;
+      depth_snapshot.topic_name = DepthImageTopic();
+      // The depth image is registered to the color image, so we copy it here.
+      depth_snapshot.camera_info = *color_camera_info_;
+      sensor_msgs::msg::Image depth_copy = *depth_image_;
+
+      // The Orbbec camera returns the depth image as 16-bit images in
+      // millimeters. We want to convert that to 32-bit float (meters) for
+      // Flowstate.
+      depth_snapshot.image.header = depth_copy.header;
+      depth_snapshot.image.height = depth_copy.height;
+      depth_snapshot.image.width = depth_copy.width;
+      depth_snapshot.image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+      depth_snapshot.image.is_bigendian = false;
+      depth_snapshot.image.step = 4 * depth_snapshot.image.width;
+      depth_snapshot.image.data.resize(depth_snapshot.image.step *
+                                       depth_snapshot.image.height);
+      // Use OpenCV's amazingly optimized implementation to do the conversion
+      const cv::Mat depth_unsigned(depth_copy.height, depth_copy.width, CV_16U,
+                                   depth_copy.data.data());
+      cv::Mat depth_float(depth_snapshot.image.height,
+                          depth_snapshot.image.width, CV_32F,
+                          depth_snapshot.image.data.data());
+      depth_unsigned.convertTo(depth_float, CV_32F, 0.001);
+
+      response.images.push_back(std::move(depth_snapshot));
+    }
+  }
+  RCLCPP_INFO(get_logger(), "snapshot IR-color dt = %.6f",
+              rclcpp::Time(color_image_->header.stamp).seconds() -
+                  rclcpp::Time(left_ir_image_->header.stamp).seconds());
+  return response;
 }
 
 // If the extrinsics transforms have not yet been populated, use TF
@@ -889,6 +893,12 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
           .append_parameter_override(
               rclcpp::Parameter("software_trigger_enabled", false))
           .append_parameter_override(
+              rclcpp::Parameter("software_trigger_period", 200))
+          .append_parameter_override(
+              rclcpp::Parameter("enable_frame_sync", true))
+          .append_parameter_override(
+              rclcpp::Parameter("frame_aggregate_mode", "full_frame"))
+          .append_parameter_override(
               rclcpp::Parameter("diagnostic_period", -1.0))
           .append_parameter_override(
               rclcpp::Parameter("enumerate_net_device", true));
@@ -971,7 +981,6 @@ rclcpp::NodeOptions AdapterNode::CreateOrbbecNodeOptions(
         get_logger(),
         "Depth registration not enabled: requires depth and color at startup");
   }
-
   return options;
 }
 
@@ -1023,10 +1032,10 @@ void AdapterNode::CreateOrbbecNode() {
     this->orbbec_executor_->spin();
   });
   RCLCPP_INFO(get_logger(), "Sleeping a bit to allow Orbbec thread to start");
-  rclcpp::sleep_for(std::chrono::seconds(2));
+  rclcpp::sleep_for(std::chrono::seconds(5));
   this->warmup_snapshot_count_ = 0;
   initial_snapshot_timer_ =
-      create_wall_timer(std::chrono::seconds(3), [this]() {
+      create_wall_timer(std::chrono::milliseconds(500), [this]() {
         absl::StatusOr<snapshot_interfaces::srv::Snapshot::Response> response =
             this->BuildSnapshotResponse();
         if (!response.ok()) {
@@ -1037,7 +1046,7 @@ void AdapterNode::CreateOrbbecNode() {
           RCLCPP_INFO(get_logger(), "Initial snapshot %d OK", this->warmup_snapshot_count_);
         }
         this->warmup_snapshot_count_++;
-        if (this->warmup_snapshot_count_ > 3) {
+        if (this->warmup_snapshot_count_ > 20) {
           this->initial_snapshot_timer_->cancel();
         }
       });
