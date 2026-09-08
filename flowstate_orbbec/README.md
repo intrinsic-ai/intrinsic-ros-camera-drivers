@@ -5,8 +5,8 @@
 To build the Orbbec driver, first ensure you have completed the core setup in the [main README](../README.md). Then, make sure you have the following Orbbec-specific repositories cloned in your workspace `ros_cameras_ws/src` directory:
 
 ```bash
-git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install
-git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build
+git clone https://github.com/codebot/OrbbecSDK_v2 OrbbecSDK --branch colcon_compatible_install_v2.9.3
+git clone https://github.com/codebot/OrbbecSDK_ROS2 --branch use_sdk_from_colcon_build_v2.9.3
 ```
 
 Orbbec camera models are supplied by the vendor as Xacro URDF and several STL files.
