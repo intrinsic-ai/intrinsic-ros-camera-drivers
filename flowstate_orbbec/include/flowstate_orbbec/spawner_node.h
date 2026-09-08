@@ -42,6 +42,9 @@ class SpawnerNode : public flowstate_common::BaseSpawnerNode {
   std::vector<std::string> GetSerials() override;
   std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> SpawnNodes(
       const std::vector<std::string>& serials) override;
+
+ private:
+  std::shared_ptr<ob::Context> context_;
 };
 
 }  // namespace flowstate_orbbec

@@ -77,9 +77,10 @@ class BaseAdapterNode : public rclcpp::Node {
    * @param node_name_prefix ROS node name prefix (will be prefixed with camera
    * type)
    */
-  BaseAdapterNode(const std::string& serial,
-                  const std::vector<std::string>& locators,
-                  const std::string& node_name_prefix);
+  BaseAdapterNode(
+      const std::string& serial, const std::vector<std::string>& locators,
+      const std::string& node_name_prefix,
+      const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
   virtual ~BaseAdapterNode();
 
@@ -134,8 +135,8 @@ class BaseAdapterNode : public rclcpp::Node {
    * @return unique_ptr to camera info (nullptr if not yet received)
    */
   std::unique_ptr<sensor_msgs::msg::CameraInfo> GetColorCameraInfo() const
-      ABSL_LOCKS_EXCLUDED(camera_info_mutex_) {
-    absl::MutexLock lock(&camera_info_mutex_);
+      ABSL_LOCKS_EXCLUDED(mutex_) {
+    absl::MutexLock lock(&mutex_);
     if (!color_camera_info_) return nullptr;
     return std::make_unique<sensor_msgs::msg::CameraInfo>(*color_camera_info_);
   }
@@ -146,8 +147,8 @@ class BaseAdapterNode : public rclcpp::Node {
    * @return unique_ptr to image (nullptr if not yet received)
    */
   std::unique_ptr<sensor_msgs::msg::Image> GetColorImage() const
-      ABSL_LOCKS_EXCLUDED(image_mutex_) {
-    absl::MutexLock lock(&image_mutex_);
+      ABSL_LOCKS_EXCLUDED(mutex_) {
+    absl::MutexLock lock(&mutex_);
     if (!color_image_) return nullptr;
     return std::make_unique<sensor_msgs::msg::Image>(*color_image_);
   }
@@ -194,20 +195,19 @@ class BaseAdapterNode : public rclcpp::Node {
   // Thread management
   std::thread thread_;
   std::atomic<bool> exited_thread_{false};
+  mutable absl::Mutex mutex_;
 
   // Camera identification
   std::string serial_;
   std::vector<std::string> locators_;
 
   // Subscriptions and cached data
-  mutable absl::Mutex camera_info_mutex_;
   std::unique_ptr<sensor_msgs::msg::CameraInfo> color_camera_info_
-      ABSL_GUARDED_BY(camera_info_mutex_);
+      ABSL_GUARDED_BY(mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr color_info_sub_;
 
-  mutable absl::Mutex image_mutex_;
   std::unique_ptr<sensor_msgs::msg::Image> color_image_
-      ABSL_GUARDED_BY(image_mutex_);
+      ABSL_GUARDED_BY(mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_image_sub_;
 
   // Timeout monitoring

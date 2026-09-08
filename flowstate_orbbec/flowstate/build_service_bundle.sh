@@ -20,7 +20,7 @@ fi
 
 set -o errexit
 
-src/sdk-ros/scripts/setup_docker.sh
+src/flowstate-ros-camera-drivers/scripts/setup_docker.sh
 
 CAMERA_TYPE="orbbec"
 SERVICE_NAME="orbbec_gemini_driver"
@@ -50,9 +50,9 @@ src/flowstate-ros-camera-drivers/docker_scripts/build_container.sh \
   "${CONTEXT_ARGS[@]}"
 
 if [[ -z "$CI" && "$PRESUBMIT" != "true" ]]; then
-  src/sdk-ros/scripts/build_bundle.sh \
-    --service_name "$SERVICE_NAME" \
-    --service_package "$SERVICE_PACKAGE" \
-    --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto" \
-    --default_config "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}_default_config.textproto"
+  src/flowstate-ros-camera-drivers/scripts/build_bundle.sh \
+     --service_name "$SERVICE_NAME" \
+     --service_package "$SERVICE_PACKAGE" \
+     --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto" \
+     --default_config "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}_default_config.textproto"
 fi

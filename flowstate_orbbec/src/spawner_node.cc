@@ -31,15 +31,14 @@ ABSL_CONST_INIT absl::Mutex SpawnerNode::s_discovery_mutex(absl::kConstInit);
 
 SpawnerNode::SpawnerNode()
     : flowstate_common::BaseSpawnerNode("orbbec_spawner", "orbbec",
-                                        std::chrono::seconds(10)) {
-}
+                                        std::chrono::seconds(10)),
+      context_(std::make_shared<ob::Context>()) {}
 
 std::vector<std::string> SpawnerNode::GetSerials() {
   absl::MutexLock lock(&s_discovery_mutex);
-  auto context = std::make_unique<ob::Context>();
-  auto list = context->queryDeviceList();
+  auto list = context_->queryDeviceList();
   std::vector<std::string> serials;
-  
+
   for (size_t i = 0; i < list->deviceCount(); i++) {
     if (std::string(list->getConnectionType(i)) == "Ethernet") {
       serials.push_back(list->serialNumber(i));
@@ -52,8 +51,11 @@ std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>>
 SpawnerNode::SpawnNodes(const std::vector<std::string>& serials) {
   RCLCPP_INFO(get_logger(), "flowstate_orbbec::SpawnerNode::SpawnNodes()");
   std::vector<std::shared_ptr<flowstate_common::BaseAdapterNode>> new_nodes;
-  auto context = std::make_unique<ob::Context>();
-  auto list = context->queryDeviceList();
+  std::shared_ptr<ob::DeviceList> list;
+  {
+    absl::MutexLock lock(&s_discovery_mutex);
+    list = context_->queryDeviceList();
+  }
   
   std::unordered_set<std::string> serials_to_spawn(serials.begin(), serials.end());
   

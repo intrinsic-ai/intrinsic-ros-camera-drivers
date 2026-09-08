@@ -30,8 +30,9 @@ namespace flowstate_common {
 
 BaseAdapterNode::BaseAdapterNode(const std::string& serial,
                                  const std::vector<std::string>& locators,
-                                 const std::string& node_name_prefix)
-    : Node(node_name_prefix + "_" + serial),
+                                 const std::string& node_name_prefix,
+                                 const rclcpp::NodeOptions& options)
+    : Node(node_name_prefix + "_" + serial, options),
       serial_(serial),
       locators_(locators) {}
 
@@ -82,8 +83,6 @@ void BaseAdapterNode::DescribeCallback(
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Request>,
     const std::shared_ptr<snapshot_interfaces::srv::Describe::Response>
         response) {
-  RCLCPP_INFO(get_logger(), "=== DESCRIBE SERVICE ===");
-
   absl::StatusOr<snapshot_interfaces::srv::Describe::Response>
       describe_response = BuildDescribeResponse();
 

@@ -120,29 +120,31 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   bool auto_white_balance_ = true;  // this resets WB if you disable it "again"
   std::unique_ptr<orbbec_camera::OBCameraNodeDriver> orbbec_node_;
 
+  rclcpp::CallbackGroup::SharedPtr subscription_cb_group_;
+
   // IR Data
   std::unique_ptr<sensor_msgs::msg::CameraInfo> left_ir_camera_info_
-      ABSL_GUARDED_BY(camera_info_mutex_);
+      ABSL_GUARDED_BY(data_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
       left_ir_info_sub_;
   std::unique_ptr<sensor_msgs::msg::Image> left_ir_image_
-      ABSL_GUARDED_BY(image_mutex_);
+      ABSL_GUARDED_BY(data_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr left_ir_image_sub_;
 
   std::unique_ptr<sensor_msgs::msg::CameraInfo> right_ir_camera_info_
-      ABSL_GUARDED_BY(camera_info_mutex_);
+      ABSL_GUARDED_BY(data_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
       right_ir_info_sub_;
   std::unique_ptr<sensor_msgs::msg::Image> right_ir_image_
-      ABSL_GUARDED_BY(image_mutex_);
+      ABSL_GUARDED_BY(data_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr right_ir_image_sub_;
 
   // Depth Data
   std::unique_ptr<sensor_msgs::msg::CameraInfo> depth_camera_info_
-      ABSL_GUARDED_BY(camera_info_mutex_);
+      ABSL_GUARDED_BY(data_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_sub_;
   std::unique_ptr<sensor_msgs::msg::Image> depth_image_
-      ABSL_GUARDED_BY(image_mutex_);
+      ABSL_GUARDED_BY(data_mutex_);
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
 
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr set_auto_exposure_client_;
@@ -158,6 +160,12 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_depth_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_left_ir_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_right_ir_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr software_trigger_client_;
+
+  uint64_t color_frame_count_ ABSL_GUARDED_BY(data_mutex_) = 0;
+  uint64_t left_ir_frame_count_ ABSL_GUARDED_BY(data_mutex_) = 0;
+  uint64_t right_ir_frame_count_ ABSL_GUARDED_BY(data_mutex_) = 0;
+  uint64_t depth_frame_count_ ABSL_GUARDED_BY(data_mutex_) = 0;
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -170,7 +178,11 @@ class AdapterNode : public flowstate_common::BaseAdapterNode {
   rclcpp::Time t_last_depth_image_ ABSL_GUARDED_BY(timeout_mutex_);
 
   int reboot_count_ = 0;
-  double fps_ = 5.0;
+  double fps_ = 10.0;
+  bool streaming_ = false;
+  int warmup_snapshot_count_ = 0;
+  rclcpp::TimerBase::SharedPtr streaming_timer_;
+  rclcpp::TimerBase::SharedPtr initial_snapshot_timer_;
 
   std::unique_ptr<std::thread> orbbec_thread_;
   std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> orbbec_executor_;
