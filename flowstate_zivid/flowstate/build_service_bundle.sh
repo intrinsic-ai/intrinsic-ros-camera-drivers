@@ -20,7 +20,7 @@ fi
 
 set -o errexit
 
-src/sdk-ros/scripts/setup_docker.sh
+src/flowstate-ros-camera-drivers/scripts/setup_docker.sh
 
 CAMERA_TYPE="zivid"
 SERVICE_NAME="zivid_driver"

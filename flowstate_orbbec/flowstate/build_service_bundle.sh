@@ -20,17 +20,7 @@ fi
 
 set -o errexit
 
-IMAGES_DIR=images
-BUILDER_NAME=container-builder
-mkdir -p $IMAGES_DIR
-docker buildx inspect --builder $BUILDER_NAME || \
-  docker buildx create --name="$BUILDER_NAME" --driver="docker-container"
-
-echo "images
-build
-log" > ./.dockerignore
-
-#############################################################################
+src/flowstate-ros-camera-drivers/scripts/setup_docker.sh
 
 CAMERA_TYPE="orbbec"
 SERVICE_NAME="orbbec_gemini_driver"
