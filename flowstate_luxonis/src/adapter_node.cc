@@ -61,7 +61,7 @@ AdapterNode::AdapterNode(const std::string& serial,
   color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       absl::StrFormat("luxonis/camera_%s/driver/rgb/camera_info", serial_), 2,
       [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) {
-        absl::MutexLock lock(&this->camera_info_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->color_camera_info_ = std::move(msg);
       });
 
@@ -71,7 +71,7 @@ AdapterNode::AdapterNode(const std::string& serial,
           absl::MutexLock timeout_lock(&this->timeout_mutex_);
           this->t_last_color_image_ = this->get_clock()->now();
         }
-        absl::MutexLock lock(&this->image_mutex_);
+        absl::MutexLock lock(&this->mutex_);
         this->color_image_ = std::move(msg);
       });
 
