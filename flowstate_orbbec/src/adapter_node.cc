@@ -648,7 +648,6 @@ AdapterNode::BuildSnapshotResponse() {
       auto trigger_req = std::make_shared<std_srvs::srv::SetBool::Request>();
       trigger_req->data = true;
       software_trigger_client_->async_send_request(trigger_req);
-      RCLCPP_INFO(get_logger(), "Sent trigger request async");
     }
 
     {
@@ -694,7 +693,6 @@ AdapterNode::BuildSnapshotResponse() {
       }
     }
   }
-  RCLCPP_INFO(get_logger(), "got all frames");
 
   // In streaming mode, proactively trigger the NEXT frame right after
   // AwaitWithTimeout() unblocks so the camera exposes the next frame in the background.
