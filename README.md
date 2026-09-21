@@ -1,8 +1,8 @@
-# flowstate-ros-camera-drivers
+# intrinsic-ros-camera-drivers
 
 Welcome.
 
-This repo is intended to contain Flowstate-compatible ROS adapter nodes for existing ROS camera drivers.
+This repo contains Intrinsic-compatible ROS camera driver nodes and adapters.
 
 # Building
 
@@ -16,7 +16,7 @@ Here is an example command sequence to create such a workspace:
 ```
 mkdir -p ros_cameras_ws/src
 cd ros_cameras_ws/src
-git clone ssh://git@github.com/intrinsic-dev/flowstate-ros-camera-drivers
+git clone ssh://git@github.com/intrinsic-ai/intrinsic-ros-camera-drivers
 git clone ssh://git@github.com/intrinsic-ai/sdk-ros
 git clone https://github.com/codebot/rmw_zenoh -b morganquigley/jazzy_with_old_attachment_metadata_format && cd rmw_zenoh && git checkout 05cdda05a7c5e7c2871e6d85bfc9411546a529c4 && cd ..
 ```
@@ -27,7 +27,7 @@ The resulting directory structure should look like this:
 ```
 ros_cameras_ws/
 └── src
-    ├── flowstate-ros-camera-drivers
+    ├── intrinsic-ros-camera-drivers
     ├── rmw_zenoh
     └── sdk-ros
 ```
