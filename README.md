@@ -90,12 +90,35 @@ colcon build --event-handlers console_direct+ --executor sequential
 ```
 
 
-# Disclaimer
+---
 
-This is not an officially supported Google product. This project is not
-eligible for the [Google Open Source Software Vulnerability Rewards
-Program](https://bughunters.google.com/open-source-security).
+## Documentation and related repositories
 
-These drivers are designed to be compatible with the Intrinsic Platform. Use of the Intrinsic Platform is subject to the Intrinsic Terms of Service. Please review them here: [Intrinsic Platform Terms of Service URL](https://www.intrinsic.ai/legal/platform-terms)
+* [**Intrinsic Developer Community**](https://developer.intrinsic.ai): Complete guides, interactive tutorials, and API references.
 
+---
 
+## Contributing and community
+
+Contributions are welcome! Please review:
+
+* [CONTRIBUTING.md](CONTRIBUTING.md): Details on signing the Google Contributor License Agreement (CLA), community guidelines, C++20 coding standards, and pull request workflows.
+* [SECURITY.md](SECURITY.md): Instructions for reporting security vulnerabilities.
+
+---
+
+## License
+
+This project is licensed under the [Apache 2.0 License](LICENSE).
+
+---
+
+> **Disclaimer**: This is not an officially supported Google product. This project is not eligible for the [Google Open Source Software Vulnerability Rewards Program](https://bughunters.google.com/open-source-security).
+>
+> These drivers are designed to be compatible with the Intrinsic Platform. Use of the Intrinsic Platform is subject to the Intrinsic Terms of Service. Please review them here: [Intrinsic Platform Terms of Service](https://www.intrinsic.ai/legal/platform-terms).
+
+---
+
+### Trademark notice
+
+"Intrinsic" and "Intrinsic Core" are trademarks of Intrinsic Innovation LLC. See [TRADEMARK.md](TRADEMARK.md) for usage guidelines.
