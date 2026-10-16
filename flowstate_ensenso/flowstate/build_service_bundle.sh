@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ ! -d "src/sdk-ros" ] || [ ! -d "src/flowstate-ros-camera-drivers" ]; then
+if [ ! -d "src/sdk-ros" ] || [ ! -d "src/intrinsic-ros-camera-drivers" ]; then
   echo "This script must be run at the top of a Colcon workspace. See README for details"
   exit
 fi
 
 set -o errexit
 
-src/sdk-ros/scripts/setup_docker.sh
+src/intrinsic-ros-camera-drivers/scripts/setup_docker.sh
 
 CAMERA_TYPE="ensenso"
 SERVICE_NAME="ensenso_driver"
@@ -42,17 +42,17 @@ else
 fi
 
 set -o verbose
-src/flowstate-ros-camera-drivers/docker_scripts/build_container.sh \
+src/intrinsic-ros-camera-drivers/docker_scripts/build_container.sh \
   --builder_name container-builder \
   --service_name "$SERVICE_NAME" \
   --service_package "$SERVICE_PACKAGE" \
-  --dockerfile "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/Dockerfile.flowstate_service" \
+  --dockerfile "src/intrinsic-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/Dockerfile.flowstate_service" \
   "${CONTEXT_ARGS[@]}"
 
 if [[ -z "$CI" && "$PRESUBMIT" != "true" ]]; then
-  src/sdk-ros/scripts/build_bundle.sh \
+  src/intrinsic-ros-camera-drivers/scripts/build_bundle.sh \
     --service_name "$SERVICE_NAME" \
     --service_package "$SERVICE_PACKAGE" \
-    --manifest_path "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto" \
-    --default_config "src/flowstate-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}_default_config.textproto"
+    --manifest_path "src/intrinsic-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}.manifest.textproto" \
+    --default_config "src/intrinsic-ros-camera-drivers/${SERVICE_PACKAGE}/flowstate/${SERVICE_NAME}_default_config.textproto"
 fi
