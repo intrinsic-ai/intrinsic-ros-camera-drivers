@@ -137,7 +137,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
     nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ADD src/flowstate-ros-camera-drivers /opt/ros/overlay/src/flowstate-ros-camera-drivers
+ADD src/intrinsic-ros-camera-drivers /opt/ros/overlay/src/intrinsic-ros-camera-drivers
 
 RUN cp -r /opt/ros/underlay/src/ros_driver /opt/ros/overlay/src/ros_driver \
     && . /opt/ros/jazzy/setup.sh \
