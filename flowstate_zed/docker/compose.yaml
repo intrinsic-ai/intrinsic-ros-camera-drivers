@@ -1,0 +1,48 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Run on the ZED Box, from the workspace root:
+#   docker compose -f src/intrinsic-ros-camera-drivers/flowstate_zed/docker/compose.yaml up -d
+#
+# FLOWSTATE_IPC_ADDRESS must be set for every compose command (build, up, down,
+# logs, ps). Set it in a .env file beside this file:
+#   FLOWSTATE_IPC_ADDRESS=<address of the Flowstate IPC>
+name: flowstate_zed
+services:
+  flowstate_zed:
+    image: flowstate_zed:jazzy
+    build:
+      context: ../../../..
+      dockerfile: src/intrinsic-ros-camera-drivers/flowstate_zed/docker/Dockerfile
+    runtime: nvidia
+    privileged: true
+    network_mode: host
+    restart: unless-stopped
+    # A stop during camera start waits for the SDK open to finish: up to
+    # 10.6 s measured, about 12.6 s computed. Docker's default is 10 s.
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      ZENOH_CONFIG_OVERRIDE: 'connect/endpoints=["tcp/${FLOWSTATE_IPC_ADDRESS:?set FLOWSTATE_IPC_ADDRESS}:17447"]'
+    volumes:
+      - /tmp:/tmp
+      - /dev:/dev
+      - /var/nvidia/nvcam/settings/:/var/nvidia/nvcam/settings/
+      - /etc/systemd/system/zed_x_daemon.service:/etc/systemd/system/zed_x_daemon.service
+      - /usr/local/zed/resources/:/usr/local/zed/resources/
+      - /usr/local/zed/settings/:/usr/local/zed/settings/

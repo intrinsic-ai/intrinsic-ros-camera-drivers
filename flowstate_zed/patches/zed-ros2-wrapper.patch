@@ -1,0 +1,243 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Patch for https://github.com/stereolabs/zed-ros2-wrapper at commit
+# f134486a814111b1c737a41211113dee41921776.
+#
+# Adds no class member, no method, and no C++ exception:
+#
+# Multi-camera in-process safety (both ZedCamera and ZedCameraOne):
+#   - initNode(): when startCamera() fails, log "Camera start failed. Component
+#     stopped.", run deInitNode(), and return instead of exit(EXIT_FAILURE).
+#   - initNode(): move initServices() below startCamera() so a failed component
+#     advertises no service against an uninitialized camera handle.
+#   - Grab thread: on a critical grab error, set the stop flag and leave the
+#     grab loop instead of exit(EXIT_FAILURE).
+#   - Pre-shutdown callback: capture weak_from_this() so destroyed components
+#     do not dangle on the global ROS context.
+#
+# ZedCameraOne dynamic video parameter fixes:
+#   - handleExposure(): map "video.denoising" (already registered and applied
+#     by applyExposureCompensationAndDenoising(), only omitted from dispatch).
+#   - applyWhiteBalance(), applyExposure(), applyAnalogGain(): when switching
+#     auto_* from true to false, mark the paired manual scalar dirty so a
+#     manual target equal to the stored parameter is still written to the SDK.
+#   - applyExposure(), applyAnalogGain(): skip resetting the auto range to
+#     [28, 30000] / [1000, 16000] when explicit range bounds are already dirty
+#     in the same update (including startup overrides on frame 0).
+#
+# Apply with `git apply` in a checkout at the commit above. Lines before the
+# first "diff --git" are ignored by `git apply`.
+#
+# Classification of every exit(EXIT_FAILURE) call at that commit. Line numbers
+# are those of the unpatched files in zed_components/src/.
+#
+# | File, lines | Function and thread | Condition | Patched |
+# |---|---|---|---|
+# | zed_camera/src/zed_camera_component_main.cpp 122, 127 | constructor | null ROS context | no, cannot occur in a running process |
+# | same, 153 | constructor | SDK version check | no, compile-time constant, SDK 5.5.0 passes |
+# | same, 216 | initNode, 50 ms one-shot timer | startCamera() returned false | yes |
+# | same, 1084, 1108, 1133, 1159 | getGeneralParams | `else if (!IS_JETSON)` branches | no, non-Jetson host |
+# | same, 1214 | getGeneralParams | virtual stereo without two serials | no |
+# | same, 3569, 3583, 3597 | startCamera | setting read, inside `if (_debugCamCtrl && !mSvoMode)` and `if (!sl_tools::isZEDX(...))` | no, USB models |
+# | same, 3612 to 3710 (8) and 3727 to 3831 (8) | startCamera | setting read, inside `if (_debugCamCtrl && !mSvoMode)` (line 3555) | no, debug flag only |
+# | same, 3959, 3996 | startCamera | Fusion init | no |
+# | same, 5209 | threadFunc_zedGrab | positional tracking cannot start | no, tracking is off |
+# | same, 5406 | threadFunc_zedGrab, grab thread | critical grab error | yes |
+# | same, 6381 | publishCameraTFs, grab thread (called from publishTFs at 5583) | unknown model | no, our three stereo models are in the switch |
+# | zed_camera/src/zed_camera_component_objdet.cpp 77, 84, 190 | object detection parameters | | no |
+# | zed_camera_one/src/zed_camera_one_component_main.cpp 90 | constructor | SDK version check | no, compile-time constant, SDK 5.5.0 passes |
+# | same, 482 | getStreamParams | stream input | no |
+# | same, 510, 531, 552, 576 | getCameraModelParams | `else if (!IS_JETSON)` branches | no, non-Jetson host |
+# | same, 956 | initNode, 50 ms one-shot timer | startCamera() returned false | yes |
+# | same, 2508 | performCameraGrab, grab thread | critical grab error | yes |
+#
+# Counts: 33, 3 and 8 calls before; 31, 3 and 6 after. The 16 debug-flag sites
+# are reachable only through `debug.debug_camera_controls`, default false,
+# which the driver never sets.
+
+diff --git a/zed_components/src/zed_camera/src/zed_camera_component_main.cpp b/zed_components/src/zed_camera/src/zed_camera_component_main.cpp
+index 43a69f5..441b0e1 100644
+--- a/zed_components/src/zed_camera/src/zed_camera_component_main.cpp
++++ b/zed_components/src/zed_camera/src/zed_camera_component_main.cpp
+@@ -208,15 +208,17 @@ void ZedCamera::initNode()
+   mDiagUpdater.setHardwareID(hw_id);
+   // <---- Diagnostic initialization
+ 
+-  // Services initialization
+-  initServices();
+-
+   // ----> Start camera
+   if (!startCamera()) {
+-    exit(EXIT_FAILURE);
++    RCLCPP_ERROR(get_logger(), "Camera start failed. Component stopped.");
++    deInitNode();
++    return;
+   }
+   // <---- Start camera
+ 
++  // Services initialization
++  initServices();
++
+   // Callback when the node is destroyed
+   // This is used to stop the camera when the node is destroyed
+   // and to stop the timers
+@@ -224,7 +226,12 @@ void ZedCamera::initNode()
+   // Close camera callback before shutdown
+   using rclcpp::contexts::get_global_default_context;
+   get_global_default_context()->add_pre_shutdown_callback(
+-    [this]() {
++    [this, weak_node = weak_from_this()]() {
++      // The context keeps this callback after the node is destroyed.
++      const auto node = weak_node.lock();
++      if (!node) {
++        return;
++      }
+       DEBUG_COMM("ZED Component is shutting down");
+       deInitNode();
+       DEBUG_COMM("ZED Component is shutting down - done");
+@@ -5402,8 +5409,8 @@ void ZedCamera::threadFunc_zedGrab()
+             get_logger(),
+             "Critical camera error: " << sl::toString(mGrabStatus).c_str()
+                                       << ". NODE KILLED.");
+-          mZed.reset();
+-          exit(EXIT_FAILURE);
++          mThreadStop = true;
++          break;
+         }
+       }
+       // <---- Grab errors?
+diff --git a/zed_components/src/zed_camera_one/src/zed_camera_one_component_main.cpp b/zed_components/src/zed_camera_one/src/zed_camera_one_component_main.cpp
+index 1d30348..a642773 100644
+--- a/zed_components/src/zed_camera_one/src/zed_camera_one_component_main.cpp
++++ b/zed_components/src/zed_camera_one/src/zed_camera_one_component_main.cpp
+@@ -947,16 +947,17 @@ void ZedCameraOne::initNode()
+   // Parameters initialization
+   initParameters();
+ 
+-  // Services initialization
+-  initServices();
+-
+   // ----> Start camera
+   if (!startCamera()) {
+-    _zed.reset();
+-    exit(EXIT_FAILURE);
++    RCLCPP_ERROR(get_logger(), "Camera start failed. Component stopped.");
++    deInitNode();
++    return;
+   }
+   // <---- Start camera
+ 
++  // Services initialization
++  initServices();
++
+   // Callback when the node is destroyed
+   // This is used to stop the camera when the node is destroyed
+   // and to stop the timers
+@@ -964,7 +965,12 @@ void ZedCameraOne::initNode()
+   // Close camera callback before shutdown
+   using rclcpp::contexts::get_global_default_context;
+   get_global_default_context()->add_pre_shutdown_callback(
+-    [this]() {
++    [this, weak_node = weak_from_this()]() {
++      // The context keeps this callback after the node is destroyed.
++      const auto node = weak_node.lock();
++      if (!node) {
++        return;
++      }
+       DEBUG_COMM("ZED X One Component is shutting down");
+       deInitNode();
+       DEBUG_COMM("ZED X One Component is shutting down - done");
+@@ -1948,6 +1954,9 @@ bool ZedCameraOne::handleExposure(
+   } else if (param_name == "video.exposure_compensation") {
+     if (updateIntParam(param_name, param.as_int(), _camExposureComp)) {count_ok++;}
+     return true;
++  } else if (param_name == "video.denoising") {
++    if (updateIntParam(param_name, param.as_int(), _camDenoising)) {count_ok++;}
++    return true;
+ #if (ZED_SDK_MAJOR_VERSION * 10 + ZED_SDK_MINOR_VERSION) >= 53
+   } else if (param_name == "video.ae_antibanding") {
+     if (updateIntParam(param_name, param.as_int(), _camAEAntibanding)) {count_ok++;}
+@@ -2504,8 +2513,8 @@ bool ZedCameraOne::performCameraGrab()
+         get_logger(), "Critical camera error: "
+           << sl::toString(_grabStatus).c_str() << ". " << sl::toVerbose(_grabStatus).c_str()
+           << ". NODE KILLED.");
+-      _zed.reset();
+-      exit(EXIT_FAILURE);
++      _threadStop = true;
++      return false;
+     }
+   }
+   _frameCount++;
+diff --git a/zed_components/src/zed_camera_one/src/zed_camera_one_component_video.cpp b/zed_components/src/zed_camera_one/src/zed_camera_one_component_video.cpp
+index c2a6c9e..b84c2f1 100644
+--- a/zed_components/src/zed_camera_one/src/zed_camera_one_component_video.cpp
++++ b/zed_components/src/zed_camera_one/src/zed_camera_one_component_video.cpp
+@@ -954,8 +954,12 @@ void ZedCameraOne::applyWhiteBalance()
+       }
+     };
+ 
++  const bool auto_changed = _camDynParMapChanged["video.auto_whitebalance"];
+   setVideoSetting(sl::VIDEO_SETTINGS::WHITEBALANCE_AUTO, _camAutoWB, "video.auto_whitebalance");
+   if (!_camAutoWB) {
++    if (auto_changed) {
++      _camDynParMapChanged["video.whitebalance_temperature"] = true;
++    }
+     setVideoSetting(
+       sl::VIDEO_SETTINGS::WHITEBALANCE_TEMPERATURE, _camWBTemp * 100,
+       "video.whitebalance_temperature");
+@@ -1009,7 +1013,10 @@ void ZedCameraOne::applyExposure()
+     };
+ 
+   if (_camAutoExposure) {
+-    if (_camDynParMapChanged["video.auto_exposure"]) {
++    if (_camDynParMapChanged["video.auto_exposure"] &&
++      !_camDynParMapChanged["video.auto_exposure_time_range_min"] &&
++      !_camDynParMapChanged["video.auto_exposure_time_range_max"])
++    {
+       set_parameters(
+         {
+           rclcpp::Parameter("video.auto_exposure_time_range_min", 28),
+@@ -1021,6 +1028,9 @@ void ZedCameraOne::applyExposure()
+       "Set video.auto_exposure to "
+         << (_camAutoExposure ? "TRUE" : "FALSE"));
+   } else {
++    if (_camDynParMapChanged["video.auto_exposure"]) {
++      _camDynParMapChanged["video.exposure_time"] = true;
++    }
+     setVideoSetting(
+       sl::VIDEO_SETTINGS::EXPOSURE_TIME, _camExpTime,
+       "video.exposure_time");
+@@ -1104,7 +1114,10 @@ void ZedCameraOne::applyAnalogGain()
+     };
+ 
+   if (_camAutoAnalogGain) {
+-    if (_camDynParMapChanged["video.auto_analog_gain"]) {
++    if (_camDynParMapChanged["video.auto_analog_gain"] &&
++      !_camDynParMapChanged["video.auto_analog_gain_range_min"] &&
++      !_camDynParMapChanged["video.auto_analog_gain_range_max"])
++    {
+       set_parameters(
+         {
+           rclcpp::Parameter("video.auto_analog_gain_range_min", 1000),
+@@ -1116,6 +1129,9 @@ void ZedCameraOne::applyAnalogGain()
+       "Set video.auto_analog_gain to "
+         << (_camAutoAnalogGain ? "TRUE" : "FALSE"));
+   } else {
++    if (_camDynParMapChanged["video.auto_analog_gain"]) {
++      _camDynParMapChanged["video.analog_gain"] = true;
++    }
+     setVideoSetting(
+       sl::VIDEO_SETTINGS::ANALOG_GAIN, _camAnalogGain, "video.analog_gain");
+     set_parameters(
