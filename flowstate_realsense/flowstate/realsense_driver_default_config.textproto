@@ -1,0 +1,8 @@
+# proto-file: google/protobuf/any.proto
+# proto-message: Any
+[type.googleapis.com/realsense_driver.RealSenseDriverConfig] {
+  # If no serials are provided, the service serves every RealSense camera it
+  # finds on the host.
+
+  # serials: "123456789012"
+}
