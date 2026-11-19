@@ -1,0 +1,55 @@
+# proto-file: https://github.com/intrinsic-ai/sdk/blob/main/intrinsic/assets/services/proto/service_manifest.proto
+# proto-message: intrinsic_proto.services.ServiceManifest
+
+metadata {
+  id {
+    package: "ai.intrinsic"
+    name: "realsense_driver"
+  }
+  vendor {
+    display_name: "Intrinsic"
+  }
+  documentation {
+    description: "Low-level ROS driver for Intel RealSense cameras."
+  }
+  display_name: "RealSense Driver"
+}
+service_def {
+  real_spec {
+    image {
+      archive_filename: "realsense_driver.tar"
+      # The apt librealsense uses the V4L2 backend: it opens the cameras
+      # through the host's /dev/video* and /dev/media* nodes, numbered as they
+      # enumerate, which only a privileged container sees. The usb mount names
+      # the bus they hang on.
+      settings {
+        volume_mounts {
+          name: "usb"
+          mount_path: "/dev/bus/usb"
+        }
+        security_context {
+          privileged: true
+        }
+      }
+    }
+    settings {
+      host_network: true
+      volumes {
+        name: "usb"
+        host_path {
+          path: "/dev/bus/usb"
+        }
+      }
+    }
+  }
+  sim_spec {
+    image {
+      archive_filename: "realsense_driver.tar"
+    }
+  }
+}
+assets {
+  default_configuration_filename: "default_config.binarypb",
+  parameter_descriptor_filename: "parameter-descriptor-set.proto.bin",
+  image_filenames: ["realsense_driver.tar"]
+}
